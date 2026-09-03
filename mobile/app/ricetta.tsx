@@ -1,0 +1,257 @@
+/**
+ * Dettaglio della ricetta.
+ *
+ * `fetchRecipe` prova il backend e ricade sul motore deterministico locale se
+ * non risponde. La schermata mostra sempre qualcosa, e dichiara in fondo da
+ * dove viene la ricetta.
+ *
+ * Quest'ultimo punto non e' un dettaglio: il prototipo attribuiva a siti reali
+ * anche le ricette inventate dal modello, e un investitore che tocca il link
+ * se ne accorge. Qui la fonte e' dichiarata per quello che e'.
+ */
+
+import { useEffect, useState } from "react";
+import { Image, StyleSheet, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  Body,
+  Button,
+  Card,
+  Label,
+  Loading,
+  Pill,
+  Screen,
+  Subtitle,
+  Title,
+  TopBar,
+} from "../src/components/ui";
+import { fetchRecipe, type ContentSource } from "../src/lib/content";
+import type { Recipe } from "../src/lib/recipes/types";
+import { useSession } from "../src/lib/state/session";
+import { colors, font, radius, spacing } from "../src/theme";
+
+const DIFFICULTY: Record<string, string> = {
+  easy: "facile",
+  medium: "media",
+  hard: "impegnativa",
+};
+
+const MEAL_LABEL: Record<string, string> = {
+  breakfast: "Colazione",
+  lunch: "Pranzo",
+  dinner: "Cena",
+};
+
+export default function RicettaScreen() {
+  const router = useRouter();
+  const { profile } = useSession();
+  const params = useLocalSearchParams<{ piatto?: string; pasto?: string; giorno?: string }>();
+
+  const dish = params.piatto ?? "";
+  const mealType = (params.pasto as "breakfast" | "lunch" | "dinner") ?? "dinner";
+  const servings = Math.max(1, parseInt((profile.household || "4").replace("+", ""), 10) || 4);
+
+  const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [source, setSource] = useState<ContentSource>("locale");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!dish) {
+      setLoading(false);
+      return;
+    }
+    let alive = true;
+    setLoading(true);
+    (async () => {
+      // `fetchRecipe` prova il backend e ricade sul motore locale: qui non
+      // serve gestire l'errore, perche' una ricetta arriva sempre.
+      const result = await fetchRecipe(dish, {
+        servings,
+        mealType,
+        language: "it",
+        country: profile.country || "Italy",
+        allergies: profile.allergies,
+      });
+      if (!alive) return;
+      setRecipe(result.recipe);
+      setSource(result.source);
+      setLoading(false);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [dish, servings, mealType, profile.country]);
+
+  if (loading) {
+    return (
+      <Screen>
+        <TopBar onBack={() => router.back()} />
+        <Loading text="Preparo la ricetta…" />
+      </Screen>
+    );
+  }
+
+  if (!recipe) {
+    return (
+      <Screen>
+        <View style={styles.empty}>
+          <Title>Ricetta non trovata</Title>
+          <Subtitle>Torna al menù e scegli un piatto.</Subtitle>
+          <Button label="Torna al menù" onPress={() => router.back()} />
+        </View>
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen footer={<Button label="Torna al menù" onPress={() => router.back()} />}>
+      <Image
+        source={{ uri: recipe.image }}
+        style={styles.photo}
+        accessibilityLabel={`Foto di ${recipe.title}`}
+        resizeMode="cover"
+      />
+
+      <View style={styles.head}>
+        {params.giorno ? (
+          <Body style={styles.eyebrow}>
+            {params.giorno} · {MEAL_LABEL[mealType] ?? ""}
+          </Body>
+        ) : null}
+        <Title>{recipe.title}</Title>
+        {recipe.description ? <Subtitle>{recipe.description}</Subtitle> : null}
+      </View>
+
+      <View style={styles.facts}>
+        <Fact value={`${recipe.prepMinutes}′`} label="preparazione" />
+        <Fact value={`${recipe.cookMinutes}′`} label="cottura" />
+        <Fact value={`${recipe.servings}`} label="porzioni" />
+        <Fact value={DIFFICULTY[recipe.difficulty] ?? recipe.difficulty} label="difficoltà" />
+      </View>
+
+      <Card>
+        <Label>Ingredienti</Label>
+        {recipe.ingredients.map((ing, i) => (
+          <View key={`${ing.name}-${i}`} style={styles.ingredient}>
+            <Body style={styles.ingName}>{ing.name}</Body>
+            <Body style={styles.ingQty}>{ing.quantity}</Body>
+          </View>
+        ))}
+      </Card>
+
+      <Card>
+        <Label>Come si prepara</Label>
+        {recipe.steps.map((step, i) => (
+          <View key={i} style={styles.step}>
+            <View style={styles.stepNum}>
+              <Body style={styles.stepNumText}>{i + 1}</Body>
+            </View>
+            <Body style={styles.stepText}>{step}</Body>
+          </View>
+        ))}
+      </Card>
+
+      {recipe.nutrition ? (
+        <Card>
+          <Label>Valori per porzione</Label>
+          <View style={styles.facts}>
+            <Fact value={`${Math.round(recipe.nutrition.calories)}`} label="kcal" />
+            <Fact value={`${Math.round(recipe.nutrition.protein)} g`} label="proteine" />
+            <Fact value={`${Math.round(recipe.nutrition.carbs)} g`} label="carboidrati" />
+            <Fact value={`${Math.round(recipe.nutrition.fat)} g`} label="grassi" />
+          </View>
+        </Card>
+      ) : null}
+
+      {recipe.allergens?.length ? (
+        <Card>
+          <Label>Allergeni</Label>
+          <View style={styles.pills}>
+            {recipe.allergens.map((a) => (
+              <Pill key={a} tone="warning">
+                {a}
+              </Pill>
+            ))}
+          </View>
+        </Card>
+      ) : null}
+
+      {/* Onestà sulla fonte: questa ricetta è costruita dall'app, non presa
+          da un sito. Dirlo evita che un link porti altrove. */}
+      <Card style={styles.note}>
+        <Label icon="information-circle-outline">Da dove viene questa ricetta</Label>
+        <Body style={styles.small}>
+          {source === "ai"
+            ? "Generata su misura per le tue preferenze, con ingredienti e dosi adattati al numero di persone."
+            : "Versione classica del piatto, costruita dall'app senza collegarsi a internet. Con il servizio attivo le ricette sono su misura."}
+        </Body>
+      </Card>
+    </Screen>
+  );
+}
+
+function Fact({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.fact}>
+      <Body style={styles.factValue}>{value}</Body>
+      <Body style={styles.factLabel}>{label}</Body>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  photo: {
+    width: "100%",
+    height: 200,
+    borderRadius: radius.lg,
+    backgroundColor: colors.muted,
+  },
+  head: { gap: spacing.xs },
+  eyebrow: {
+    fontSize: font.size.xs,
+    fontWeight: font.weight.semibold,
+    color: colors.primary,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  empty: { gap: spacing.lg, paddingTop: spacing.xxxl, alignItems: "flex-start" },
+
+  facts: { flexDirection: "row", gap: spacing.sm },
+  fact: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.muted,
+    gap: 2,
+  },
+  factValue: { fontSize: font.size.lg, fontWeight: font.weight.bold, color: colors.foreground },
+  factLabel: { fontSize: font.size.xs, color: colors.mutedForeground },
+
+  ingredient: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  ingName: { flex: 1, fontSize: font.size.md, color: colors.foreground },
+  ingQty: { fontSize: font.size.md, color: colors.mutedForeground },
+
+  step: { flexDirection: "row", gap: spacing.md, paddingVertical: spacing.sm },
+  stepNum: {
+    width: 26,
+    height: 26,
+    borderRadius: radius.pill,
+    backgroundColor: colors.successBg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepNumText: { color: colors.primary, fontWeight: font.weight.bold, fontSize: font.size.sm },
+  stepText: { flex: 1, fontSize: font.size.md, color: colors.foreground, lineHeight: 23 },
+
+  pills: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  note: { backgroundColor: colors.muted },
+  small: { fontSize: font.size.sm, color: colors.mutedForeground, lineHeight: 20 },
+});

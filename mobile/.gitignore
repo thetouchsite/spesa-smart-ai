@@ -10,3 +10,4 @@ web-build/
 .env
 .env.local
 expo-env.d.ts
+scripts/*.mjs

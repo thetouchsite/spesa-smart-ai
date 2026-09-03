@@ -11,8 +11,23 @@
  * resta identico al web, e quando una correzione arriva da una parte vale
  * anche per l'altra.
  *
- * `installPolyfills()` va chiamata UNA volta all'avvio, dopo `hydrate()` e
- * prima di montare qualunque componente.
+ * ORDINE, CHE QUI E' TUTTO
+ * ------------------------
+ * L'installazione avviene come EFFETTO DI IMPORT, non dentro un effetto
+ * React. Motivo: `state/session.ts` configura zustand con
+ * `createJSONStorage(() => window.localStorage)`, e quel getter viene
+ * valutato quando il modulo si carica — molto prima che un componente venga
+ * montato. Installando in un `useEffect` lo storage risultava `undefined` e
+ * ogni scrittura sul profilo moriva con "Cannot read property 'setItem' of
+ * undefined".
+ *
+ * Questo file va quindi importato PRIMA di qualunque altro modulo che
+ * tocchi lo stato: in `app/_layout.tsx` è la prima riga di import.
+ *
+ * `hydrate()` resta asincrona: al caricamento lo specchio è vuoto e zustand
+ * legge un archivio vuoto. Per questo, a idratazione finita, il layout
+ * richiama `useSession.persist.rehydrate()` — senza, il profilo salvato non
+ * tornerebbe mai indietro.
  */
 
 import * as Location from "expo-location";
@@ -145,3 +160,7 @@ export function installPolyfills(): void {
 
   installed = true;
 }
+
+// Eseguita al caricamento del modulo, non su chiamata: vedi la nota
+// sull'ordine in testa al file.
+installPolyfills();

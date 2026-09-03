@@ -7,6 +7,8 @@
 
 import type { Plan } from "@/lib/models/plan-schema";
 import type { Recipe } from "./types";
+import { resolveIngredientKey } from "@/lib/price-data/resolve-ingredient";
+import { CATALOG_BY_KEY } from "@/lib/price-data/sources/manual/catalog";
 
 interface ParsedQty {
   amount: number;
@@ -87,6 +89,14 @@ function normaliseName(name: string): string {
 }
 
 function categorise(name: string): string {
+  // Le regole a parole chiave sotto sono in inglese: su una lista italiana
+  // finivano quasi tutte nella categoria di riserva, pasta compresa.
+  const key = resolveIngredientKey(name);
+  if (key) {
+    const item = CATALOG_BY_KEY[key];
+    if (item) return item.category;
+  }
+
   const n = name.toLowerCase();
   if (/(chicken|beef|pork|lamb|turkey|fish|salmon|tuna|cod|prawn|shrimp|egg|tofu|lentil|bean|chickpea|tempeh|guanciale|bacon|sausage)/.test(n)) return "Proteins";
   if (/(tomato|onion|garlic|carrot|celery|pepper|zucchini|cucumber|spinach|cabbage|salad|greens|lettuce|broccoli|cauliflower|mushroom|asparagus|potato|avocado|berry|berries|banana|fruit|herb|basil|parsley|mint|spring onion|leek|bok choy|ginger|chilli|chili)/.test(n)) return "Vegetables";

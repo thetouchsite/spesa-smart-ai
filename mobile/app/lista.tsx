@@ -2,20 +2,57 @@
  * Lista della spesa.
  *
  * Raggruppata per reparto, con le voci spuntabili mentre si fa la spesa —
- * è l'uso reale dell'app, in piedi davanti allo scaffale, e va funzionare
+ * è l'uso reale dell'app, in piedi davanti allo scaffale, e deve funzionare
  * con una mano sola.
+ *
+ * DA DOVE ARRIVANO I PREZZI
+ * -------------------------
+ * Da `pricePlan()`, non da `plan.groceryList`: il motore pasti produce le
+ * voci con `estimatedCost` a zero, ed è il motore prezzi ad assegnare gli
+ * importi. Leggere la lista grezza faceva mostrare "—" su ogni riga anche
+ * quando la copertura era del 100%.
+ *
+ * `pricePlan` oggi legge la tabella di riferimento inclusa nell'app: nessuna
+ * rete, risposta immediata. Quando il backend sarà in linea la stessa
+ * funzione userà le fonti reali, e questa schermata non cambia.
  *
  * Le spunte vivono solo in questa sessione: legarle al piano salvato ha senso
  * quando ci sarà l'account, così una lista iniziata sul telefono si ritrova
  * anche altrove.
  */
 
-import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Pressable, Share, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Body, Button, Card, Label, Screen, Subtitle, Title } from "../src/components/ui";
+import * as WebBrowser from "expo-web-browser";
+import {
+  Body,
+  Button,
+  Card,
+  Ionicons,
+  Label,
+  ListRow,
+  Loading,
+  Screen,
+  Subtitle,
+  Title,
+  TopBar,
+} from "../src/components/ui";
 import { useSession } from "../src/lib/state/session";
+import { pricePlan } from "../src/lib/price-data/price-engine";
+import type { PricingResult } from "../src/lib/price-data";
+import { buildShoppingLink } from "../src/lib/shopping-links";
+import { defaultRetailerFor } from "../src/lib/shopping-links/retailers";
+import { buildWhatsAppMessage } from "../src/lib/export/whatsapp-share";
+import { PriceCheckSheet } from "../src/components/price-check";
 import { colors, font, radius, spacing } from "../src/theme";
+
+interface Row {
+  name: string;
+  quantity: string;
+  category: string;
+  cost: number;
+}
 
 function money(value: number, currency: string): string {
   try {
@@ -28,22 +65,67 @@ function money(value: number, currency: string): string {
 export default function ListaScreen() {
   const router = useRouter();
   const { currentPlan, profile } = useSession();
+  const [pricing, setPricing] = useState<PricingResult | null>(null);
+  const [loading, setLoading] = useState(true);
   const [done, setDone] = useState<Record<string, boolean>>({});
+  // Prodotto per cui si sta verificando il prezzo reale: null = riquadro chiuso.
+  const [checking, setChecking] = useState<string | null>(null);
 
   const cur = profile.currency || "EUR";
+  const city = profile.city || "Bologna";
+  const country = profile.country || "IT";
 
-  /** Voci raggruppate per reparto, nell'ordine in cui il motore le produce. */
-  const groups = useMemo(() => {
+  useEffect(() => {
+    if (!currentPlan) return;
+    let alive = true;
+    (async () => {
+      try {
+        const result = await pricePlan(currentPlan, city, country);
+        if (alive) setPricing(result);
+      } catch (err) {
+        // Senza prezzi la lista resta utile: nomi e quantità ci sono.
+        console.warn("[lista] prezzi non disponibili:", err);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [currentPlan, city, country]);
+
+  /**
+   * Righe con il prezzo risolto. Il motore prezzi restituisce le stesse voci
+   * arricchite; se non ha risposto si ricade sulla lista grezza, che ha nomi
+   * e quantità ma importi a zero.
+   */
+  const rows: Row[] = useMemo(() => {
     if (!currentPlan) return [];
-    const map = new Map<string, typeof currentPlan.groceryList>();
-    for (const item of currentPlan.groceryList) {
-      const key = item.category || "Altro";
-      const list = map.get(key);
-      if (list) list.push(item);
-      else map.set(key, [item]);
+    if (pricing?.items?.length) {
+      return pricing.items.map((i) => ({
+        name: i.name,
+        quantity: i.packQuantity ?? i.quantity,
+        category: i.category || "Altro",
+        cost: i.estimatedCost ?? 0,
+      }));
+    }
+    return currentPlan.groceryList.map((g) => ({
+      name: g.name,
+      quantity: g.quantity,
+      category: g.category || "Altro",
+      cost: g.estimatedCost ?? 0,
+    }));
+  }, [currentPlan, pricing]);
+
+  const groups = useMemo(() => {
+    const map = new Map<string, Row[]>();
+    for (const row of rows) {
+      const list = map.get(row.category);
+      if (list) list.push(row);
+      else map.set(row.category, [row]);
     }
     return [...map.entries()];
-  }, [currentPlan]);
+  }, [rows]);
 
   if (!currentPlan) {
     return (
@@ -57,22 +139,67 @@ export default function ListaScreen() {
     );
   }
 
-  const total = currentPlan.groceryList.reduce((sum, i) => sum + (i.estimatedCost || 0), 0);
+  const total = rows.reduce((sum, r) => sum + r.cost, 0);
   const checked = Object.values(done).filter(Boolean).length;
+  const retailer = defaultRetailerFor(country);
+
+  /**
+   * Apre la ricerca del prodotto sul sito della catena, dentro l'app.
+   * `buildShoppingLink` conosce oltre quaranta catene su sette paesi: il
+   * link porta alla pagina di ricerca del negozio, non a un prezzo — quello
+   * arrivera' con il servizio dedicato.
+   */
+  async function buyOnline(itemName: string) {
+    try {
+      const link = buildShoppingLink({ itemName, city, country, retailer });
+      const url = link.productUrl ?? link.searchUrl;
+      if (url) await WebBrowser.openBrowserAsync(url);
+    } catch (err) {
+      console.warn("[lista] apertura link fallita:", err);
+    }
+  }
+
+  /** Condivide la lista con il messaggio gia' formattato del prototipo. */
+  async function shareList() {
+    try {
+      const message = buildWhatsAppMessage({
+        plan: currentPlan!,
+        profile,
+        estimatedSpend: total,
+        savings: Math.max(0, (Number(profile.budget) || 0) - total),
+        language: "it",
+      });
+      await Share.share({ message });
+    } catch (err) {
+      console.warn("[lista] condivisione fallita:", err);
+    }
+  }
 
   return (
-    <Screen footer={<Button label="Torna ai risultati" onPress={() => router.back()} />}>
+    <Screen
+      footer={
+        <View style={styles.actions}>
+          <Button label="Condividi la lista" icon="share-social-outline" onPress={() => void shareList()} />
+          <Button label="Torna ai risultati" variant="ghost" onPress={() => router.back()} />
+        </View>
+      }
+    >
+      <TopBar title="Lista della spesa" onBack={() => router.back()} />
+
       <View style={styles.head}>
         <Title>Lista della spesa</Title>
         <Subtitle>
-          {currentPlan.groceryList.length} prodotti · totale stimato {money(total, cur)}
+          {rows.length} prodotti
+          {total > 0 ? ` · totale stimato ${money(total, cur)}` : ""}
         </Subtitle>
         {checked > 0 ? (
           <Body style={styles.progress}>
-            {checked} di {currentPlan.groceryList.length} nel carrello
+            {checked} di {rows.length} nel carrello
           </Body>
         ) : null}
       </View>
+
+      {loading ? <Loading text="Calcolo i prezzi…" /> : null}
 
       {groups.map(([category, items]) => (
         <Card key={category}>
@@ -96,23 +223,54 @@ export default function ListaScreen() {
                   <Body style={[styles.name, isDone && styles.nameDone]}>{item.name}</Body>
                   <Body style={styles.qty}>{item.quantity}</Body>
                 </View>
-                {item.estimatedCost > 0 ? (
-                  <Body style={styles.price}>{money(item.estimatedCost, cur)}</Body>
-                ) : (
-                  <Body style={styles.noPrice}>—</Body>
-                )}
+                <View style={styles.rowRight}>
+                  {item.cost > 0 ? (
+                    <Body style={styles.price}>{money(item.cost, cur)}</Body>
+                  ) : (
+                    <Body style={styles.noPrice}>—</Body>
+                  )}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Verifica il prezzo reale di ${item.name}`}
+                    onPress={() => setChecking(item.name)}
+                    hitSlop={10}
+                    style={({ pressed }) => [styles.buyBtn, pressed && styles.rowPressed]}
+                  >
+                    <Ionicons name="pricetag-outline" size={16} color={colors.primary} />
+                  </Pressable>
+                </View>
               </Pressable>
             );
           })}
         </Card>
       ))}
 
+      <PriceCheckSheet
+        itemName={checking}
+        country={country}
+        onClose={() => setChecking(null)}
+      />
+
+      <Card>
+        <Label icon="storefront-outline">Compra online</Label>
+        {groups.slice(0, 1).map(([, items]) => (
+          <ListRow
+            key="apri-negozio"
+            icon="open-outline"
+            title={`Apri ${retailer.name}`}
+            subtitle="Cerca il primo prodotto della lista sul sito del negozio"
+            onPress={() => void buyOnline(items[0]?.name ?? rows[0]?.name ?? "")}
+          />
+        ))}
+      </Card>
+
       <Card style={styles.note}>
-        <Label>Sui prezzi</Label>
+        <Label icon="information-circle-outline">Sui prezzi e sui link</Label>
         <Body style={styles.small}>
-          Sono stime indicative basate sui prezzi medi del tuo paese, non rilevazioni dai
-          supermercati. La verifica del prezzo reale prodotto per prodotto arriverà con
-          l'attivazione del servizio dedicato.
+          I prezzi in elenco sono stime indicative basate sui valori medi del tuo paese.
+          L'icona accanto a ogni prodotto cerca il <Body style={styles.bold}>prezzo reale</Body>:
+          prodotto, importo e venditore veri, con il link per comprarlo. Puoi anche aprire
+          direttamente {retailer.name}.
         </Body>
       </Card>
     </Screen>
@@ -150,6 +308,17 @@ const styles = StyleSheet.create({
   price: { fontSize: font.size.sm, fontWeight: font.weight.semibold, color: colors.foreground },
   noPrice: { fontSize: font.size.sm, color: colors.mutedForeground },
 
+  actions: { gap: spacing.sm },
+  bold: { fontWeight: font.weight.semibold, color: colors.foreground },
+  rowRight: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  buyBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.successBg,
+  },
   note: { backgroundColor: colors.muted, borderRadius: radius.md },
   small: { fontSize: font.size.sm, color: colors.mutedForeground, lineHeight: 20 },
 });

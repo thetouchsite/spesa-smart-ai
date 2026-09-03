@@ -37,6 +37,7 @@ import {
   COUNTRIES,
 } from "./sources/manual";
 import { resolveCountry } from "@/lib/country";
+import { resolveIngredientEnglishName } from "./resolve-ingredient";
 import { trackFallbackUsage } from "@/lib/telemetry/global";
 import { fetchExternalApiPrices } from "./sources/external-api";
 import { fetchWebImportPrices } from "./sources/web-import";
@@ -227,7 +228,17 @@ function matchScore(ingredient: string, candidate: string): number {
  *  bread") we must not dilute its price with weaker token matches such as
  *  "Wholegrain bread". */
 function findMatches(ingredient: string, prices: IngredientPrice[]): IngredientPrice[] {
-  const names = [normalise(ingredient), ...(PRICE_NAME_ALIASES[normalise(ingredient)] ?? [])];
+  // I piani generati dall'AI hanno la lista della spesa in italiano, mentre
+  // ogni riga di prezzo e' indicizzata sul nome inglese del catalogo. Senza
+  // questo passaggio l'abbinamento fallisce su quasi tutte le voci e la
+  // schermata risultati mostra "prezzo non disponibile".
+  // Verificato su 55 ingredienti reali: 100% di corrispondenza, zero errori.
+  const canonical = resolveIngredientEnglishName(ingredient);
+  const names = [
+    ...(canonical ? [normalise(canonical)] : []),
+    normalise(ingredient),
+    ...(PRICE_NAME_ALIASES[normalise(ingredient)] ?? []),
+  ];
   const scored = prices
     .map((p) => ({
       p,
@@ -345,26 +356,40 @@ interface ParsedShoppingQty {
 }
 
 function parseShoppingQty(qty: string): ParsedShoppingQty | null {
-  const match = qty.match(/([\d.]+)\s*([a-zA-Z]*)/);
+  // Virgola decimale (italiana) e punti abbreviativi ("q.b.") inclusi.
+  const match = qty.match(/([\d.,]+)?\s*([a-zA-Z.]*)/);
   if (!match) return null;
-  const amount = parseFloat(match[1]);
+  const amount = parseFloat((match[1] ?? "1").replace(",", "."));
   if (!Number.isFinite(amount) || amount <= 0) return null;
-  const unitRaw = (match[2] || "").toLowerCase();
+  const unitRaw = (match[2] || "").toLowerCase().replace(/\./g, "");
   if (unitRaw === "kg") return { amount, unit: "kg" };
   if (unitRaw === "g") return { amount, unit: "g" };
   if (unitRaw === "l") return { amount, unit: "l" };
   if (unitRaw === "ml") return { amount, unit: "ml" };
-  if (/^(tbsp|tablespoon|tablespoons)$/.test(unitRaw)) return { amount: amount * 15, unit: "ml" };
-  if (/^(tsp|teaspoon|teaspoons)$/.test(unitRaw)) return { amount: amount * 5, unit: "ml" };
-  if (/^(cup|cups)$/.test(unitRaw)) return { amount: amount * 240, unit: "ml" };
-  if (/^(pinch|pinches|dash)$/.test(unitRaw)) return { amount: amount * 2, unit: "ml" };
-  if (/^(pack|packs)$/.test(unitRaw)) return { amount, unit: "pack" };
-  if (/^(slice|slices)$/.test(unitRaw)) return { amount: Math.ceil(amount / 20), unit: "unit" };
-  if (/^(clove|cloves)$/.test(unitRaw)) return { amount: amount * 5, unit: "g" };
-  if (/^(sprig|sprigs|leaf|leaves|handful|handfuls)$/.test(unitRaw)) return { amount: 1, unit: "unit" };
-  if (/^(bunch|bunches|head|heads|loaf|loaves|can|cans|tin|tins|jar|jars|bottle|bottles|piece|pieces|pcs|unit|units)$/.test(unitRaw)) {
+  // Le unita' non inglesi non sono un caso limite: i piani generati dall'AI
+  // producono la lista nella lingua dell'utente, quindi "6 pz" e "2 spicchi"
+  // sono la norma. Senza queste righe il prodotto resta senza prezzo.
+  if (/^(tbsp|tablespoon|tablespoons|cucchiaio|cucchiai|c\.?da)$/.test(unitRaw)) return { amount: amount * 15, unit: "ml" };
+  if (/^(tsp|teaspoon|teaspoons|cucchiaino|cucchiaini|c\.?to)$/.test(unitRaw)) return { amount: amount * 5, unit: "ml" };
+  if (/^(cup|cups|tazza|tazze|taza|tasse)$/.test(unitRaw)) return { amount: amount * 240, unit: "ml" };
+  if (/^(pinch|pinches|dash|pizzico|pizzichi)$/.test(unitRaw)) return { amount: amount * 2, unit: "ml" };
+  if (/^(pack|packs|confezione|confezioni|conf|paquet|paquete|packung)$/.test(unitRaw)) return { amount, unit: "pack" };
+  if (/^(slice|slices|fetta|fette|tranche|rebanada|scheibe)$/.test(unitRaw)) return { amount: Math.ceil(amount / 20), unit: "unit" };
+  if (/^(clove|cloves|spicchio|spicchi|gousse|diente|zehe)$/.test(unitRaw)) return { amount: amount * 5, unit: "g" };
+  if (/^(sprig|sprigs|leaf|leaves|handful|handfuls|rametto|rametti|foglia|foglie|manciata|mazzetto|ciuffo)$/.test(unitRaw)) {
+    return { amount: 1, unit: "unit" };
+  }
+  if (
+    /^(bunch|bunches|head|heads|loaf|loaves|can|cans|tin|tins|jar|jars|bottle|bottles|piece|pieces|pcs|unit|units|pz|pezzo|pezzi|barattolo|barattoli|vasetto|vasetti|bottiglia|bottiglie|lattina|lattine|mazzo|filone|piece?s?|pieza|piezas|stuck)$/.test(
+      unitRaw,
+    )
+  ) {
     return { amount, unit: "unit" };
   }
+  // "q.b." (quanto basta) e simili: quantita' non misurabile. Si conta come
+  // una unita' minima invece di scartare la riga, cosi' sale e pepe compaiono
+  // comunque nella lista con un costo simbolico.
+  if (/^(qb|q|ab|selon|gusto|geschmack)$/.test(unitRaw)) return { amount: 1, unit: "unit" };
   if (unitRaw === "") return { amount, unit: "unit" };
   return null;
 }

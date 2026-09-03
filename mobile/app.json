@@ -8,8 +8,9 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0F7A54"
+      "backgroundColor": "#00723B"
     },
     "ios": {
       "supportsTablet": false,
@@ -22,7 +23,8 @@
     "android": {
       "package": "com.spesasmart.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0F7A54"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#00723B"
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
@@ -42,6 +44,9 @@
     ],
     "extra": {
       "apiUrl": "http://localhost:3000"
-    }
+    },
+    "icon": "./assets/icon.png",
+    "description": "Organizza la spesa della settimana dentro il tuo budget: menù, ricette e lista della spesa.",
+    "primaryColor": "#00723B"
   }
 }

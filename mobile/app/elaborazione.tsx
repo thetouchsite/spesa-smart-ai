@@ -1,23 +1,15 @@
 /**
  * Costruzione del piano.
  *
- * FINCHÉ IL BACKEND NON È IN LINEA
- * --------------------------------
- * Si usa `generateMealPlan`, il motore deterministico già presente nel
- * prototipo: pesca i piatti dai panieri di `style-catalog.ts` in base a
- * budget, numero di persone e stile. Non serve rete, non serve una chiave,
- * e produce lo stesso risultato che il cliente vede oggi nella sua demo.
+ * `fetchPlan` prova il backend e, se non risponde entro pochi secondi, usa il
+ * motore deterministico del prototipo. Entrambe le vie restituiscono lo stesso
+ * tipo `Plan`, quindi questa schermata non sa quale sia stata usata e non deve
+ * saperlo.
  *
- * QUANDO IL BACKEND SARÀ DEPLOYATO
- * --------------------------------
- * `generateMealPlanWithAI` (già portato in `lib/ai/meal-ai.ts`) chiama gli
- * endpoint reali e arricchisce ogni pasto con ricette vere. Il passaggio è
- * la sola riga marcata più sotto: la schermata non cambia, perché entrambe
- * le vie restituiscono lo stesso tipo `Plan`.
- *
- * In ogni caso l'utente non resta mai a mani vuote — se la generazione
- * fallisce si mostra l'errore con la possibilità di riprovare, non una
- * schermata bianca.
+ * Con il backend acceso i piatti sono italiani veri ("pasta e ceci",
+ * "parmigiana"); senza, arrivano dai panieri di `style-catalog.ts`. In
+ * entrambi i casi l'utente ottiene un piano completo: il ripiego non e' un
+ * errore, e infatti non produce nessun avviso.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -25,7 +17,7 @@ import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Body, Button, Loading, Screen, Subtitle, Title } from "../src/components/ui";
 import { useSession } from "../src/lib/state/session";
-import { generateMealPlan } from "../src/lib/meal-engine";
+import { fetchPlan, type ContentSource } from "../src/lib/content";
 import { colors, font, spacing } from "../src/theme";
 
 /** Messaggi mostrati a rotazione: la generazione è quasi istantanea, ma una
@@ -34,6 +26,7 @@ const BEATS = [
   "Scelgo i piatti della settimana…",
   "Metto insieme la lista della spesa…",
   "Controllo che stia nel budget…",
+  "Ci siamo quasi…",
 ];
 
 export default function ElaborazioneScreen() {
@@ -67,12 +60,11 @@ export default function ElaborazioneScreen() {
       const country = profile.country || "IT";
       updateProfile({ household, country });
 
-      // ── Unica riga da cambiare quando il backend sarà in linea: ──
-      //    const plan = await generateMealPlanWithAI({ ...profile, household, country }, variantSeed);
-      const { plan } = generateMealPlan({
-        profile: { ...profile, household, country },
-        seed: variantSeed,
-      });
+      // Prova il backend; se non risponde usa il motore locale. Vedi
+      // `lib/content.ts`: il ripiego e' il comportamento normale finche' il
+      // backend non e' pubblicato, non un errore.
+      const { plan, source } = await fetchPlan({ ...profile, household, country }, variantSeed);
+      if (__DEV__) console.info(`[elaborazione] piano generato da: ${source}`);
 
       setPlan(plan);
       setStatus("ready");

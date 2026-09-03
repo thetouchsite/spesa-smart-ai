@@ -35,6 +35,8 @@ import { isConfigured, model, MODEL_ID } from "./gemini.js";
 import { fetchPageContext, rankHits, searchProvider } from "./search.js";
 import { cache, isDbConfigured, plans, users } from "./db.js";
 import { hashPassword, issueToken, requireUser, verifyPassword } from "./auth.js";
+import { isShoppingConfigured, searchShopping } from "./shopping.js";
+import { quotaStatus, recordUse } from "./quota.js";
 import {
   AiRecipeInput,
   ChefInput,
@@ -69,6 +71,39 @@ function parse<T extends z.ZodTypeAny>(schema: T, body: unknown): z.infer<T> {
 
 const CACHE_TTL_DAYS = 30;
 
+/**
+ * Cache in memoria, usata quando MongoDB non e' configurato.
+ *
+ * Serve a proteggere la quota: senza, ogni singola richiesta — comprese le
+ * ripetizioni durante una dimostrazione — consuma una generazione. Con una
+ * chiave gratuita si esaurisce in pochi minuti di prove.
+ *
+ * Vive quanto il processo e non e' condivisa fra istanze: e' un ripiego per
+ * lo sviluppo, non un sostituto della cache su database.
+ */
+const memoryCache = new Map<string, { value: unknown; expires: number }>();
+const MEMORY_CACHE_MAX = 500;
+
+function memoryGet(key: string): unknown | undefined {
+  const hit = memoryCache.get(key);
+  if (!hit) return undefined;
+  if (hit.expires < Date.now()) {
+    memoryCache.delete(key);
+    return undefined;
+  }
+  return hit.value;
+}
+
+function memorySet(key: string, value: unknown): void {
+  // Sfratto la voce piu' vecchia: senza limite un processo lungo cresce
+  // senza fine.
+  if (memoryCache.size >= MEMORY_CACHE_MAX) {
+    const oldest = memoryCache.keys().next().value;
+    if (oldest) memoryCache.delete(oldest);
+  }
+  memoryCache.set(key, { value, expires: Date.now() + CACHE_TTL_DAYS * 86_400_000 });
+}
+
 function cacheKey(endpoint: string, payload: unknown): string {
   const hash = createHash("sha256").update(JSON.stringify(payload)).digest("hex").slice(0, 32);
   return `${endpoint}:${hash}`;
@@ -90,11 +125,19 @@ async function generate<T extends z.ZodTypeAny>(
   if (!isConfigured()) throw new HttpError(503, "Servizio AI non configurato su questo ambiente");
 
   const key = cacheKey(endpoint, cacheOn);
+
+  const local = memoryGet(key);
+  if (local !== undefined) {
+    console.info(`[cache] HIT memoria ${key}`);
+    return local as z.infer<T>;
+  }
+
   if (isDbConfigured()) {
     try {
       const hit = await (await cache()).findOne({ _id: key });
       if (hit) {
-        console.info(`[cache] HIT ${key}`);
+        console.info(`[cache] HIT database ${key}`);
+        memorySet(key, hit.value);
         return hit.value as z.infer<T>;
       }
     } catch (err) {
@@ -103,6 +146,9 @@ async function generate<T extends z.ZodTypeAny>(
     }
   }
 
+  // Contata qui e non prima: le risposte servite dalla cache non consumano
+  // quota, ed e' proprio quello il valore della cache.
+  recordUse("gemini");
   const { experimental_output } = await generateText({
     model: model(),
     experimental_output: Output.object({ schema }),
@@ -112,6 +158,7 @@ async function generate<T extends z.ZodTypeAny>(
   // `generateText` non riesce a legare l'output allo schema quando lo schema
   // arriva come generico: il tipo torna `unknown` e va riaffermato qui.
   const output = experimental_output as z.infer<T>;
+  memorySet(key, output);
 
   if (isDbConfigured()) {
     try {
@@ -137,7 +184,11 @@ app.get("/health", async () => ({
   // non l'utente che riceve un errore.
   aiConfigured: isConfigured(),
   dbConfigured: isDbConfigured(),
+  shoppingConfigured: isShoppingConfigured(),
   searchProvider: searchProvider().id,
+  // Consumo delle chiavi gratuite: l'app lo legge e avvisa a schermo prima
+  // che la quota finisca a meta' di una dimostrazione.
+  quota: quotaStatus(),
 }));
 
 /* ───────────────────────────── Account ───────────────────────────── */
@@ -297,9 +348,75 @@ app.post("/ai/recipe-web", async (body) => {
   return generate("recipe-syn", WebRecipeSchema, webSynthesizePrompt(data), data);
 });
 
+/* ───────────────────── Prezzo reale del prodotto ───────────────────── */
+
+const ShoppingInput = z.object({
+  query: z.string().min(2).max(120),
+  country: z.string().max(2).default("IT"),
+  limit: z.number().min(1).max(10).default(6),
+});
+
+/**
+ * Prezzo e link reali di UN prodotto, su richiesta dell'utente.
+ *
+ * Si paga a ricerca, quindi passa dalla stessa cache degli endpoint AI: due
+ * utenti che cercano lo stesso prodotto nello stesso paese consumano una
+ * ricerca sola. Con la chiave gratuita (250/mese) questo e' cio' che rende
+ * l'endpoint utilizzabile in una dimostrazione.
+ */
+app.post("/product/shopping", async (body) => {
+  const data = parse(ShoppingInput, body);
+  if (!isShoppingConfigured()) {
+    // 503 e non 500: e' uno stato di configurazione previsto, e il client
+    // lo traduce in "prezzo non verificabile" invece che in un errore.
+    throw new HttpError(503, "Ricerca prodotti non configurata su questo ambiente");
+  }
+
+  const key = cacheKey("shopping", data);
+  const local = memoryGet(key);
+  if (local !== undefined) {
+    console.info(`[cache] HIT memoria ${key}`);
+    return local;
+  }
+  if (isDbConfigured()) {
+    try {
+      const hit = await (await cache()).findOne({ _id: key });
+      if (hit) {
+        memorySet(key, hit.value);
+        return hit.value;
+      }
+    } catch {
+      /* cache irraggiungibile: si prosegue */
+    }
+  }
+
+  recordUse("serpapi");
+  const result = await searchShopping(data.query, data.country, data.limit);
+
+  // Si mette in cache solo un esito positivo: un "nessun risultato" oggi puo'
+  // diventare un risultato domani, e non vale la pena congelarlo per 30 giorni.
+  if (result.ok) {
+    memorySet(key, result);
+    if (isDbConfigured()) {
+      try {
+        await (await cache()).insertOne({
+          _id: key,
+          value: result,
+          createdAt: new Date(),
+          expiresAt: new Date(Date.now() + 7 * 86_400_000),
+        });
+      } catch {
+        /* chiave gia' presente */
+      }
+    }
+  }
+  return result;
+});
+
 /* ─────────────────────────────── Avvio ─────────────────────────────── */
 
 const port = Number(process.env.PORT ?? 3000);
 if (!isConfigured()) console.warn("ATTENZIONE: GOOGLE_GENERATIVE_AI_API_KEY assente — /ai/* risponde 503.");
-if (!isDbConfigured()) console.warn("ATTENZIONE: MONGODB_URI assente — account, piani e cache non disponibili.");
+if (!isDbConfigured()) console.warn("ATTENZIONE: MONGODB_URI assente — account e piani non disponibili, cache solo in memoria.");
+if (!isShoppingConfigured()) console.warn("ATTENZIONE: SERPAPI_KEY assente — /product/shopping risponde 503.");
 app.listen(port);
