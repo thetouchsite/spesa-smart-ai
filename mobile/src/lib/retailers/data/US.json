@@ -1,0 +1,22 @@
+{
+  "country": "US",
+  "retailers": [
+    { "id":"walmart","name":"Walmart","kind":"grocery","domains":["walmart.com"] },
+    { "id":"kroger","name":"Kroger","kind":"grocery","domains":["kroger.com"] },
+    { "id":"target","name":"Target","kind":"grocery","domains":["target.com"] },
+    { "id":"wholefoods","name":"Whole Foods","kind":"grocery","domains":["wholefoodsmarket.com"] },
+    { "id":"safeway","name":"Safeway","kind":"grocery","domains":["safeway.com"] },
+    { "id":"costco","name":"Costco","kind":"wholesale","domains":["costco.com"] }
+  ],
+  "delivery": [
+    { "id":"instacart","provider":"instacart","eta":"1-2h" },
+    { "id":"doordash","provider":"doordash","eta":"30-60m" },
+    { "id":"ubereats-us","provider":"ubereats","eta":"30-45m" }
+  ],
+  "marketplaces": [
+    { "id":"amazon-us","domain":"amazon.com",
+      "fresh":{"cities":["new york","brooklyn","los angeles","san francisco","seattle","chicago","boston","washington","dallas","houston","atlanta","miami"],"eta":"Same day"},
+      "marketplaceEta":"Next day" }
+  ],
+  "remoteExcludes": []
+}

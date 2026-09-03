@@ -1,0 +1,19 @@
+{
+  "country": "BR",
+  "retailers": [
+    { "id":"pao-de-acucar","name":"Pão de Açúcar","kind":"grocery","domains":["paodeacucar.com"] },
+    { "id":"carrefour-br","name":"Carrefour","kind":"grocery","domains":["carrefour.com.br"] },
+    { "id":"assai","name":"Assaí","kind":"wholesale","domains":["assai.com.br"] },
+    { "id":"extra","name":"Extra","kind":"grocery","domains":["extra.com.br"] }
+  ],
+  "delivery": [
+    { "id":"rappi-br","provider":"rappi","eta":"20-40m",
+      "coverage":{"cities":["são paulo","sao paulo","rio de janeiro","belo horizonte","brasília","brasilia","curitiba","porto alegre","salvador","fortaleza","recife"]} },
+    { "id":"ifood","provider":"ifood","eta":"30-45m" }
+  ],
+  "marketplaces": [
+    { "id":"amazon-br","domain":"amazon.com.br","marketplaceEta":"2-4 days" },
+    { "id":"mercadolivre","domain":"mercadolivre.com.br","marketplaceEta":"2-5 days" }
+  ],
+  "remoteExcludes": []
+}

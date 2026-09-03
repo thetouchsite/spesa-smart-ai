@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Spesa Smart",
+    "slug": "spesa-smart",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "spesasmart",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0F7A54"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.spesasmart.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Serve per trovare i supermercati vicini a te e stimare i prezzi della tua zona.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.spesasmart.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0F7A54"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Serve per trovare i supermercati vicini a te e stimare i prezzi della tua zona."
+        }
+      ],
+      "expo-asset"
+    ],
+    "extra": {
+      "apiUrl": "http://localhost:3000"
+    }
+  }
+}

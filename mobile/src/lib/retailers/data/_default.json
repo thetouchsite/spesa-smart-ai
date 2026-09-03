@@ -1,0 +1,9 @@
+{
+  "country": "_default",
+  "retailers": [],
+  "delivery": [],
+  "marketplaces": [
+    { "id": "amazon-com", "domain": "amazon.com", "marketplaceEta": "Next day" }
+  ],
+  "remoteExcludes": []
+}

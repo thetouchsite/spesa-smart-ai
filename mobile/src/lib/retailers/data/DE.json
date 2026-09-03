@@ -1,0 +1,23 @@
+{
+  "country": "DE",
+  "retailers": [
+    { "id":"rewe","name":"REWE","kind":"grocery","domains":["rewe.de"] },
+    { "id":"edeka","name":"Edeka","kind":"grocery","domains":["edeka.de"] },
+    { "id":"aldi-de","name":"Aldi","kind":"grocery","domains":["aldi.de","aldi-sued.de","aldi-nord.de"] },
+    { "id":"lidl-de","name":"Lidl","kind":"grocery","domains":["lidl.de"] },
+    { "id":"kaufland","name":"Kaufland","kind":"grocery","domains":["kaufland.de"] }
+  ],
+  "delivery": [
+    { "id":"gorillas","provider":"gorillas","eta":"10-20m",
+      "coverage":{"cities":["berlin","hamburg","munich","münchen","cologne","köln","frankfurt","stuttgart","düsseldorf"]} },
+    { "id":"flink","provider":"flink","eta":"10-20m",
+      "coverage":{"cities":["berlin","hamburg","munich","münchen","cologne","köln","frankfurt","stuttgart","düsseldorf"]} },
+    { "id":"lieferando","provider":"lieferando","eta":"30-45m" }
+  ],
+  "marketplaces": [
+    { "id":"amazon-de","domain":"amazon.de",
+      "fresh":{"cities":["berlin","munich","münchen","hamburg","frankfurt","köln","cologne"],"eta":"Same day"},
+      "marketplaceEta":"Next day" }
+  ],
+  "remoteExcludes": []
+}

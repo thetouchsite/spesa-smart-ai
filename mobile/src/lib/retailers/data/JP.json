@@ -1,0 +1,21 @@
+{
+  "country": "JP",
+  "retailers": [
+    { "id":"aeon","name":"AEON","kind":"grocery","domains":["aeon.com","aeonnetshop.com"] },
+    { "id":"ito-yokado","name":"Ito-Yokado","kind":"grocery","domains":["iyingshop.com"] },
+    { "id":"seiyu","name":"Seiyu","kind":"grocery","domains":["seiyu.co.jp"] },
+    { "id":"life","name":"Life","kind":"grocery","domains":["lifecorp.jp"] }
+  ],
+  "delivery": [
+    { "id":"ubereats-jp","provider":"ubereats","eta":"30-45m",
+      "coverage":{"cities":["tokyo","osaka","kyoto","yokohama","nagoya","fukuoka","sapporo"]} },
+    { "id":"demae-can","provider":"demae-can","eta":"30-45m" }
+  ],
+  "marketplaces": [
+    { "id":"amazon-jp","domain":"amazon.co.jp",
+      "fresh":{"cities":["tokyo","kanagawa","chiba"],"eta":"Same day"},
+      "marketplaceEta":"Next day" },
+    { "id":"rakuten","domain":"rakuten.co.jp","marketplaceEta":"1-3 days" }
+  ],
+  "remoteExcludes": []
+}

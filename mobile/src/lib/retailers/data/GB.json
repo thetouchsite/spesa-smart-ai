@@ -1,0 +1,25 @@
+{
+  "country": "GB",
+  "retailers": [
+    { "id": "tesco",       "name": "Tesco",       "kind": "grocery", "domains": ["tesco.com"] },
+    { "id": "sainsburys",  "name": "Sainsbury's", "kind": "grocery", "domains": ["sainsburys.co.uk"] },
+    { "id": "asda",        "name": "Asda",        "kind": "grocery", "domains": ["asda.com"] },
+    { "id": "waitrose",    "name": "Waitrose",    "kind": "grocery", "domains": ["waitrose.com"] },
+    { "id": "morrisons",   "name": "Morrisons",   "kind": "grocery", "domains": ["morrisons.com"] },
+    { "id": "ocado",       "name": "Ocado",       "kind": "grocery", "domains": ["ocado.com"] },
+    { "id": "aldi",        "name": "Aldi",        "kind": "grocery", "domains": ["aldi.co.uk"] },
+    { "id": "lidl",        "name": "Lidl",        "kind": "grocery", "domains": ["lidl.co.uk"] }
+  ],
+  "delivery": [
+    { "id": "deliveroo-gb", "provider": "deliveroo", "eta": "30-45m" },
+    { "id": "ubereats-gb",  "provider": "ubereats",  "eta": "30-45m" },
+    { "id": "getir-gb",     "provider": "getir",     "eta": "10-20m",
+      "coverage": { "cities": ["london", "manchester", "birmingham", "liverpool", "leeds", "bristol"] } }
+  ],
+  "marketplaces": [
+    { "id": "amazon-uk", "domain": "amazon.co.uk",
+      "fresh": { "cities": ["london", "manchester", "birmingham", "liverpool", "leeds", "glasgow"], "eta": "Same day" },
+      "marketplaceEta": "Next day" }
+  ],
+  "remoteExcludes": []
+}

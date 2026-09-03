@@ -1,0 +1,21 @@
+{
+  "country": "ES",
+  "retailers": [
+    { "id":"mercadona","name":"Mercadona","kind":"grocery","domains":["mercadona.es"] },
+    { "id":"carrefour-es","name":"Carrefour","kind":"grocery","domains":["carrefour.es"] },
+    { "id":"dia","name":"DIA","kind":"grocery","domains":["dia.es"] },
+    { "id":"lidl-es","name":"Lidl","kind":"grocery","domains":["lidl.es"] },
+    { "id":"corte-ingles","name":"El Corte Inglés","kind":"grocery","domains":["elcorteingles.es"] }
+  ],
+  "delivery": [
+    { "id":"glovo-es","provider":"glovo","eta":"20-40m",
+      "coverage":{"cities":["madrid","barcelona","valencia","sevilla","zaragoza","málaga","malaga","bilbao"]} },
+    { "id":"deliveroo-es","provider":"deliveroo","eta":"30-45m" }
+  ],
+  "marketplaces": [
+    { "id":"amazon-es","domain":"amazon.es",
+      "fresh":{"cities":["madrid","barcelona","valencia","sevilla"],"eta":"Same day"},
+      "marketplaceEta":"Next day" }
+  ],
+  "remoteExcludes": []
+}

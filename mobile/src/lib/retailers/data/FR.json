@@ -1,0 +1,22 @@
+{
+  "country": "FR",
+  "retailers": [
+    { "id":"carrefour","name":"Carrefour","kind":"grocery","domains":["carrefour.fr"] },
+    { "id":"leclerc","name":"E.Leclerc","kind":"grocery","domains":["leclerc.com","leclercdrive.fr"] },
+    { "id":"auchan","name":"Auchan","kind":"grocery","domains":["auchan.fr"] },
+    { "id":"monoprix","name":"Monoprix","kind":"grocery","domains":["monoprix.fr"] },
+    { "id":"intermarche","name":"Intermarché","kind":"grocery","domains":["intermarche.com"] },
+    { "id":"lidl-fr","name":"Lidl","kind":"grocery","domains":["lidl.fr"] }
+  ],
+  "delivery": [
+    { "id":"deliveroo-fr","provider":"deliveroo","eta":"30-45m",
+      "coverage":{"cities":["paris","lyon","marseille","toulouse","nice","bordeaux","lille","nantes","strasbourg","montpellier"]} },
+    { "id":"ubereats-fr","provider":"ubereats","eta":"30-45m" }
+  ],
+  "marketplaces": [
+    { "id":"amazon-fr","domain":"amazon.fr",
+      "fresh":{"cities":["paris","lyon","marseille"],"eta":"Same day"},
+      "marketplaceEta":"Next day" }
+  ],
+  "remoteExcludes": []
+}
