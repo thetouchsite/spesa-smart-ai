@@ -2,7 +2,7 @@
  * Storage abstraction for saved plans.
  *
  * The UI calls `getPlanStore()` and never touches `localStorage` or any
- * Supabase client directly. To migrate to Cloud, swap the default impl in
+ * backend direttamente. Per passare al remoto si cambia l'implementazione in
  * `index.ts` — no UI changes.
  */
 

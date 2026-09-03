@@ -15,6 +15,7 @@
  * prima di montare qualunque componente.
  */
 
+import * as Location from "expo-location";
 import { kv } from "./kv";
 
 /** Implementazione di `Storage` appoggiata allo specchio sincrono di `kv`. */
@@ -56,6 +57,52 @@ function deviceLanguage(): string {
   }
 }
 
+/**
+ * `navigator.geolocation` appoggiato a expo-location.
+ *
+ * `detectLocation()` nel codice portato chiama `getCurrentPosition` con le
+ * callback del browser. Qui riproduciamo quella firma: la richiesta del
+ * permesso avviene dentro, come fa il browser, così il chiamante non cambia.
+ *
+ * Il permesso negato non è un errore da propagare: il flusso ha già la via
+ * alternativa della ricerca per città, quindi si risponde con l'errore
+ * previsto e l'interfaccia mostra il campo di testo.
+ */
+function makeGeolocation() {
+  return {
+    getCurrentPosition(
+      onSuccess: (pos: { coords: { latitude: number; longitude: number } }) => void,
+      onError?: (err: { code: number; message: string }) => void,
+      options?: { timeout?: number; enableHighAccuracy?: boolean },
+    ) {
+      (async () => {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== "granted") {
+            onError?.({ code: 1, message: "Permesso di posizione negato" });
+            return;
+          }
+          const pos = await Location.getCurrentPositionAsync({
+            accuracy: options?.enableHighAccuracy
+              ? Location.Accuracy.High
+              : Location.Accuracy.Balanced,
+          });
+          onSuccess({
+            coords: { latitude: pos.coords.latitude, longitude: pos.coords.longitude },
+          });
+        } catch (err) {
+          onError?.({ code: 2, message: String(err) });
+        }
+      })();
+    },
+    watchPosition() {
+      // Non usata dall'app: dichiarata perché il tipo `Geolocation` la prevede.
+      return 0;
+    },
+    clearWatch() {},
+  };
+}
+
 let installed = false;
 
 export function installPolyfills(): void {
@@ -71,9 +118,19 @@ export function installPolyfills(): void {
     });
   }
 
-  // React Native definisce `navigator`, ma senza i campi di lingua che il
-  // rilevamento automatico del prototipo si aspetta.
+  // React Native definisce `navigator`, ma senza i campi di lingua né la
+  // geolocalizzazione che il codice portato si aspetta.
   const nav = g.navigator as Record<string, unknown> | undefined;
+  if (nav && !nav.geolocation) {
+    try {
+      Object.defineProperty(nav, "geolocation", {
+        value: makeGeolocation(),
+        configurable: true,
+      });
+    } catch {
+      console.warn("[polyfills] navigator.geolocation non impostabile: resta la ricerca per città");
+    }
+  }
   if (nav && typeof nav.language !== "string") {
     const lang = deviceLanguage();
     try {

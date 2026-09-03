@@ -19,7 +19,20 @@ const TOKEN_KEY = "auth.token";
 function baseUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
   const fromConfig = (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl;
-  return (fromEnv || fromConfig || "http://localhost:3000").replace(/\/+$/, "");
+  const configured = (fromEnv || fromConfig || "http://localhost:3000").replace(/\/+$/, "");
+
+  // In sviluppo su un telefono fisico, "localhost" è il telefono stesso: il
+  // backend gira sul computer e non risponderebbe mai. Metro conosce già
+  // l'indirizzo di rete della macchina, quindi lo riusiamo. Evita di dover
+  // scrivere a mano l'IP in app.json a ogni cambio di rete.
+  if (__DEV__ && /^https?:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(configured)) {
+    const metroHost = Constants.expoConfig?.hostUri?.split(":")[0];
+    if (metroHost && metroHost !== "localhost" && metroHost !== "127.0.0.1") {
+      const port = configured.split(":")[2] ?? "3000";
+      return `http://${metroHost}:${port}`;
+    }
+  }
+  return configured;
 }
 
 /** Errore con lo status HTTP, così il chiamante distingue 401 da 503. */

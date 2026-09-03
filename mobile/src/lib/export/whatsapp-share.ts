@@ -41,7 +41,10 @@ export function buildWhatsAppMessage(input: ShareInput): string {
   const s = STRINGS[language] ?? STRINGS.en;
   const fmt = (n: number) => formatMoney(n, profile.currency, language);
   const top = plan.groceryList.slice(0, 12).map((g) => `• ${g.name} (${g.quantity})`).join("\n");
-  const url = appUrl || (typeof window !== "undefined" ? window.location.origin : "https://spesa-smart-ai-pilot.lovable.app");
+  // In React Native non esiste `window`, e il dominio Lovable non e' piu'
+  // nostro. L'indirizzo pubblico lo passa chi condivide: se manca si omette
+  // il richiamo finale, invece di mandare le persone su un sito altrui.
+  const url = appUrl?.trim() || "";
   const budget = Number(profile.budget) || 0;
   return [
     s.title,
@@ -53,7 +56,7 @@ export function buildWhatsAppMessage(input: ShareInput): string {
     `${s.list}:`,
     top,
     "",
-    `👉 ${s.cta}: ${url}`,
+    url ? `👉 ${s.cta}: ${url}` : null,
   ].join("\n");
 }
 

@@ -3,7 +3,7 @@
  *
  * Exposes a single `locationProvider` that the rest of the app talks to.
  * The active provider is determined at module load from
- * `VITE_LOVABLE_LOCATION_PROVIDER` (defaulting to OSM) and can be swapped
+ * `EXPO_PUBLIC_LOCATION_PROVIDER` (defaulting to OSM) and can be swapped
  * at runtime via `setLocationProvider("google" | "apple" | "osm")` — the
  * UI never imports a specific backend.
  *

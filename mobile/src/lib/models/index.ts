@@ -1,9 +1,8 @@
 /**
  * Database-ready domain models.
  *
- * These interfaces describe the shape we'll persist when Lovable Cloud
- * (Supabase) is enabled. Today they back the local store; tomorrow they map
- * 1:1 to the tables in `supabase/migrations/0001_init.sql`.
+ * Forma dei dati persistiti. Oggi alimentano l'archivio locale del telefono;
+ * sul backend corrispondono alle collezioni MongoDB di `server/src/db.ts`.
  *
  * Naming convention: snake_case columns for DB rows, camelCase for app
  * objects. The two are mapped by `src/lib/storage/*`.

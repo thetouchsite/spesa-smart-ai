@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { Link, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { Body, Button, Card, Label, Pill, Screen, Subtitle, Title } from "../src/components/ui";
 import { ping } from "../src/api/client";
 import { colors, font, radius, spacing } from "../src/theme";
@@ -66,9 +66,10 @@ export default function Home() {
         </Card>
       ) : null}
 
-      <Link href="/accesso" style={styles.link}>
-        Ho già un account
-      </Link>
+      {/* L'accesso arrivera' col backend in linea: i piani salvati vivono
+          ancora sul telefono, quindi un pulsante "accedi" oggi non avrebbe
+          nulla da sincronizzare. Meglio niente pulsante che uno che non fa
+          quello che promette. */}
     </Screen>
   );
 }
@@ -105,11 +106,4 @@ const styles = StyleSheet.create({
   disclaimer: { fontSize: font.size.sm, color: colors.mutedForeground },
   bold: { fontWeight: font.weight.semibold, color: colors.foreground },
   diag: { fontSize: font.size.xs, color: colors.mutedForeground },
-  link: {
-    textAlign: "center",
-    color: colors.primary,
-    fontSize: font.size.sm,
-    fontWeight: font.weight.semibold,
-    paddingVertical: spacing.md,
-  },
 });

@@ -7,9 +7,9 @@
  *   • Crowd-sourced submissions
  *
  * Wiring guide when this lands:
- *   1. Persist imported rows in a `ingredient_prices` table (Lovable Cloud)
+ *   1. Persistere le righe importate in una collezione `ingredient_prices`
  *      using the `IngredientPrice` schema verbatim.
- *   2. Replace this stub with a `createServerFn` that queries that table,
+ *   2. Sostituire questo stub con un endpoint del backend che la interroga,
  *      filtered by `city` / `country`.
  *   3. Tag every imported row with `source_type: "web_import"` and a
  *      `confidence_score` reflecting how recent / verified the data is.

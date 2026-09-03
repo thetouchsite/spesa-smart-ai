@@ -5,9 +5,9 @@
  * the backend can be swapped without UI changes. Activation:
  *
  *   1. Link the `google_maps` connector (`standard_connectors--connect`).
- *   2. Set `VITE_LOVABLE_LOCATION_PROVIDER=google` (or call
+ *   2. Impostare `EXPO_PUBLIC_LOCATION_PROVIDER=google` (oppure chiamare
  *      `setLocationProvider("google")`).
- *   3. Calls are routed through the Lovable Maps gateway so the API key
+ *   3. Le chiamate passano dal nostro backend, cosi' la chiave
  *      never ships to the browser.
  *
  * Until then every method throws `ProviderUnavailableError`, which the

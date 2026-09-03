@@ -33,3 +33,9 @@ dist-ssr
 
 # Deliverable generati (documenti per il cliente, non codice)
 *.pdf
+
+# Residui della piattaforma Lovable e cache TanStack
+.lovable/
+.tanstack/
+bun.lock
+bunfig.toml

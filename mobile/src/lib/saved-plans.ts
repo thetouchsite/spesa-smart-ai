@@ -1,8 +1,8 @@
 /**
  * Saved Plans — localStorage persistence (MVP).
  *
- * Future: swap the storage backend for Lovable Cloud without changing the
- * public surface. The shape of `SavedPlan` is the contract.
+ * La sincronizzazione remota passa da `api/client` verso il nostro backend.
+ * La forma di `SavedPlan` resta il contratto fra le due parti.
  */
 
 import type { Plan } from "./models/plan-schema";

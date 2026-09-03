@@ -1,7 +1,7 @@
 /**
  * Real AI provider (STUB).
  *
- * Wires to the existing `generatePlan` server function (Lovable AI Gateway,
+ * Si collega all'endpoint `/ai/plan` del nostro backend (Gemini diretto,
  * `google/gemini-3-flash-preview`). Disabled by default so the app stays
  * fully offline-capable. Toggle via `USE_AI_GATEWAY=true` once budgets,
  * prompts, and structured-output schema have been verified end-to-end.

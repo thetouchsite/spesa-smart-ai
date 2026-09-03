@@ -4,7 +4,7 @@
  * Records the signals we need to understand which countries are being used,
  * where resolvers/registries fall back, and where coverage is thin. The
  * transport is a no-op console sink for now — replace `emit()` with a real
- * event pipeline (analytics or Supabase) later without touching call sites.
+ * raccolta eventi in un secondo momento, senza toccare i punti di chiamata.
  *
  * All functions are safe to call from any runtime (SSR, edge, browser).
  * They never throw.

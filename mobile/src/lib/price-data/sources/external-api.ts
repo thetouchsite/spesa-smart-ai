@@ -8,7 +8,7 @@
  *   • Instacart, Amazon Fresh, regional aggregators
  *
  * Wiring guide when a provider is selected:
- *   1. Move this file's logic into a `createServerFn` so API keys read from
+ *   1. Spostare questa logica in un endpoint del backend, dove le chiavi
  *      `process.env.<PROVIDER>_API_KEY` stay server-side.
  *   2. Map the provider response to the shared `IngredientPrice` shape so
  *      no caller (Results page, API layer, scoring) needs to change.

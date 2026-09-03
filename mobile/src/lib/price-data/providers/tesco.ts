@@ -3,7 +3,7 @@
  *
  * To connect:
  *   1. Obtain a Tesco Grocery API key. Store as TESCO_API_KEY secret.
- *   2. Move this file behind a `createServerFn` so the key stays server-side.
+ *   2. Spostare questo file dietro un endpoint del backend: la chiave resta li'.
  *   3. Map Tesco product nodes → IngredientPrice (category, unit, quantity, price).
  *   4. Return [] on auth / rate-limit failure — the orchestrator falls back.
  */

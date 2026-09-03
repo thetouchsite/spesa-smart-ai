@@ -3,7 +3,7 @@
  *
  * Wraps the existing `src/lib/saved-plans.ts` so all reads/writes share the
  * same key (`spesa.savedPlans.v1`). All methods are async to match the
- * Supabase implementation.
+ * implementazione remota su MongoDB.
  */
 
 import {
