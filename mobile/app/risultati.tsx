@@ -105,7 +105,12 @@ export default function RisultatiScreen() {
   }
 
   const cur = profile.currency || "EUR";
-  const st = STATUS[results.status] ?? STATUS.unavailable;
+  // Con un totale parziale lo stato del budget e' comunque significativo:
+  // dire "prezzi non disponibili" sopra un numero valido confonde.
+  const st =
+    results.status === "unavailable" && results.estimatedSpend > 0
+      ? { label: "Stima parziale", tone: "warning" as const, icon: "information-circle-outline" }
+      : (STATUS[results.status] ?? STATUS.unavailable);
 
   async function share() {
     try {
@@ -165,7 +170,11 @@ export default function RisultatiScreen() {
 
       {/* Il dato principale, in evidenza: spesa contro budget */}
       <GradientCard>
-        <Body style={styles.heroLabel}>Spesa prevista</Body>
+        <Body style={styles.heroLabel}>
+          {results.estimatedSpend > 0 && !results.savingsAvailable
+            ? "Spesa prevista (parziale)"
+            : "Spesa prevista"}
+        </Body>
         <Body style={styles.heroValue}>{money(results.estimatedSpend, cur)}</Body>
         <Body style={styles.heroSub}>
           su {money(results.budget, cur)} di budget
@@ -249,8 +258,10 @@ export default function RisultatiScreen() {
           {loading
             ? "Sto calcolando i prezzi…"
             : results.savingsAvailable
-              ? "Sono stime indicative basate sui prezzi medi del tuo paese, non rilevazioni dai supermercati. Dalla lista della spesa puoi aprire la pagina del prodotto sul sito del negozio."
-              : `Alcuni prodotti non hanno un prezzo di riferimento (${results.missingPrices.length} su ${currentPlan.groceryList.length}), quindi il totale è parziale.`}
+              ? "Sono stime indicative basate sui prezzi medi del tuo paese, non rilevazioni dai supermercati. Dalla lista della spesa puoi verificare il prezzo reale di ogni prodotto."
+              : results.estimatedSpend > 0
+                ? `Totale parziale: ${results.missingPrices.length} prodotti su ${currentPlan.groceryList.length} non hanno un prezzo di riferimento, quindi la spesa reale sarà un po' più alta. Gli altri sono stime indicative, non rilevazioni dai supermercati.`
+                : "Non abbiamo prezzi di riferimento sufficienti per questa lista. Menù e lista della spesa restano completi, e dalla lista puoi verificare il prezzo reale di ogni prodotto."}
         </Body>
       </Card>
     </Screen>

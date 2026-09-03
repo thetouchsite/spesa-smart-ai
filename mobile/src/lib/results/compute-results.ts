@@ -98,17 +98,43 @@ export function computeResults({ profile, plan, pricing }: ComputeInput): Comput
         ...pricing.missing,
       ]))
     : [];
-  const savingsAvailable = !!pricing && pricedItems.length > 0 && missingPrices.length === 0 && Number.isFinite(pricing.totalCost) && pricing.totalCost > 0;
-  const basketTotal = savingsAvailable ? Math.round(pricing.totalCost * 100) / 100 : null;
+  /**
+   * REGOLA DEI PREZZI PARZIALI
+   *
+   * Prima bastava UN prodotto senza prezzo per azzerare tutto: spesa 0,00 EUR,
+   * punteggio 0, "prezzi non disponibili". Con i piani generati dall'AI capita
+   * regolarmente, perche' produce voci composte come "Frutta di stagione
+   * (Arance, Mele, Melone)" che il catalogo non riconosce.
+   *
+   * Un totale su 21 voci di 23 e' molto piu' utile di uno zero, purche' sia
+   * dichiarato per quello che e'. Sotto il 60% di copertura invece il numero
+   * sarebbe fuorviante e si torna a non mostrarlo.
+   *
+   * `savingsAvailable` resta il segnale di copertura piena: l'interfaccia lo
+   * usa per decidere se scrivere "totale" o "totale parziale".
+   */
+  const MIN_COVERAGE = 0.6;
+  const priceCoverage = pricing && pricedItems.length > 0
+    ? pricedItems.filter((i) => i.estimatedCost > 0).length / pricedItems.length
+    : 0;
+  const hasUsableTotal =
+    !!pricing &&
+    pricedItems.length > 0 &&
+    priceCoverage >= MIN_COVERAGE &&
+    Number.isFinite(pricing.totalCost) &&
+    pricing.totalCost > 0;
+
+  const savingsAvailable = hasUsableTotal && missingPrices.length === 0;
+  const basketTotal = hasUsableTotal ? Math.round(pricing.totalCost * 100) / 100 : null;
   const estimatedSpend = basketTotal ?? 0;
   const weeklySpend =
     Math.round((estimatedSpend / periodScale) * 100) / 100; // per-week view
   const monthlyCost =
     Math.round((weeklySpend * (30 / 7)) * 100) / 100;
-  const rawSavings = savingsAvailable ? Math.round((budget - estimatedSpend) * 100) / 100 : 0;
-  const savings = savingsAvailable ? Math.max(0, rawSavings) : 0;
-  const overBudgetAmount = savingsAvailable ? Math.max(0, Math.round((estimatedSpend - budget) * 100) / 100) : 0;
-  const ratio = savingsAvailable && budget > 0 ? estimatedSpend / budget : 0;
+  const rawSavings = hasUsableTotal ? Math.round((budget - estimatedSpend) * 100) / 100 : 0;
+  const savings = hasUsableTotal ? Math.max(0, rawSavings) : 0;
+  const overBudgetAmount = hasUsableTotal ? Math.max(0, Math.round((estimatedSpend - budget) * 100) / 100) : 0;
+  const ratio = hasUsableTotal && budget > 0 ? estimatedSpend / budget : 0;
 
   // eslint-disable-next-line no-console
   console.log("[compute-results]", {
@@ -129,7 +155,7 @@ export function computeResults({ profile, plan, pricing }: ComputeInput): Comput
     ratio: Math.round(ratio * 1000) / 1000,
   });
 
-  if (pricing && !savingsAvailable) {
+  if (pricing && !hasUsableTotal) {
     // eslint-disable-next-line no-console
     console.warn("[compute-results] savings unavailable: incomplete basket pricing", {
       coverage,

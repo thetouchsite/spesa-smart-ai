@@ -159,6 +159,34 @@ const MANUAL_OVERRIDES: Record<string, string> = {
   finocchio: "seasonal_veg",
 
   // ── Italiano — dispensa e proteine ──────────────────────────────────
+  // Voci comuni nei piani generati dall'AI che il catalogo non ha come tali:
+  // si abbinano al prodotto piu' vicino per prezzo e reparto.
+  provola: "mozzarella",
+  "provola affumicata": "mozzarella",
+  scamorza: "mozzarella",
+  stracchino: "ricotta",
+  "fette biscottate": "white_bread",
+  biscotti: "oats",
+  "legumi secchi": "chickpeas",
+  legumi: "chickpeas",
+  "verdure miste": "seasonal_veg",
+  "verdure di stagione": "seasonal_veg",
+  verdure: "seasonal_veg",
+  ortaggi: "seasonal_veg",
+  "frutta di stagione": "apples",
+  frutta: "apples",
+  "frutta fresca": "apples",
+  affettati: "ham",
+  salumi: "ham",
+  formaggio: "cheddar",
+  formaggi: "cheddar",
+  "pesce azzurro": "white_fish",
+  pesce: "white_fish",
+  carne: "beef_mince",
+  "carne bianca": "chicken_breast",
+  "carne rossa": "beef_mince",
+  cereali: "oats",
+  "cereali integrali": "oats",
   uova: "eggs",
   uovo: "eggs",
   ceci: "chickpeas",
@@ -307,6 +335,32 @@ const OVERRIDE_INDEX: Record<string, string> = (() => {
   return idx;
 })();
 
+/**
+ * Scompone i nomi composti che l'AI produce regolarmente:
+ *
+ *   "Frutta di stagione (Arance, Mele, Melone)" → arance | mele | melone | frutta di stagione
+ *   "Passata di pomodoro e Pelati"              → passata di pomodoro | pelati
+ *   "Ingredienti base (Sale, Zucchero, Farina)" → sale | zucchero | farina
+ *
+ * Il primo pezzo che risolve vince. Senza questo passaggio quelle righe
+ * restano senza prezzo, e su un piano generato dall'AI sono diverse per lista.
+ */
+function splitCompound(raw: string): string[] {
+  const parts: string[] = [];
+
+  // Contenuto fra parentesi: e' l'elenco vero, quindi ha la precedenza sul
+  // termine generico che lo introduce ("Frutta di stagione").
+  const inParens = raw.match(/\(([^)]+)\)/)?.[1];
+  if (inParens) {
+    parts.push(...inParens.split(/[,;/]|\se\s|\sed\s/i));
+  }
+
+  const outside = raw.replace(/\([^)]*\)/g, " ");
+  parts.push(...outside.split(/[,;/]|\se\s|\sed\s|\so\s|\soppure\s/i));
+
+  return parts.map((p) => p.trim()).filter((p) => p.length > 2);
+}
+
 /** Candidate lookup forms for a free-text ingredient name, most specific first. */
 function candidates(raw: string): string[] {
   // Drop any leading quantity ("400 g pomodori pelati" → "pomodori pelati").
@@ -323,6 +377,26 @@ function candidates(raw: string): string[] {
 export function resolveIngredientKey(ingredient: string): string | null {
   if (!ingredient) return null;
 
+  // I PEZZI PRIMA DEL NOME INTERO, e l'ordine qui e' il punto.
+  //
+  // Su "Frutta di stagione (Arance, Mele, Melone)" il ripiego su parola
+  // singola del nome intero trovava "frutta" e lo abbinava a "frutta secca":
+  // un prezzo sbagliato mostrato come corretto, che e' peggio di nessun
+  // prezzo. Partendo dai pezzi si prova "arance" per prima e si ottiene la
+  // risposta giusta.
+  const pieces = splitCompound(ingredient);
+  if (pieces.length > 1) {
+    for (const piece of pieces) {
+      const hit = lookup(piece);
+      if (hit) return hit;
+    }
+  }
+
+  return lookup(ingredient);
+}
+
+/** Risoluzione di un singolo termine, senza scomposizione. */
+function lookup(ingredient: string): string | null {
   for (const c of candidates(ingredient)) {
     const override = OVERRIDE_INDEX[c];
     if (override) return override;
