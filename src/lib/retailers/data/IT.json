@@ -1,0 +1,30 @@
+{
+  "country": "IT",
+  "retailers": [
+    { "id": "esselunga", "name": "Esselunga", "kind": "grocery", "domains": ["esselunga.it"],
+      "excludeCities": ["napoli","naples","salerno","caserta","avellino","benevento","bari","taranto","lecce","foggia","brindisi","palermo","catania","messina","siracusa","trapani","cagliari","sassari","olbia","reggio calabria","cosenza","catanzaro","crotone","potenza","matera","campobasso","l'aquila","pescara"] },
+    { "id": "coop",      "name": "Coop",      "kind": "grocery", "domains": ["coop.it"] },
+    { "id": "conad",     "name": "Conad",     "kind": "grocery", "domains": ["conad.it"] },
+    { "id": "carrefour-it","name": "Carrefour Italia","kind":"grocery","domains":["carrefour.it"] },
+    { "id": "eurospin",  "name": "Eurospin",  "kind": "grocery", "domains": ["eurospin.it"] },
+    { "id": "lidl-it",   "name": "Lidl",      "kind": "grocery", "domains": ["lidl.it"] }
+  ],
+  "delivery": [
+    { "id": "deliveroo-it","provider":"deliveroo","eta":"30-45m",
+      "coverage":{"cities":["milano","milan","roma","rome","torino","turin","bologna","firenze","florence","napoli","naples","bari","genova","genoa","verona","padova","palermo","catania"]} },
+    { "id": "glovo-it","provider":"glovo","eta":"20-40m",
+      "coverage":{"cities":["milano","milan","roma","rome","torino","turin","bologna","firenze","florence","napoli","naples","bari","genova","genoa","verona","padova","palermo","catania"]} },
+    { "id": "everli-it","provider":"everli","eta":"1-3h",
+      "coverage":{"cities":["milano","milan","roma","rome","torino","turin","bologna","firenze","florence","napoli","naples","bari"]} }
+  ],
+  "marketplaces": [
+    { "id": "amazon-it", "domain": "amazon.it",
+      "fresh": { "cities": ["milano","milan","roma","rome","bologna","torino","turin"], "eta": "Same day" },
+      "marketplaceEta": "Next day" }
+  ],
+  "remoteExcludes": [
+    "porto cervo","costa smeralda","san pantaleo","arzachena",
+    "capri","anacapri","positano","amalfi","ravello","praiano","ischia","procida",
+    "portofino","portovenere","taormina","pantelleria","lampedusa","linosa"
+  ]
+}

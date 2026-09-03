@@ -1,0 +1,23 @@
+{
+  "country": "AE",
+  "retailers": [
+    { "id":"carrefour-ae","name":"Carrefour","kind":"grocery","domains":["carrefouruae.com"] },
+    { "id":"lulu","name":"LuLu Hypermarket","kind":"grocery","domains":["luluhypermarket.com"] },
+    { "id":"spinneys","name":"Spinneys","kind":"grocery","domains":["spinneys.com"] },
+    { "id":"union-coop","name":"Union Coop","kind":"grocery","domains":["unioncoop.ae"] }
+  ],
+  "delivery": [
+    { "id":"talabat","provider":"talabat","eta":"30-45m",
+      "coverage":{"cities":["dubai","abu dhabi","sharjah","ajman"]} },
+    { "id":"careem-quik","provider":"careem","eta":"15-30m",
+      "coverage":{"cities":["dubai","abu dhabi","sharjah"]} },
+    { "id":"noon-minutes","provider":"noon","eta":"15-30m",
+      "coverage":{"cities":["dubai","abu dhabi"]} }
+  ],
+  "marketplaces": [
+    { "id":"amazon-ae","domain":"amazon.ae",
+      "fresh":{"cities":["dubai","abu dhabi"],"eta":"Same day"},
+      "marketplaceEta":"1-2 days" }
+  ],
+  "remoteExcludes": []
+}

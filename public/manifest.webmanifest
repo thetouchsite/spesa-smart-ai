@@ -1,0 +1,26 @@
+{
+  "name": "Spesa Smart",
+  "short_name": "Spesa Smart",
+  "description": "Helping families save money on food. Build a personalized grocery and meal plan that fits your budget.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
+  "categories": ["food", "lifestyle", "shopping", "finance"],
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
