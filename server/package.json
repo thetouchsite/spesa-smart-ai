@@ -1,0 +1,26 @@
+{
+  "name": "spesa-smart-api",
+  "private": true,
+  "type": "module",
+  "description": "Micro-backend Node.js: custodisce le chiavi API e inoltra a Gemini. Nessun database, nessuna autenticazione — solo ciò che l'app mobile non può fare da sola in sicurezza.",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^2.0.0",
+    "ai": "^6.0.205",
+    "mongodb": "^6.10.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.5",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
