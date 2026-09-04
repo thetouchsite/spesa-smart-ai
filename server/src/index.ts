@@ -41,6 +41,7 @@ import { isShoppingConfigured, searchShopping } from "./shopping.js";
 import { budgetExhausted, quotaStatus, recordCost, recordUse, spendStatus } from "./quota.js";
 import { generateMenu, generatePricesParallel, GROUNDED_MODEL, MENU_MODEL } from "./plan-grounded.js";
 import { groupByProduct, pickBestStore, verifyPrices } from "./price-page.js";
+import { generatePricesSerpapi } from "./prices-serpapi.js";
 import {
   AiRecipeInput,
   ChefInput,
@@ -371,7 +372,50 @@ const GroundedInput = z.object({
   dislikes: z.string().max(200).default(""),
   language: z.string().max(5).default("it"),
   withRecipes: z.boolean().default(true),
+  /**
+   * Da dove prendere i prezzi.
+   *
+   *   "ai"       il motore con ricerca: lo stesso prodotto della lista nei
+   *              supermercati della città, con ogni pagina aperta e verificata
+   *   "serpapi"  Google Shopping su tutta la lista, come si aspettava il
+   *              prototipo del cliente: copertura più alta, pertinenza più
+   *              bassa, e consuma la quota SerpAPI (una ricerca per prodotto)
+   *
+   * Esiste per poter confrontare le due strade sugli stessi dati prima di
+   * decidere cosa promettere. Il valore predefinito si imposta con
+   * PRICE_SOURCE nell'ambiente; il client può forzarlo per singola richiesta.
+   */
+  priceSource: z.enum(["ai", "serpapi"]).optional(),
 });
+
+/** La strada predefinita, se il client non ne chiede una. */
+const PRICE_SOURCE_DEFAULT = process.env.PRICE_SOURCE === "serpapi" ? "serpapi" : "ai";
+
+/**
+ * Da nome di paese a codice ISO, per Google Shopping.
+ *
+ * L'app manda "Italia" o "Svizzera", SerpAPI vuole "it" e "ch": senza la
+ * conversione una ricerca italiana torna con risultati americani in dollari.
+ * L'elenco copre i paesi provati; per gli altri si passa il testo cosi' com'e'
+ * quando sono gia' due lettere, altrimenti si ripiega sull'Italia.
+ */
+const ISO_PER_PAESE: Record<string, string> = {
+  italia: "it", italy: "it",
+  svizzera: "ch", schweiz: "ch", suisse: "ch", switzerland: "ch",
+  francia: "fr", france: "fr",
+  spagna: "es", "españa": "es", espana: "es", spain: "es",
+  germania: "de", deutschland: "de", germany: "de",
+  "paesi bassi": "nl", nederland: "nl", olanda: "nl", netherlands: "nl",
+  "regno unito": "gb", "united kingdom": "gb", uk: "gb", inghilterra: "gb",
+  austria: "at", belgio: "be", belgium: "be", portogallo: "pt", portugal: "pt",
+};
+
+function paeseIso(paese: string): string {
+  const chiave = (paese ?? "").trim().toLowerCase();
+  if (ISO_PER_PAESE[chiave]) return ISO_PER_PAESE[chiave];
+  if (/^[a-z]{2}$/.test(chiave)) return chiave;
+  return "it";
+}
 
 /**
  * Il motore dell'app: una chiamata, tutto il piano.
@@ -399,6 +443,8 @@ app.post("/ai/plan-full", async (body) => {
   const data = parse(GroundedInput, body);
   if (!isConfigured()) throw new HttpError(503, "Servizio AI non configurato su questo ambiente");
 
+  // La fonte entra nella chiave: le due strade non devono servirsi
+  // a vicenda le risposte dalla cache.
   const key = cacheKey("plan-full", data);
 
   const local = memoryGet(key);
@@ -445,6 +491,7 @@ app.post("/ai/plan-full", async (body) => {
   /* FASE 2 — prezzi. Prompt corto sulla sola lista della spesa: e' l'unico modo
      perche' il modello cerchi davvero, ed e' l'unica fase che si paga. */
   const items = fase1.data.lista.map((v) => `${v.nome} ${v.quantita}`.trim()).slice(0, 18);
+  const fonte = data.priceSource ?? PRICE_SOURCE_DEFAULT;
 
   let prezziGrezzi: Awaited<ReturnType<typeof generatePricesParallel>>["data"]["prezzi"] = [];
   let fase2Secondi = 0;
@@ -453,19 +500,42 @@ app.post("/ai/plan-full", async (body) => {
   let hacercato = false;
 
   try {
-    recordUse("gemini");
-    recordUse("grounding");
-    const fase2 = await generatePricesParallel(items, data.city, data.country, data.currency);
-    prezziGrezzi = fase2.data.prezzi;
-    fase2Secondi = fase2.seconds;
-    fase2Costo = fase2.cost;
-    ricerche = fase2.data.searches;
-    recordCost(fase2.cost);
-    hacercato = fase2.data.grounded;
-    console.info(
-      `[plan-full] fase 2 ${fase2.model}: ${fase2.seconds.toFixed(0)}s, ` +
-        `$${fase2.cost.toFixed(4)}, ${ricerche} ricerche, ${prezziGrezzi.length} prezzi`,
-    );
+    if (fonte === "serpapi") {
+      // La strada del prototipo: una ricerca per prodotto su Google Shopping.
+      // Consuma la quota SerpAPI in fretta — 250 al mese sono una dozzina di
+      // piani — quindi si accende solo per confronto.
+      if (!isShoppingConfigured()) {
+        throw new HttpError(503, "SERPAPI_KEY non configurata: la strada 'serpapi' non e' disponibile");
+      }
+      const t0 = Date.now();
+      const serp = await generatePricesSerpapi(items, paeseIso(data.country));
+      for (let i = 0; i < serp.ricerche; i++) recordUse("serpapi");
+      prezziGrezzi = serp.prezzi;
+      fase2Secondi = (Date.now() - t0) / 1000;
+      ricerche = serp.ricerche;
+      // Google Shopping cerca davvero, sempre: non c'e' il rischio di risposte
+      // a memoria che ha il modello.
+      hacercato = true;
+      console.info(
+        `[plan-full] fase 2 Google Shopping: ${fase2Secondi.toFixed(0)}s, ` +
+          `${serp.ricerche} ricerche SerpAPI, ${prezziGrezzi.length} prezzi, ` +
+          `${serp.senzaPrezzo} prodotti senza risultati`,
+      );
+    } else {
+      recordUse("gemini");
+      recordUse("grounding");
+      const fase2 = await generatePricesParallel(items, data.city, data.country, data.currency);
+      prezziGrezzi = fase2.data.prezzi;
+      fase2Secondi = fase2.seconds;
+      fase2Costo = fase2.cost;
+      ricerche = fase2.data.searches;
+      recordCost(fase2.cost);
+      hacercato = fase2.data.grounded;
+      console.info(
+        `[plan-full] fase 2 ${fase2.model}: ${fase2.seconds.toFixed(0)}s, ` +
+          `$${fase2.cost.toFixed(4)}, ${ricerche} ricerche, ${prezziGrezzi.length} prezzi`,
+      );
+    }
   } catch (err) {
     // Senza prezzi il piano resta utile: menu', ricette e lista ci sono. Molto
     // meglio di un errore che lascia l'utente a mani vuote.
@@ -544,7 +614,10 @@ app.post("/ai/plan-full", async (body) => {
     },
     meta: {
       motoreMenu: fase1.model,
-      motorePrezzi: GROUNDED_MODEL,
+      motorePrezzi: fonte === "serpapi" ? "Google Shopping (SerpAPI)" : GROUNDED_MODEL,
+      // Dichiarata apertamente: le due strade danno risultati diversi, e chi
+      // legge i numeri deve sapere da quale vengono.
+      fontePrezzi: fonte,
       secondi: Math.round(fase1.seconds + fase2Secondi),
       secondiMenu: Math.round(fase1.seconds),
       secondiPrezzi: Math.round(fase2Secondi),

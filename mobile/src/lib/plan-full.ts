@@ -82,6 +82,8 @@ export interface Recipe {
 export interface PlanMeta {
   motoreMenu: string;
   motorePrezzi: string;
+  /** Quale strada ha prodotto questi prezzi: cambia quanto valgono. */
+  fontePrezzi?: "ai" | "serpapi";
   secondi: number;
   ricerche: number;
   /** Falso quando il modello non ha interrogato il web: prezzi meno affidabili. */
@@ -283,6 +285,26 @@ export interface PlanFullResult {
  */
 const TIMEOUT_MS = 180_000;
 
+/**
+ * Quale strada usare per i prezzi.
+ *
+ * Si imposta in `mobile/.env` con EXPO_PUBLIC_PRICE_SOURCE, e serve a poter
+ * confrontare le due sullo stesso profilo:
+ *
+ *   "ai"       il motore con ricerca — cerca LO STESSO prodotto della lista
+ *              nei supermercati della città e apre ogni pagina per
+ *              verificarla. Pertinenza alta, copertura 60-85%, ~0,04 $ a piano
+ *
+ *   "serpapi"  Google Shopping su tutta la lista, come si aspettava il
+ *              prototipo del cliente. Trova quasi sempre qualcosa, ma sono i
+ *              venditori del marketplace: prezzi veri di prodotti spesso
+ *              sbagliati. E consuma una ricerca per prodotto — con la chiave
+ *              gratuita si arriva a una dozzina di piani al mese
+ *
+ * Vuoto o assente: decide il server, che ha il suo PRICE_SOURCE.
+ */
+const PRICE_SOURCE = process.env.EXPO_PUBLIC_PRICE_SOURCE;
+
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     p,
@@ -319,6 +341,8 @@ export async function fetchPlanFull(
         dislikes: profile.dislikes ?? "",
         language,
         withRecipes: true,
+        // Omesso quando non impostato: decide il server.
+        ...(PRICE_SOURCE ? { priceSource: PRICE_SOURCE } : {}),
       },
       TIMEOUT_MS,
     ),
