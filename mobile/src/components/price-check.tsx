@@ -1,128 +1,51 @@
 /**
- * Verifica del prezzo reale di un prodotto.
+ * Tutti i negozi che vendono un prodotto della lista.
  *
- * Tocchi una riga della lista e l'app cerca quel prodotto su Google Shopping:
- * prezzo vero, venditore vero, link alla pagina d'acquisto. È l'unico punto
- * dell'app dove i numeri non sono stime.
+ * Tocchi una riga e vedi dove si trova quel prodotto e a quanto, dal più
+ * economico. Ogni riga apre la pagina del negozio.
  *
- * PERCHÉ SOLO SU RICHIESTA
- * ------------------------
- * Si paga a ricerca. Valorizzare in automatico una lista da 40 prodotti
- * consumerebbe la quota gratuita in sette liste. Una ricerca per tocco, invece,
- * dura per un'intera dimostrazione — e come esperienza è pure migliore:
- * l'utente verifica quello che gli interessa, non tutto.
+ * DA DOVE VENGONO QUESTI PREZZI
+ * -----------------------------
+ * Dal motore con ricerca, arrivati insieme al piano: sono gli stessi prezzi
+ * che il server ha già verificato aprendo le pagine una per una. Niente viene
+ * cercato adesso — è tutto già in memoria, quindi il riquadro si apre subito
+ * e non costa nulla.
  *
- * Se la quota è esaurita o il backend è spento, si spiega cosa è successo
- * invece di mostrare una schermata vuota.
+ * Prima questo riquadro interrogava Google Shopping, e si vedeva perché non
+ * andava bene: per «filetti di merluzzo» proponeva come più conveniente un
+ * barattolino Amazon da 105 g a 2,15 CHF accanto a un surgelato svizzero da
+ * 19,95. Prodotti diversi, formati diversi, paesi diversi — un confronto che
+ * non significa niente. Il motore invece prezza LO STESSO prodotto della
+ * lista nei negozi della città dell'utente.
  */
 
-import { useEffect, useState } from "react";
 import { Linking, Modal, Pressable, StyleSheet, View } from "react-native";
-import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import { Body, Button, Label, Loading, Title } from "./ui";
-import { post, ApiError } from "../api/client";
-import { filterShoppingRows } from "../lib/product-search/filters";
+import { Body, Button, Label, Title } from "./ui";
+import type { ProductOffers } from "../lib/plan-full";
 import { productLabel } from "../lib/price-data/labels";
-import { money, languageOfCountry } from "../lib/format";
+import { money } from "../lib/format";
 import { useI18n } from "../lib/i18n";
 import { colors, font, radius, spacing } from "../theme";
 import { uiText } from "../lib/ui-strings";
 
-interface ShoppingItem {
-  title: string;
-  price: number | null;
-  currency: string;
-  source: string;
-  link: string;
-  thumbnail: string;
-}
-
-type Result =
-  | { ok: true; items: ShoppingItem[] }
-  | { ok: false; reason: "not-configured" | "no-results" | "error" };
-
-const REASONS: Record<string, string> = {
-  "not-configured":
-    "La ricerca dei prezzi reali non è attiva su questo ambiente, oppure la quota gratuita del mese è esaurita.",
-  "no-results":
-    "Nessun prodotto attendibile trovato. I risultati fuori tema — confezioni all’ingrosso, integratori, venditori esteri — vengono scartati apposta.",
-  error: "Ricerca non riuscita. Controlla la connessione e riprova.",
-  offline: "Il servizio prezzi non risponde. L'app continua a funzionare con le stime.",
-};
-
 export function PriceCheckSheet({
   itemName,
-  country,
+  offers,
   onClose,
 }: {
+  /** Nome del prodotto come compare nella lista. Null = riquadro chiuso. */
   itemName: string | null;
-  country: string;
+  /** Le offerte trovate dal motore per questo prodotto, già dalla più economica. */
+  offers: ProductOffers | null;
   onClose: () => void;
 }) {
   const { language } = useI18n();
-  /** Testo nella lingua scelta dall utente. */
+  /** Testo nella lingua scelta dall'utente. */
   const ui = (t: string) => uiText(t, language);
-  const [result, setResult] = useState<Result | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!itemName) {
-      setResult(null);
-      return;
-    }
-    let alive = true;
-    setLoading(true);
-    setResult(null);
-    (async () => {
-      try {
-        // La ricerca va fatta nella lingua del PAESE in cui si compra, non
-        // in quella dell'interfaccia. Un utente inglese a Napoli legge l'app
-        // in inglese ma sugli scaffali i prodotti sono in italiano; e
-        // cercare "Patatas" sul mercato italiano restituisce una marca di
-        // patatine gourmet, non le patate.
-        const searchLang = languageOfCountry(country);
-        const query = productLabel(itemName, searchLang) ?? itemName;
-
-        const res = await post<Result>("/product/shopping", {
-          query,
-          country,
-          limit: 12,
-        });
-
-        // Stessi sbarramenti che il prototipo applicava e che avevo
-        // scavalcato chiamando l'endpoint direttamente.
-        const filtered: Result = res.ok
-          ? (() => {
-              const rows = filterShoppingRows(res.items, query, country);
-              return rows.length > 0
-                ? { ok: true, items: rows.slice(0, 6) }
-                : { ok: false, reason: "no-results" };
-            })()
-          : res;
-
-        if (alive) setResult(filtered);
-      } catch (err) {
-        if (!alive) return;
-        // 503 = chiave assente o quota finita: e' uno stato previsto, non un
-        // guasto, e va spiegato con parole diverse da un errore di rete.
-        const reason = err instanceof ApiError && err.status === 503 ? "not-configured" : "error";
-        setResult({ ok: false, reason: reason as never });
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [itemName, country]);
-
-  const cheapest =
-    result?.ok && result.items.length > 0
-      ? result.items.reduce((min, i) =>
-          (i.price ?? Infinity) < (min.price ?? Infinity) ? i : min,
-        )
-      : null;
+  const righe = offers?.offerte ?? [];
+  const migliore = righe[0] ?? null;
 
   return (
     <Modal
@@ -136,12 +59,14 @@ export function PriceCheckSheet({
 
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <Label icon="pricetag-outline">Prezzo reale</Label>
-            <Title style={styles.title}>{itemName ? (productLabel(itemName, language) ?? itemName) : ""}</Title>
+            <Label icon="pricetag-outline">{ui("Prezzo reale")}</Label>
+            <Title style={styles.title}>
+              {itemName ? (productLabel(itemName, language) ?? itemName) : ""}
+            </Title>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Chiudi"
+            accessibilityLabel={ui("Chiudi")}
             onPress={onClose}
             hitSlop={12}
             style={styles.close}
@@ -150,60 +75,73 @@ export function PriceCheckSheet({
           </Pressable>
         </View>
 
-        {loading ? <Loading text={"Cerco il prodotto…"} /> : null}
-
-        {!loading && result?.ok === false ? (
+        {righe.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="information-circle-outline" size={36} color={colors.mutedForeground} />
-            <Body style={styles.emptyText}>{REASONS[result.reason] ?? REASONS.error}</Body>
+            <Body style={styles.emptyText}>
+              {ui("Nessun negozio online ha questo prodotto a catalogo. Il prezzo non è stato trovato, e preferiamo non inventarlo.")}
+            </Body>
           </View>
-        ) : null}
-
-        {!loading && result?.ok ? (
+        ) : (
           <View style={styles.list}>
-            {cheapest?.price != null ? (
+            {migliore ? (
               <View style={styles.best}>
-                <Body style={styles.bestLabel}>{"Più conveniente"}</Body>
-                <Body style={styles.bestPrice}>{money(cheapest.price, cheapest.currency, language)}</Body>
-                <Body style={styles.bestSource}>da {cheapest.source}</Body>
+                <Body style={styles.bestLabel}>{ui("Più conveniente")}</Body>
+                <Body style={styles.bestPrice}>
+                  {money(migliore.prezzo, migliore.valuta, language)}
+                </Body>
+                <Body style={styles.bestSource}>
+                  {`${ui("da")} ${migliore.negozio}`}
+                  {/* Quanto separa il più economico dal più caro: è il motivo
+                      per cui questo riquadro esiste. */}
+                  {offers?.differenza
+                    ? ` · ${ui("risparmi")} ${money(offers.differenza, migliore.valuta, language)}`
+                    : ""}
+                </Body>
               </View>
             ) : null}
 
-            {result.items.map((item, i) => (
+            {righe.map((o, i) => (
               <Pressable
-                key={`${item.title}-${i}`}
+                key={`${o.negozio}-${i}`}
                 accessibilityRole="link"
-                accessibilityLabel={`${item.title}, ${item.price ?? "prezzo non disponibile"}, da ${item.source}`}
-                onPress={() => item.link && Linking.openURL(item.link).catch(() => {})}
+                accessibilityLabel={`${o.nome}, ${o.prezzo} ${o.valuta}, ${o.negozio}`}
+                disabled={!o.link}
+                onPress={() => o.link && Linking.openURL(o.link).catch(() => {})}
                 style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               >
-                {item.thumbnail ? (
-                  <Image source={{ uri: item.thumbnail }} style={styles.thumb} contentFit="contain" />
-                ) : (
-                  <View style={[styles.thumb, styles.thumbEmpty]}>
-                    <Ionicons name="cube-outline" size={20} color={colors.mutedForeground} />
-                  </View>
-                )}
                 <View style={styles.rowText}>
                   <Body style={styles.rowTitle} numberOfLines={2}>
-                    {item.title}
+                    {o.nome}
                   </Body>
-                  <Body style={styles.rowSource}>{item.source}</Body>
+                  <Body style={styles.rowSource}>
+                    {o.negozio}
+                    {/* Il negozio non ci ha lasciato leggere la pagina: il
+                        prezzo è quello che l'AI ha visto, non uno confermato
+                        da noi, e va detto. */}
+                    {o.verifica === "bloccato" ? ` · ${ui("da confermare")}` : ""}
+                  </Body>
                 </View>
                 <View style={styles.rowRight}>
-                  <Body style={styles.rowPrice}>
-                    {item.price != null ? money(item.price, item.currency, language) : "—"}
-                  </Body>
-                  <Ionicons name="open-outline" size={15} color={colors.primary} />
+                  <Body style={styles.rowPrice}>{money(o.prezzo, o.valuta, language)}</Body>
+                  {/* Il prezzo pieno barrato, quando il prodotto è in offerta. */}
+                  {o.prezzoListino && o.scontoPercento ? (
+                    <Body style={styles.rowWas}>
+                      {`${money(o.prezzoListino, o.valuta, language)} −${o.scontoPercento}%`}
+                    </Body>
+                  ) : null}
+                  {o.link ? <Ionicons name="open-outline" size={15} color={colors.primary} /> : null}
                 </View>
               </Pressable>
             ))}
 
-            <Body style={styles.note}>{"Prezzi e venditori da Google Shopping, aggiornati al momento della ricerca. Toccando una riga si apre la pagina del negozio."}</Body>
+            <Body style={styles.note}>
+              {ui("Prezzi trovati sul web quando è stato creato il piano e verificati aprendo la pagina del prodotto. Toccando una riga si apre il negozio.")}
+            </Body>
           </View>
-        ) : null}
+        )}
 
-        <Button label="Chiudi" variant="secondary" onPress={onClose} style={styles.closeBtn} />
+        <Button label={ui("Chiudi")} variant="secondary" onPress={onClose} style={styles.closeBtn} />
       </View>
     </Modal>
   );
@@ -263,13 +201,16 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   rowPressed: { opacity: 0.6 },
-  thumb: { width: 46, height: 46, borderRadius: radius.sm, backgroundColor: colors.card },
-  thumbEmpty: { alignItems: "center", justifyContent: "center", backgroundColor: colors.muted },
   rowText: { flex: 1, gap: 1 },
   rowTitle: { fontSize: font.size.sm, color: colors.foreground, lineHeight: 19 },
   rowSource: { fontSize: font.size.xs, color: colors.mutedForeground },
   rowRight: { alignItems: "flex-end", gap: 2 },
   rowPrice: { fontSize: font.size.md, fontWeight: font.weight.semibold, color: colors.foreground },
+  rowWas: {
+    fontSize: font.size.xs,
+    color: colors.mutedForeground,
+    textDecorationLine: "line-through",
+  },
 
   note: {
     fontSize: font.size.xs,

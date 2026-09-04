@@ -368,16 +368,24 @@ export default function ListaScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`Verifica il prezzo reale di ${item.name}`}
                     onPress={() => {
-                      // Con un link verificato si va dritti alla pagina del
-                      // prodotto; senza, si ricade sulla ricerca del prezzo.
-                      if (item.link) void WebBrowser.openBrowserAsync(item.link);
+                      // Con piu' negozi conviene mostrarli tutti: e' il
+                      // confronto, ed e' il motivo per cui li cerchiamo.
+                      // Con uno solo si va dritti alla sua pagina.
+                      if (item.alternatives && item.alternatives > 0) setChecking(item.source);
+                      else if (item.link) void WebBrowser.openBrowserAsync(item.link);
                       else setChecking(item.source);
                     }}
                     hitSlop={10}
                     style={({ pressed }) => [styles.buyBtn, pressed && styles.rowPressed]}
                   >
                     <Ionicons
-                      name={item.link ? "open-outline" : "pricetag-outline"}
+                      name={
+                        item.alternatives && item.alternatives > 0
+                          ? "swap-horizontal-outline"
+                          : item.link
+                            ? "open-outline"
+                            : "pricetag-outline"
+                      }
                       size={16}
                       color={colors.primary}
                     />
@@ -389,9 +397,11 @@ export default function ListaScreen() {
         </Card>
       ))}
 
+      {/* Le offerte le abbiamo gia': arrivano col piano, gia' verificate.
+          Nessuna ricerca da fare al tocco, nessun servizio a pagamento. */}
       <PriceCheckSheet
         itemName={checking}
-        country={country}
+        offers={checking ? findOffers(planExtra?.prodotti ?? [], checking) : null}
         onClose={() => setChecking(null)}
       />
 

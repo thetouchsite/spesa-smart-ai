@@ -110,7 +110,26 @@ export const useSession = create<SessionState>()(
         };
       },
       storage: createJSONStorage(() => (typeof window !== "undefined" ? window.localStorage : (undefined as never))),
-      partialize: (s) => ({ profile: s.profile, currentPlan: s.currentPlan, variantSeed: s.variantSeed }),
+      /**
+       * Cosa sopravvive alla chiusura dell'app.
+       *
+       * `planExtra` sta qui accanto a `currentPlan` e non è un ripensamento:
+       * sono la stessa cosa divisa in due. Salvando il piano senza i suoi
+       * prezzi, alla riapertura le schermate trovavano una lista orfana e
+       * ricadevano sul catalogo interno — che per la Svizzera non ha listini,
+       * e mostrava "prezzi non disponibili" e 0,00 CHF su un piano che i
+       * prezzi li aveva avuti eccome.
+       *
+       * Succedeva anche solo ricaricando l'app durante lo sviluppo, il che
+       * rendeva il difetto difficile da attribuire: sembrava che il motore
+       * funzionasse a intermittenza.
+       */
+      partialize: (s) => ({
+        profile: s.profile,
+        currentPlan: s.currentPlan,
+        planExtra: s.planExtra,
+        variantSeed: s.variantSeed,
+      }),
     },
   ),
 );
