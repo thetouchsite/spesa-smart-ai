@@ -25,17 +25,13 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { I18nProvider } from "../src/lib/i18n";
+import { I18nProvider, useI18n } from "../src/lib/i18n";
 import { hydrate } from "../src/lib/kv";
 import { useSession } from "../src/lib/state/session";
 import { colors, font, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
-import { useI18n } from "../src/lib/i18n";
 
 export default function RootLayout() {
-  const { language } = useI18n();
-  /** Testo nella lingua scelta dall'utente. */
-  const ui = (t: string) => uiText(t, language);
   const [ready, setReady] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -63,7 +59,10 @@ export default function RootLayout() {
   if (!ready) {
     return (
       <View style={styles.splash}>
-        <Text style={styles.splashTitle}>{ui("Spesa Smart")}</Text>
+        {/* Il nome dell'app non si traduce, ed e' un bene: qui il provider
+            della lingua non e' ancora montato — monta dopo l'idratazione,
+            perche' deve poter leggere la lingua salvata. */}
+        <Text style={styles.splashTitle}>Spesa Smart</Text>
         <ActivityIndicator color={colors.primaryForeground} />
       </View>
     );
@@ -76,7 +75,7 @@ export default function RootLayout() {
           la cambia. */}
       <I18nProvider>
         <StatusBar style="dark" />
-        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+        {notice ? <Notice /> : null}
         <Stack
           screenOptions={{
             headerShown: false,
@@ -91,6 +90,22 @@ export default function RootLayout() {
         </Stack>
       </I18nProvider>
     </SafeAreaProvider>
+  );
+}
+
+/**
+ * L'avviso di caricamento parziale.
+ *
+ * Componente a parte perche' e' l'unico testo del layout che va tradotto, e
+ * per tradurlo serve stare DENTRO `I18nProvider`: il componente radice non
+ * puo' usare l'hook, visto che e' lui a montare il provider.
+ */
+function Notice() {
+  const { language } = useI18n();
+  return (
+    <Text style={styles.notice}>
+      {uiText("Alcune preferenze non sono state caricate.", language)}
+    </Text>
   );
 }
 

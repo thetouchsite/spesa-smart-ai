@@ -51,6 +51,8 @@ const UI: Record<string, Entry> = {
   "La fonte": {"it": "La fonte", "en": "The source", "fr": "La source", "es": "La fuente", "de": "Die Quelle"},
   "Lista aggregata, con le quantità già arrotondate.": {"it": "Lista aggregata, con le quantità già arrotondate.", "en": "Aggregated list, with quantities rounded up.", "fr": "Liste agrégée, avec des quantités déjà arrondies.", "es": "Lista agregada, con las cantidades ya redondeadas.", "de": "Zusammengefasste Liste mit bereits gerundeten Mengen."},
   "Nessun piano": {"it": "Nessun piano", "en": "No plan", "fr": "Aucun plan", "es": "Ningún plan", "de": "Kein Plan"},
+  "Alcune preferenze non sono state caricate.": {"it": "Alcune preferenze non sono state caricate.", "en": "Some preferences could not be loaded.", "fr": "Certaines préférences n'ont pas pu être chargées.", "es": "Algunas preferencias no se han podido cargar.", "de": "Einige Einstellungen konnten nicht geladen werden."},
+  "Prezzi reali di oggi": {"it": "Prezzi reali di oggi", "en": "Real prices, today", "fr": "Prix réels du jour", "es": "Precios reales de hoy", "de": "Echte Preise von heute"},
   "Nessuna lista": {"it": "Nessuna lista", "en": "No list", "fr": "Aucune liste", "es": "Ninguna lista", "de": "Keine Liste"},
   "Ogni quanto": {"it": "Ogni quanto", "en": "How often", "fr": "À quelle fréquence", "es": "Cada cuánto", "de": "Wie oft"},
   "Persone": {"it": "Persone", "en": "People", "fr": "Personnes", "es": "Personas", "de": "Personen"},
