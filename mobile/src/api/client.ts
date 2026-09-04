@@ -96,10 +96,26 @@ export function isLoggedIn(): boolean {
  * generoso evita di annullare richieste che stavano per riuscire, ma esiste
  * perché senza, una rete che non risponde lascerebbe la schermata a girare
  * per sempre.
+ *
+ * Non vale per tutte le chiamate allo stesso modo, ed è un errore che è
+ * costato: il piano completo con la ricerca dei prezzi impiega fra 45 e 85
+ * secondi, e questo limite lo troncava a 45. Il server finiva il lavoro — 57
+ * secondi, prezzi trovati e verificati — ma l'app aveva già chiuso la
+ * connessione e ripiegato sul motore vecchio, mostrando una lista senza
+ * prezzi. Da fuori sembrava che il motore nuovo non funzionasse, mentre
+ * funzionava benissimo e nessuno lo stava ad ascoltare.
+ *
+ * Per questo il tempo si passa per chiamata: chi sa quanto durerà la propria
+ * lo dichiara.
  */
 const TIMEOUT_MS = 45_000;
 
-async function request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+async function request<T>(
+  method: "GET" | "POST",
+  path: string,
+  body?: unknown,
+  timeoutMs: number = TIMEOUT_MS,
+): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
@@ -112,7 +128,7 @@ async function request<T>(method: "GET" | "POST", path: string, body?: unknown):
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
     // Rete assente, DNS, timeout: al chiamante serve un messaggio mostrabile,
@@ -150,8 +166,8 @@ export function get<T>(path: string): Promise<T> {
  * Il backend accetta sia `{ data: {...} }` sia l'oggetto diretto. Manteniamo
  * l'involucro `data` perché è la forma che il codice portato già produce.
  */
-export function post<T>(path: string, data?: unknown): Promise<T> {
-  return request<T>("POST", path, data === undefined ? undefined : { data });
+export function post<T>(path: string, data?: unknown, timeoutMs?: number): Promise<T> {
+  return request<T>("POST", path, data === undefined ? undefined : { data }, timeoutMs);
 }
 
 /** True se il backend risponde: usato dalla schermata di diagnostica. */

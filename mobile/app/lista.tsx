@@ -45,6 +45,7 @@ import {
   TopBar,
 } from "../src/components/ui";
 import { useSession } from "../src/lib/state/session";
+import { findOffers } from "../src/lib/plan-full";
 import { pricePlan } from "../src/lib/price-data/price-engine";
 import type { PricingResult } from "../src/lib/price-data";
 import { buildShoppingLink } from "../src/lib/shopping-links";
@@ -80,6 +81,8 @@ interface Row {
    * all'utente, perché su un prezzo reale può contare e su una stima no.
    */
   kind: "reale" | "stima";
+  /** Vero quando il negozio non ci ha lasciato leggere la pagina: prezzo non confermato. */
+  unconfirmed?: boolean;
   /** Il negozio, quando il prezzo è reale. */
   store?: string;
   /** Link alla pagina del prodotto: solo se il server è riuscito ad aprirla. */
@@ -149,13 +152,8 @@ export default function ListaScreen() {
     // e gia' verificati aprendo la pagina — non c'e' niente di meglio da
     // mostrare, e nessuna traduzione da fare.
     if (planExtra?.prodotti?.length) {
-      const byName = new Map(
-        planExtra.prodotti.map((p) => [p.prodotto.trim().toLowerCase(), p]),
-      );
-
       return currentPlan.groceryList.map((g) => {
-        const key = `${g.name} ${g.quantity}`.trim().toLowerCase();
-        const found = byName.get(key) ?? byName.get(g.name.trim().toLowerCase());
+        const found = findOffers(planExtra.prodotti, g.name, g.quantity);
         const best = found?.offerte?.[0];
 
         if (!best) {
@@ -180,6 +178,7 @@ export default function ListaScreen() {
           kind: "reale" as const,
           store: best.negozio,
           link: best.link || undefined,
+          unconfirmed: best.verifica === "bloccato",
           alternatives: Math.max(0, (found?.offerte.length ?? 1) - 1),
           spread: found?.differenza ?? null,
           wasPrice: best.prezzoListino,
@@ -334,6 +333,10 @@ export default function ListaScreen() {
                   <Body style={styles.qty}>
                     {item.quantity}
                     {item.store ? ` · ${item.store}` : ""}
+                    {/* Detto in chiaro: il negozio non ci ha fatto leggere la
+                        pagina, quindi il prezzo e' quello che l'AI ha visto e
+                        non uno che abbiamo confermato noi. */}
+                    {item.unconfirmed ? " · da confermare" : ""}
                   </Body>
                   {/* Le alternative sono il motivo per cui il confronto esiste:
                       va detto in chiaro quanto si risparmia scegliendo qui. */}

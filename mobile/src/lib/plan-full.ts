@@ -26,6 +26,7 @@ import { post } from "@/api/client";
 import { PlanSchema, type Plan } from "@/lib/models/plan-schema";
 import type { UserProfile } from "@/lib/models";
 import { deviceDefaults } from "@/lib/format";
+import type { PricedItem, PricingResult } from "@/lib/price-data/types";
 
 /** Un prezzo trovato in un negozio, già controllato dal server. */
 export interface Offer {
@@ -36,8 +37,15 @@ export interface Offer {
   valuta: string;
   /** Vuoto se la pagina non si apriva: in quel caso non si mostra il link. */
   link: string;
-  /** "verificato" = pagina aperta e prezzo letto lì; "pagina-ok" = solo la pagina. */
-  verifica: "verificato" | "pagina-ok" | "non-raggiungibile";
+  /**
+   * Quanto ci si può fidare del prezzo.
+   *
+   *   "verificato"  pagina aperta e prezzo letto lì dentro
+   *   "pagina-ok"   pagina aperta, prezzo non leggibile dal codice
+   *   "bloccato"    il sito rifiuta le richieste automatiche: la pagina esiste
+   *                 e dal telefono si apre, ma il prezzo non è confermato
+   */
+  verifica: "verificato" | "pagina-ok" | "bloccato" | "non-raggiungibile";
   /** Presenti solo quando il prodotto è in promozione. */
   prezzoListino?: number;
   risparmio?: number;
@@ -118,6 +126,75 @@ interface ServerResponse {
   meta: PlanMeta;
 }
 
+
+/* ─────────── Abbinare le voci della lista alle offerte trovate ─────────── */
+
+/** Toglie accenti, punteggiatura e doppi spazi: resta solo la sostanza. */
+function normalize(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Trova le offerte di una voce della lista.
+ *
+ * L'abbinamento non può essere un confronto esatto. Al modello viene chiesto
+ * di riscrivere il nome del prodotto identico a come gli è stato dato, e per
+ * lo più lo fa — ma basta una virgola, un accento o un "1 confezione da"
+ * diventato "1 conf. da" perché il prezzo, trovato e verificato, non arrivi
+ * mai alla riga a cui appartiene. Il risultato è una lista di trattini con i
+ * prezzi giusti a pochi centimetri di distanza in memoria.
+ *
+ * Tre tentativi, dal più severo al più permissivo: uguaglianza, contenimento,
+ * e infine le parole in comune. L'ultimo scatta solo con una sovrapposizione
+ * ampia, perché abbinare il prezzo sbagliato a un prodotto è peggio che non
+ * abbinarne nessuno.
+ */
+export function findOffers(
+  prodotti: ProductOffers[],
+  name: string,
+  quantity = "",
+): ProductOffers | null {
+  if (!prodotti?.length) return null;
+
+  const full = normalize(`${name} ${quantity}`);
+  const bare = normalize(name);
+  if (!bare) return null;
+
+  const indexed = prodotti.map((p) => ({ p, key: normalize(p.prodotto) }));
+
+  const exact = indexed.find((x) => x.key === full || x.key === bare);
+  if (exact) return exact.p;
+
+  const contained = indexed.find(
+    (x) => x.key.includes(bare) || bare.includes(x.key) || x.key.includes(full),
+  );
+  if (contained) return contained.p;
+
+  // Ultima risorsa: le parole significative in comune. Le parole corte —
+  // "da", "di", "kg", "1" — non contano, altrimenti "1 kg di mele" e
+  // "1 kg di pane" sembrerebbero lo stesso prodotto.
+  const words = new Set(bare.split(" ").filter((w) => w.length > 3));
+  if (words.size === 0) return null;
+
+  let best: { p: ProductOffers; score: number } | null = null;
+  for (const { p, key } of indexed) {
+    const other = key.split(" ").filter((w) => w.length > 3);
+    if (!other.length) continue;
+    const shared = other.filter((w) => words.has(w)).length;
+    const score = shared / Math.max(words.size, other.length);
+    if (score > (best?.score ?? 0)) best = { p, score };
+  }
+  // Sotto i due terzi di parole in comune non è un abbinamento, è una
+  // somiglianza: meglio nessun prezzo che il prezzo di un altro prodotto.
+  return best && best.score >= 0.67 ? best.p : null;
+}
+
 /**
  * Quanto margine resta sul budget, e come si chiama.
  *
@@ -144,21 +221,12 @@ function statusOf(spent: number, budget: number): Plan["status"] {
  * un totale completo.
  */
 function toPlan(r: ServerResponse): Plan {
-  const bestByProduct = new Map<string, number>();
-  for (const p of r.prodotti ?? []) {
-    const best = p.offerte?.[0]?.prezzo;
-    if (typeof best === "number") bestByProduct.set(p.prodotto.trim().toLowerCase(), best);
-  }
-
-  const groceryList = (r.lista ?? []).map((v) => {
-    const key = `${v.nome} ${v.quantita}`.trim().toLowerCase();
-    return {
-      name: v.nome,
-      quantity: v.quantita,
-      estimatedCost: bestByProduct.get(key) ?? bestByProduct.get(v.nome.trim().toLowerCase()) ?? 0,
-      category: v.reparto,
-    };
-  });
+  const groceryList = (r.lista ?? []).map((v) => ({
+    name: v.nome,
+    quantity: v.quantita,
+    estimatedCost: findOffers(r.prodotti ?? [], v.nome, v.quantita)?.offerte?.[0]?.prezzo ?? 0,
+    category: v.reparto,
+  }));
 
   const spent = r.totali?.spesaAlMiglioPrezzo ?? 0;
   const budget = r.totali?.budget ?? 0;
@@ -204,11 +272,16 @@ export interface PlanFullResult {
  * Il tempo massimo di attesa.
  *
  * Due chiamate al modello, di cui una con una ventina di ricerche web, più
- * l'apertura di trenta pagine prodotto: misurato fra 50 e 75 secondi. Il
- * limite sta largo perché una generazione riuscita in 80 secondi vale più di
+ * l'apertura di trenta pagine prodotto: misurato fra 45 e 85 secondi. Il
+ * limite sta largo perché una generazione riuscita in 90 secondi vale più di
  * un errore a 60 — è il momento in cui l'app fa la cosa che nessun'altra fa.
+ *
+ * Va passato anche al client HTTP, non solo tenuto qui: il client ha un
+ * limite suo di 45 secondi e taglia la connessione per primo. È già successo
+ * a Zurigo — il server aveva finito in 57 secondi con dieci prezzi verificati,
+ * ma l'app aveva chiuso e ripiegato sul motore senza prezzi.
  */
-const TIMEOUT_MS = 150_000;
+const TIMEOUT_MS = 180_000;
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -232,19 +305,23 @@ export async function fetchPlanFull(
   const defaults = deviceDefaults();
 
   const response = await withTimeout(
-    post<ServerResponse>("/ai/plan-full", {
-      city: profile.city || "",
-      country: profile.country || defaults.country,
-      household: profile.household || "2",
-      budget: Number(profile.budget) || 100,
-      currency: profile.currency || defaults.currency,
-      frequency: profile.frequency === "monthly" ? "monthly" : "weekly",
-      style: profile.style || "equilibrato",
-      allergies: profile.allergies ?? [],
-      dislikes: profile.dislikes ?? "",
-      language,
-      withRecipes: true,
-    }),
+    post<ServerResponse>(
+      "/ai/plan-full",
+      {
+        city: profile.city || "",
+        country: profile.country || defaults.country,
+        household: profile.household || "2",
+        budget: Number(profile.budget) || 100,
+        currency: profile.currency || defaults.currency,
+        frequency: profile.frequency === "monthly" ? "monthly" : "weekly",
+        style: profile.style || "equilibrato",
+        allergies: profile.allergies ?? [],
+        dislikes: profile.dislikes ?? "",
+        language,
+        withRecipes: true,
+      },
+      TIMEOUT_MS,
+    ),
     TIMEOUT_MS,
   );
 
@@ -262,6 +339,78 @@ export async function fetchPlanFull(
       risparmioVsPiuCara: response.risparmioVsPiuCara ?? null,
       totali: response.totali,
       meta: response.meta,
+    },
+  };
+}
+
+/* ─────────── Dal motore con ricerca alla forma che l'app conosce ─────────── */
+
+/**
+ * Traduce i prezzi veri nella forma `PricingResult` del motore interno.
+ *
+ * Serve perché la schermata dei risultati calcola tutto — spesa prevista,
+ * punteggio, quanto resta del budget — a partire da quella struttura. Senza
+ * questo raccordo mostrava «Prezzi non disponibili» e 0,00 anche con i prezzi
+ * reali già in memoria: è successo a Zurigo, con 58,85 CHF trovati e uno zero
+ * a schermo, perché il catalogo interno non ha listini svizzeri.
+ *
+ * Il punto è che il catalogo interno **non deve nemmeno essere interrogato**
+ * quando i prezzi veri ci sono: sono migliori sotto ogni aspetto, e per i
+ * paesi che il catalogo non copre sono gli unici che esistono.
+ *
+ * `resolutionTier: "city"` è la corsia di massima fiducia del motore interno,
+ * e qui è meritata: questi prezzi vengono dai negozi di quella città, non da
+ * una media nazionale.
+ */
+export function pricingFromOffers(
+  extra: PlanExtra,
+  groceryList: Array<{ name: string; quantity: string; category: string }>,
+): PricingResult {
+  const items: PricedItem[] = groceryList.map((g) => {
+    const found = findOffers(extra.prodotti, g.name, g.quantity);
+    const best = found?.offerte?.[0];
+
+    // Un prezzo che la pagina ha confermato vale più di uno solo dichiarato:
+    // la differenza finisce nella confidenza, che l'app usa per decidere quanto
+    // esporsi con i numeri.
+    const confidence = !best
+      ? 0
+      : best.verifica === "verificato"
+        ? 1
+        : best.verifica === "pagina-ok"
+          ? 0.85
+          : // "bloccato": il link è buono ma il prezzo lo dice solo il modello.
+            0.6;
+
+    return {
+      name: g.name,
+      quantity: g.quantity,
+      category: g.category,
+      estimatedCost: best?.prezzo ?? 0,
+      matchedPrice: null,
+      confidence,
+      resolutionTier: best ? "city" : "missing",
+      packQuantity: g.quantity,
+    } as PricedItem;
+  });
+
+  const conPrezzo = items.filter((i) => i.estimatedCost > 0);
+
+  return {
+    items,
+    totalCost: Math.round(conPrezzo.reduce((s, i) => s + i.estimatedCost, 0) * 100) / 100,
+    currency: extra.totali.valuta as PricingResult["currency"],
+    coverage: items.length ? conPrezzo.length / items.length : 0,
+    averageConfidence: conPrezzo.length
+      ? conPrezzo.reduce((s, i) => s + i.confidence, 0) / conPrezzo.length
+      : 0,
+    missing: items.filter((i) => i.estimatedCost <= 0).map((i) => i.name),
+    tierCounts: {
+      city: conPrezzo.length,
+      country: 0,
+      region: 0,
+      global: 0,
+      missing: items.length - conPrezzo.length,
     },
   };
 }

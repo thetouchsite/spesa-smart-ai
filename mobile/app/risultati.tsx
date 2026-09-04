@@ -6,7 +6,8 @@
  * punteggio e confronto supermercati vengono decisi. Se un numero è sbagliato
  * si corregge lì, e cambia ovunque.
  *
- * I prezzi arrivano da `pricePlan()`, che oggi legge la tabella di riferimento
+ * I prezzi arrivano dal motore con ricerca quando c'e' — quelli veri dei negozi
+ * della citta' dell'utente — e altrimenti da `pricePlan()`, che legge la tabella
  * inclusa nell'app: nessuna rete, nessuna chiave. Quando il backend sarà in
  * linea la stessa funzione userà le fonti reali senza toccare questa schermata.
  */
@@ -32,6 +33,7 @@ import { useSession } from "../src/lib/state/session";
 import { QuotaBanner } from "../src/components/quota-banner";
 import { computeResults } from "../src/lib/results/compute-results";
 import { pricePlan } from "../src/lib/price-data/price-engine";
+import { pricingFromOffers } from "../src/lib/plan-full";
 import type { PricingResult } from "../src/lib/price-data";
 import { buildWhatsAppMessage } from "../src/lib/export/whatsapp-share";
 import { money, deviceDefaults } from "../src/lib/format";
@@ -51,7 +53,7 @@ export default function RisultatiScreen() {
   /** Testo nella lingua scelta dall'utente. */
   const ui = (t: string) => uiText(t, language);
   const router = useRouter();
-  const { profile, currentPlan } = useSession();
+  const { profile, currentPlan, planExtra } = useSession();
   const { language } = useI18n();
   const [pricing, setPricing] = useState<PricingResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,6 +70,15 @@ export default function RisultatiScreen() {
     setLoading(true);
     (async () => {
       try {
+        // I prezzi veri del motore con ricerca hanno la precedenza: sono di
+        // oggi, dei negozi di questa citta', e coprono paesi che il catalogo
+        // interno non conosce affatto. A Zurigo il catalogo non ha listini
+        // svizzeri e la schermata mostrava "prezzi non disponibili" e 0,00 CHF
+        // mentre i prezzi reali erano gia' in memoria.
+        if (planExtra?.prodotti?.length) {
+          if (alive) setPricing(pricingFromOffers(planExtra, currentPlan.groceryList));
+          return;
+        }
         const result = await pricePlan(currentPlan, city, country);
         if (alive) setPricing(result);
       } catch (err) {
@@ -81,7 +92,7 @@ export default function RisultatiScreen() {
     return () => {
       alive = false;
     };
-  }, [currentPlan, city, country]);
+  }, [currentPlan, city, country, planExtra]);
 
   const results = useMemo(
     () => (currentPlan ? computeResults({ profile, plan: currentPlan, pricing }) : null),

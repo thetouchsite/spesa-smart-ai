@@ -54,9 +54,20 @@ export interface PagePrice {
  *   "pagina-ok"      la pagina si apre ma il prezzo non è leggibile dal codice
  *                    (spesso è caricato via JavaScript): il link è buono, il
  *                    prezzo resta quello dell'AI
- *   "non-raggiungibile" 404, timeout, blocco: il link NON va mostrato
+ *   "bloccato"       il sito rifiuta le richieste automatiche (403, 429).
+ *                    La pagina ESISTE — dal telefono dell'utente si apre — ma
+ *                    noi non possiamo leggerla: link buono, prezzo non
+ *                    confermato
+ *   "non-raggiungibile" 404, 410, timeout: la pagina non c'è. Link da buttare
+ *
+ * La distinzione fra "bloccato" e "non-raggiungibile" non è pignoleria.
+ * Misurato a Zurigo: Coop ha risposto 403 a nove prodotti su nove. Trattandoli
+ * come indirizzi inventati si buttavano nove link perfettamente validi, che
+ * nel browser di una persona si aprono senza problemi. Un 404 dice «questa
+ * pagina non esiste», un 403 dice «ho capito che sei un programma»: solo il
+ * primo è un errore del modello.
  */
-export type VerifyStatus = "verificato" | "pagina-ok" | "non-raggiungibile";
+export type VerifyStatus = "verificato" | "pagina-ok" | "bloccato" | "non-raggiungibile";
 
 export interface VerifiedPrice {
   status: VerifyStatus;
@@ -141,13 +152,22 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
       signal: AbortSignal.timeout(12_000),
       headers: { "User-Agent": UA, Accept: "text/html" },
     });
-    if (!res.ok) return { status: "non-raggiungibile", reason: `HTTP ${res.status}` };
+    if (!res.ok) {
+      // 403 e 429 sono difese anti-bot, non pagine mancanti: l'indirizzo è
+      // buono e va consegnato all'utente, che lo aprirà da un browser vero.
+      // 401 no: lì serve un account, e mandarci qualcuno è inutile.
+      if (res.status === 403 || res.status === 429) {
+        return { status: "bloccato", reason: `HTTP ${res.status}` };
+      }
+      return { status: "non-raggiungibile", reason: `HTTP ${res.status}` };
+    }
     // Le pagine prodotto sono grandi: i dati strutturati stanno in alto,
     // quindi non serve tenerne più di così in memoria.
     html = (await res.text()).slice(0, 200_000);
   } catch {
     return { status: "non-raggiungibile", reason: "irraggiungibile" };
   }
+
 
   // Il 404 mascherato da 200: pagina servita correttamente, contenuto assente.
   if (
@@ -189,6 +209,10 @@ export interface CheckedRow {
  * Le righe non raggiungibili non vengono buttate — il nome del prodotto resta
  * utile nella lista della spesa — ma perdono link e prezzo: meglio "prezzo non
  * disponibile" che un numero che nessuno può controllare.
+ *
+ * Quelle solo bloccate invece si tengono per intero. Il sito ha rifiutato NOI,
+ * non l'utente: dal suo telefono quel link si apre. Il prezzo resta quello del
+ * modello, dichiarato come non confermato.
  */
 export async function verifyPrices(
   rows: Array<{
@@ -213,6 +237,13 @@ export async function verifyPrices(
           return { ...row, prezzo: null, link: "", verifica: v.status };
         }
 
+        if (v.status === "bloccato") {
+          // Link e prezzo restano: la pagina esiste, semplicemente non parla
+          // con noi. Sara' l'app a dire che il prezzo non e' confermato.
+          console.info(`[verifica] non leggibile "${row.nome}": ${v.reason} — tengo il link`);
+          return { ...row, verifica: v.status };
+        }
+
         // Il prezzo della pagina vince su quello dell'AI: è quello che
         // l'utente paga oggi, promozione compresa.
         const p = v.page;
@@ -232,7 +263,10 @@ export async function verifyPrices(
 
   return {
     rows: out,
-    verificati: out.filter((r) => r.verifica !== "non-raggiungibile").length,
+    // "Verificati" conta solo le pagine che si sono davvero aperte: quelle
+    // bloccate hanno un link buono ma un prezzo che nessuno ha controllato, e
+    // farle passare per confermate sarebbe una bugia comoda.
+    verificati: out.filter((r) => r.verifica === "verificato" || r.verifica === "pagina-ok").length,
     totali: out.length,
   };
 }
@@ -287,7 +321,11 @@ export function pickBestStore(rows: CheckedRow[], minVerified = 5): StoreCompari
 
   const catene: StoreTotal[] = [...byStore.entries()]
     .map(([negozio, list]) => {
-      const good = list.filter((r) => r.verifica !== "non-raggiungibile" && r.prezzo != null);
+      // Solo i prezzi letti davvero: un totale costruito su numeri non
+      // confermati non puo' vincere un confronto di convenienza.
+      const good = list.filter(
+        (r) => (r.verifica === "verificato" || r.verifica === "pagina-ok") && r.prezzo != null,
+      );
       return {
         negozio,
         totale: Math.round(good.reduce((s, r) => s + (r.prezzo ?? 0), 0) * 100) / 100,
@@ -309,6 +347,7 @@ export function pickBestStore(rows: CheckedRow[], minVerified = 5): StoreCompari
       vincitore: null,
       risparmio: null,
       righe: rows.filter((r) => r.verifica !== "non-raggiungibile"),
+
     };
   }
 
@@ -326,6 +365,7 @@ export function pickBestStore(rows: CheckedRow[], minVerified = 5): StoreCompari
         (r.negozio || "sconosciuto").trim() === vincitore.negozio &&
         r.verifica !== "non-raggiungibile",
     ),
+
   };
 }
 
