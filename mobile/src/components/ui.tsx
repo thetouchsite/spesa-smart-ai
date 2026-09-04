@@ -29,6 +29,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LanguagePicker } from "./language-picker";
 import { colors, font, radius, shadow, spacing } from "../theme";
 
 export type IconName = keyof typeof Ionicons.glyphMap;
@@ -74,15 +75,24 @@ export function Screen({
   );
 }
 
-/** Intestazione con freccia indietro. */
+/**
+ * Intestazione con freccia indietro e selettore di lingua.
+ *
+ * Il selettore compare per default in OGNI schermata: e' un'app pensata per
+ * essere usata all'estero, e nascondere la lingua nelle impostazioni
+ * significa che chi non capisce cosa legge non la trova. Il prototipo del
+ * cliente lo aveva sempre in vista, ed era la scelta giusta.
+ */
 export function TopBar({
   title,
   onBack,
   right,
+  showLanguage = true,
 }: {
   title?: string;
   onBack?: () => void;
   right?: ReactNode;
+  showLanguage?: boolean;
 }) {
   return (
     <View style={styles.topBar}>
@@ -106,7 +116,10 @@ export function TopBar({
       ) : (
         <View style={{ flex: 1 }} />
       )}
-      {right ?? <View style={styles.backBtn} />}
+      <View style={styles.topRight}>
+        {showLanguage ? <LanguagePicker /> : null}
+        {right}
+      </View>
     </View>
   );
 }
@@ -366,6 +379,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
+  topRight: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   topBarTitle: {
     flex: 1,
     fontSize: font.size.md,

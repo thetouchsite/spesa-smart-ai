@@ -25,14 +25,11 @@ import {
   TopBar,
 } from "../src/components/ui";
 import { useSession } from "../src/lib/state/session";
+import { localDay } from "../src/lib/days";
 import { unsplashFoodImage } from "../src/lib/recipes/unsplash";
 import { colors, font, radius, spacing } from "../src/theme";
-
-/** Il motore pasti produce i giorni in inglese. */
-const DAY_IT: Record<string, string> = {
-  Monday: "Lunedì", Tuesday: "Martedì", Wednesday: "Mercoledì", Thursday: "Giovedì",
-  Friday: "Venerdì", Saturday: "Sabato", Sunday: "Domenica",
-};
+import { uiText } from "../src/lib/ui-strings";
+import { useI18n } from "../src/lib/i18n";
 
 const MEALS = [
   { key: "breakfast" as const, label: "Colazione", icon: "sunny-outline" as const },
@@ -41,6 +38,9 @@ const MEALS = [
 ];
 
 export default function MenuScreen() {
+  const { language } = useI18n();
+  /** Testo nella lingua scelta dall'utente. */
+  const ui = (t: string) => uiText(t, language);
   const router = useRouter();
   const { currentPlan } = useSession();
 
@@ -49,8 +49,8 @@ export default function MenuScreen() {
       <Screen>
         <TopBar onBack={() => router.back()} />
         <View style={styles.empty}>
-          <Title>Nessun menù</Title>
-          <Subtitle>Crea prima un piano.</Subtitle>
+          <Title>{ui("Nessun menù")}</Title>
+          <Subtitle>{ui("Crea prima un piano.")}</Subtitle>
           <Button label="Comincia" onPress={() => router.replace("/onboarding/citta")} />
         </View>
       </Screen>
@@ -61,16 +61,16 @@ export default function MenuScreen() {
     <Screen
       footer={
         <Button
-          label="Lista della spesa"
+          label={ui("Lista della spesa")}
           icon="cart-outline"
           onPress={() => router.push("/lista")}
         />
       }
     >
-      <TopBar title="Il menù" onBack={() => router.back()} />
+      <TopBar title={ui("Il menù")} onBack={() => router.back()} />
 
       <View style={styles.head}>
-        <Title>La tua settimana</Title>
+        <Title>{ui("La tua settimana")}</Title>
         <Subtitle>
           {currentPlan.mealPlan.length} giorni di pasti. Tocca un piatto per vedere la ricetta.
         </Subtitle>
@@ -83,8 +83,8 @@ export default function MenuScreen() {
         return (
           <Card key={`${day.day}-${i}`}>
             <View style={styles.dayHead}>
-              <Label icon="calendar-outline">{DAY_IT[day.day] ?? day.day}</Label>
-              {zeroSpend ? <Pill tone="success" icon="leaf-outline">spesa zero</Pill> : null}
+              <Label icon="calendar-outline">{localDay(day.day, language)}</Label>
+              {zeroSpend ? <Pill tone="success" icon="leaf-outline">{ui("spesa zero")}</Pill> : null}
             </View>
 
             {MEALS.map((m) => {
@@ -113,7 +113,7 @@ export default function MenuScreen() {
                   <View style={styles.mealText}>
                     <View style={styles.mealTop}>
                       <Ionicons name={m.icon} size={13} color={colors.mutedForeground} />
-                      <Body style={styles.mealLabel}>{m.label}</Body>
+                      <Body style={styles.mealLabel}>{ui(m.label)}</Body>
                     </View>
                     <Body style={styles.mealName} numberOfLines={2}>
                       {dish}

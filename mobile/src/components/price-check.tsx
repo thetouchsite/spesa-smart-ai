@@ -24,9 +24,10 @@ import { Body, Button, Label, Loading, Title } from "./ui";
 import { post, ApiError } from "../api/client";
 import { filterShoppingRows } from "../lib/product-search/filters";
 import { productLabel } from "../lib/price-data/labels";
-import { money } from "../lib/format";
+import { money, languageOfCountry } from "../lib/format";
 import { useI18n } from "../lib/i18n";
 import { colors, font, radius, spacing } from "../theme";
+import { uiText } from "../lib/ui-strings";
 
 interface ShoppingItem {
   title: string;
@@ -60,6 +61,8 @@ export function PriceCheckSheet({
   onClose: () => void;
 }) {
   const { language } = useI18n();
+  /** Testo nella lingua scelta dall utente. */
+  const ui = (t: string) => uiText(t, language);
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -73,10 +76,13 @@ export function PriceCheckSheet({
     setResult(null);
     (async () => {
       try {
-        // Il motore locale produce la lista in inglese ("Mushrooms"): cercata
-        // cosi' su Google Shopping Italia torna funghi essiccati, kit di
-        // coltivazione e integratori. Si cerca il nome italiano.
-        const query = productLabel(itemName, language) ?? itemName;
+        // La ricerca va fatta nella lingua del PAESE in cui si compra, non
+        // in quella dell'interfaccia. Un utente inglese a Napoli legge l'app
+        // in inglese ma sugli scaffali i prodotti sono in italiano; e
+        // cercare "Patatas" sul mercato italiano restituisce una marca di
+        // patatine gourmet, non le patate.
+        const searchLang = languageOfCountry(country);
+        const query = productLabel(itemName, searchLang) ?? itemName;
 
         const res = await post<Result>("/product/shopping", {
           query,
@@ -109,7 +115,7 @@ export function PriceCheckSheet({
     return () => {
       alive = false;
     };
-  }, [itemName, country, language]);
+  }, [itemName, country]);
 
   const cheapest =
     result?.ok && result.items.length > 0
@@ -144,7 +150,7 @@ export function PriceCheckSheet({
           </Pressable>
         </View>
 
-        {loading ? <Loading text="Cerco il prodotto…" /> : null}
+        {loading ? <Loading text={"Cerco il prodotto…"} /> : null}
 
         {!loading && result?.ok === false ? (
           <View style={styles.empty}>
@@ -157,7 +163,7 @@ export function PriceCheckSheet({
           <View style={styles.list}>
             {cheapest?.price != null ? (
               <View style={styles.best}>
-                <Body style={styles.bestLabel}>Più conveniente</Body>
+                <Body style={styles.bestLabel}>{"Più conveniente"}</Body>
                 <Body style={styles.bestPrice}>{money(cheapest.price, cheapest.currency, language)}</Body>
                 <Body style={styles.bestSource}>da {cheapest.source}</Body>
               </View>
@@ -193,10 +199,7 @@ export function PriceCheckSheet({
               </Pressable>
             ))}
 
-            <Body style={styles.note}>
-              Prezzi e venditori da Google Shopping, aggiornati al momento della ricerca. Toccando
-              una riga si apre la pagina del negozio.
-            </Body>
+            <Body style={styles.note}>{"Prezzi e venditori da Google Shopping, aggiornati al momento della ricerca. Toccando una riga si apre la pagina del negozio."}</Body>
           </View>
         ) : null}
 

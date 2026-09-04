@@ -32,10 +32,15 @@ import { searchNearbyStores } from "../src/lib/location";
 import type { NearbyStore } from "../src/lib/location/providers/types";
 import { loadResolvedLocation } from "../src/lib/location/store";
 import { colors, font, radius, spacing } from "../src/theme";
+import { uiText } from "../src/lib/ui-strings";
+import { useI18n } from "../src/lib/i18n";
 
 const RADII = [1, 3, 5, 10];
 
 export default function NegoziScreen() {
+  const { language } = useI18n();
+  /** Testo nella lingua scelta dall'utente. */
+  const ui = (t: string) => uiText(t, language);
   const router = useRouter();
   const [radius_, setRadius] = useState(3);
   const [stores, setStores] = useState<NearbyStore[]>([]);
@@ -93,7 +98,7 @@ export default function NegoziScreen() {
       <TopBar title="Supermercati vicini" onBack={() => router.back()} />
 
       <View style={styles.head}>
-        <Title>Dove fare la spesa</Title>
+        <Title>{ui("Dove fare la spesa")}</Title>
         <Subtitle>
           {location?.city ? `Vicino a ${location.city}` : "Negozi alimentari intorno a te"} · dati
           OpenStreetMap
@@ -158,7 +163,7 @@ export default function NegoziScreen() {
         </Card>
       ) : null}
 
-      <Button label="Torna indietro" variant="ghost" onPress={() => router.back()} />
+      <Button label={ui("Torna indietro")} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

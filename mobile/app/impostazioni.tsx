@@ -33,8 +33,11 @@ import { loadResolvedLocation, clearResolvedLocation } from "../src/lib/location
 import { kv } from "../src/lib/kv";
 import { QuotaDetail } from "../src/components/quota-banner";
 import { colors, font, spacing } from "../src/theme";
+import { uiText } from "../src/lib/ui-strings";
 
 export default function ImpostazioniScreen() {
+  /** Testo nella lingua scelta dall'utente. */
+  const ui = (t: string) => uiText(t, language);
   const router = useRouter();
   const { language, setLanguage } = useI18n();
   const { profile, resetProfile, setPlan } = useSession();
@@ -81,11 +84,11 @@ export default function ImpostazioniScreen() {
 
       <View style={styles.head}>
         <Title>Impostazioni</Title>
-        <Subtitle>Lingua dell'app, dati del tuo profilo e gestione delle informazioni.</Subtitle>
+        <Subtitle>{ui("Lingua dell'app, dati del tuo profilo e gestione delle informazioni.")}</Subtitle>
       </View>
 
       <Card>
-        <Label icon="language-outline">Lingua</Label>
+        <Label icon="language-outline">{ui("Lingua")}</Label>
         {LANGUAGES.map((lang) => (
           <ListRow
             key={lang}
@@ -104,10 +107,10 @@ export default function ImpostazioniScreen() {
       </Card>
 
       <Card>
-        <Label icon="person-outline">Il tuo profilo</Label>
+        <Label icon="person-outline">{ui("Il tuo profilo")}</Label>
         <ListRow
           icon="location-outline"
-          title="Città"
+          title={ui("Città")}
           subtitle={location?.city || profile.city || "non impostata"}
           onPress={() => router.push("/onboarding/citta")}
         />
@@ -118,13 +121,13 @@ export default function ImpostazioniScreen() {
         />
         <ListRow
           icon="people-outline"
-          title="Persone"
+          title={ui("Persone")}
           subtitle={profile.household || "non impostato"}
           onPress={() => router.push("/onboarding/persone")}
         />
         <ListRow
           icon="wallet-outline"
-          title="Budget"
+          title={ui("Budget")}
           subtitle={
             profile.budget
               ? `${profile.budget} ${profile.currency} ${profile.frequency === "monthly" ? "al mese" : "a settimana"}`
@@ -145,20 +148,20 @@ export default function ImpostazioniScreen() {
         <ListRow
           icon="map-outline"
           title="Supermercati vicini"
-          subtitle="Cerca i negozi alimentari intorno alla tua posizione"
+          subtitle={ui("Cerca i negozi alimentari intorno alla tua posizione")}
           onPress={() => router.push("/negozi")}
         />
       </Card>
 
       {__DEV__ ? (
         <Card>
-          <Label icon="speedometer-outline">Consumo dei servizi (solo sviluppo)</Label>
+          <Label icon="speedometer-outline">{ui("Consumo dei servizi (solo sviluppo)")}</Label>
           <QuotaDetail />
         </Card>
       ) : null}
 
       <Card>
-        <Label icon="shield-outline">I tuoi dati</Label>
+        <Label icon="shield-outline">{ui("I tuoi dati")}</Label>
         <Body style={styles.small}>
           Profilo, piano e preferenze sono salvati solo su questo telefono. Nulla viene inviato a
           un server: quando arriveranno gli account, i dati potranno seguirti fra dispositivi e

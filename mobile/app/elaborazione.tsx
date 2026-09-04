@@ -21,6 +21,7 @@ import { fetchPlan, type ContentSource } from "../src/lib/content";
 import { deviceDefaults } from "../src/lib/format";
 import { useI18n } from "../src/lib/i18n";
 import { colors, font, spacing } from "../src/theme";
+import { uiText } from "../src/lib/ui-strings";
 
 /** Messaggi mostrati a rotazione: la generazione è quasi istantanea, ma una
  *  schermata che sparisce di colpo sembra un errore. */
@@ -32,6 +33,8 @@ const BEATS = [
 ];
 
 export default function ElaborazioneScreen() {
+  /** Testo nella lingua scelta dall'utente. */
+  const ui = (t: string) => uiText(t, language);
   const router = useRouter();
   const { profile, updateProfile, setPlan, setStatus, variantSeed } = useSession();
   const { language } = useI18n();
@@ -85,7 +88,7 @@ export default function ElaborazioneScreen() {
     return (
       <Screen>
         <View style={styles.center}>
-          <Title>Qualcosa non ha funzionato</Title>
+          <Title>{ui("Qualcosa non ha funzionato")}</Title>
           <Subtitle>{error}</Subtitle>
           <Button
             label="Riprova"
@@ -95,7 +98,7 @@ export default function ElaborazioneScreen() {
             }}
           />
           <Button
-            label="Torna indietro"
+            label={ui("Torna indietro")}
             variant="ghost"
             onPress={() => router.replace("/onboarding/extra")}
           />
@@ -108,7 +111,7 @@ export default function ElaborazioneScreen() {
     <Screen scroll={false}>
       <View style={styles.center}>
         <Loading />
-        <Title style={styles.title}>Sto preparando il tuo piano</Title>
+        <Title style={styles.title}>{ui("Sto preparando il tuo piano")}</Title>
         <Body style={styles.beat}>{BEATS[beat]}</Body>
       </View>
     </Screen>

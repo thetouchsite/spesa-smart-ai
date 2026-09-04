@@ -19,10 +19,17 @@ import type { CityResult } from "../../src/lib/location/providers/types";
 import { detectLocation, type ResolvedLocation } from "../../src/lib/location/geolocate";
 import { saveResolvedLocation } from "../../src/lib/location/store";
 import { resolveCountry } from "../../src/lib/country";
+import { useSession } from "../../src/lib/state/session";
 import { colors, font, radius, spacing } from "../../src/theme";
+import { uiText } from "../../src/lib/ui-strings";
+import { useI18n } from "../../src/lib/i18n";
 
 export default function CittaScreen() {
+  const { language } = useI18n();
+  /** Testo nella lingua scelta dall'utente. */
+  const ui = (t: string) => uiText(t, language);
   const router = useRouter();
+  const { updateProfile } = useSession();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CityResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -99,6 +106,15 @@ export default function CittaScreen() {
   function next() {
     if (!chosen) return;
     saveResolvedLocation(chosen);
+    // Il profilo va aggiornato QUI, non piu' avanti: prima il paese e la
+    // valuta si scrivevano nel passo del budget, ma solo se il budget era
+    // ancora vuoto. Chi cambiava citta' dopo aver gia' risposto restava
+    // con il paese vecchio: Londra con "Italy - EUR".
+    updateProfile({
+      city: chosen.city,
+      country: chosen.countryCode,
+      ...(chosen.currency ? { currency: chosen.currency as never } : {}),
+    });
     router.push("/onboarding/persone");
   }
 
@@ -114,10 +130,8 @@ export default function CittaScreen() {
     >
       <View style={styles.head}>
         <Body style={styles.step}>Passo 1 di 6</Body>
-        <Title>Dove fai la spesa?</Title>
-        <Subtitle>
-          Serve per usare i prezzi di riferimento del tuo paese e trovare i negozi vicini.
-        </Subtitle>
+        <Title>{ui("Dove fai la spesa?")}</Title>
+        <Subtitle>{ui("Serve per usare i prezzi di riferimento del tuo paese e trovare i negozi vicini.")}</Subtitle>
       </View>
 
       <Button
@@ -128,7 +142,7 @@ export default function CittaScreen() {
       />
 
       <View style={styles.searchBox}>
-        <Label>Oppure cerca la città</Label>
+        <Label>{ui("Oppure cerca la città")}</Label>
         <View style={styles.inputRow}>
           <TextInput
             value={query}
@@ -141,7 +155,7 @@ export default function CittaScreen() {
             style={styles.input}
             autoCorrect={false}
             returnKeyType="search"
-            accessibilityLabel="Cerca la tua città"
+            accessibilityLabel={ui("Cerca la tua città")}
           />
           {searching ? <ActivityIndicator color={colors.primary} style={styles.spinner} /> : null}
         </View>
@@ -169,7 +183,7 @@ export default function CittaScreen() {
       ))}
 
       {query.trim().length >= 3 && !searching && results.length === 0 && !chosen ? (
-        <Body style={styles.empty}>Nessuna città trovata. Prova con un nome più completo.</Body>
+        <Body style={styles.empty}>{ui("Nessuna città trovata. Prova con un nome più completo.")}</Body>
       ) : null}
     </Screen>
   );

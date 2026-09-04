@@ -37,6 +37,7 @@ import { buildWhatsAppMessage } from "../src/lib/export/whatsapp-share";
 import { money, deviceDefaults } from "../src/lib/format";
 import { useI18n } from "../src/lib/i18n";
 import { colors, font, radius, spacing } from "../src/theme";
+import { uiText } from "../src/lib/ui-strings";
 
 const STATUS: Record<string, { label: string; tone: "success" | "warning" | "danger"; icon: string }> = {
   comfortable: { label: "Sei dentro il budget", tone: "success", icon: "checkmark-circle-outline" },
@@ -47,6 +48,8 @@ const STATUS: Record<string, { label: string; tone: "success" | "warning" | "dan
 };
 
 export default function RisultatiScreen() {
+  /** Testo nella lingua scelta dall'utente. */
+  const ui = (t: string) => uiText(t, language);
   const router = useRouter();
   const { profile, currentPlan } = useSession();
   const { language } = useI18n();
@@ -90,7 +93,7 @@ export default function RisultatiScreen() {
       <Screen>
         <View style={styles.empty}>
           <Ionicons name="clipboard-outline" size={44} color={colors.mutedForeground} />
-          <Title>Nessun piano</Title>
+          <Title>{ui("Nessun piano")}</Title>
           <Subtitle>Rispondi alle domande e te ne prepariamo uno.</Subtitle>
           <Button label="Comincia" onPress={() => router.replace("/onboarding/citta")} />
         </View>
@@ -125,9 +128,9 @@ export default function RisultatiScreen() {
     <Screen
       footer={
         <View style={styles.actions}>
-          <Button label="Vedi il menù" icon="restaurant-outline" onPress={() => router.push("/menu")} />
+          <Button label={ui("Vedi il menù")} icon="restaurant-outline" onPress={() => router.push("/menu")} />
           <Button
-            label="Lista della spesa"
+            label={ui("Lista della spesa")}
             variant="secondary"
             icon="cart-outline"
             onPress={() => router.push("/lista")}
@@ -136,7 +139,7 @@ export default function RisultatiScreen() {
       }
     >
       <TopBar
-        title="Il tuo piano"
+        title={ui("Il tuo piano")}
         onBack={() => router.replace("/")}
         right={
           <View style={styles.topActions}>
@@ -166,9 +169,9 @@ export default function RisultatiScreen() {
 
       <View style={styles.head}>
         <Pill tone={st.tone} icon={st.icon as never}>
-          {st.label}
+          {ui(st.label)}
         </Pill>
-        <Title>Il tuo piano</Title>
+        <Title>{ui("Il tuo piano")}</Title>
         <Subtitle>
           {city} · {profile.household || "4"} persone ·{" "}
           {profile.frequency === "monthly" ? "un mese" : "una settimana"}
@@ -199,15 +202,15 @@ export default function RisultatiScreen() {
       </GradientCard>
 
       <View style={styles.grid}>
-        <Stat icon="person-outline" label="A persona / giorno" value={money(results.costPerPersonPerDay, cur, language)} />
+        <Stat icon="person-outline" label={ui("A persona / giorno")} value={money(results.costPerPersonPerDay, cur, language)} />
         <Stat icon="ribbon-outline" label="Punteggio" value={`${results.score.total}/100`} />
       </View>
 
       {results.annualSavings > 0 ? (
         <Card>
-          <Label icon="trending-up-outline">Se continui così per un anno</Label>
+          <Label icon="trending-up-outline">{ui("Se continui così per un anno")}</Label>
           <Body style={styles.bigNumber}>{money(results.annualSavings, cur, language)}</Body>
-          <Body style={styles.muted}>risparmiati rispetto al tuo budget attuale</Body>
+          <Body style={styles.muted}>{ui("risparmiati rispetto al tuo budget attuale")}</Body>
         </Card>
       ) : null}
 
@@ -218,18 +221,18 @@ export default function RisultatiScreen() {
         <ListRow
           icon="map-outline"
           title="Supermercati vicini"
-          subtitle="Negozi alimentari intorno a te, con distanza"
+          subtitle={ui("Negozi alimentari intorno a te, con distanza")}
           onPress={() => router.push("/negozi")}
         />
         <ListRow
           icon="share-social-outline"
-          title="Condividi il piano"
-          subtitle="Manda menù e lista a chi fa la spesa con te"
+          title={ui("Condividi il piano")}
+          subtitle={ui("Manda menù e lista a chi fa la spesa con te")}
           onPress={() => void share()}
         />
         <ListRow
           icon="refresh-outline"
-          title="Rifai il piano"
+          title={ui("Rifai il piano")}
           subtitle="Ricomincia dalle domande"
           onPress={() => router.replace("/onboarding/citta")}
         />
@@ -237,7 +240,7 @@ export default function RisultatiScreen() {
 
       {currentPlan.savingTips.length > 0 ? (
         <Card>
-          <Label icon="bulb-outline">Come risparmiare ancora</Label>
+          <Label icon="bulb-outline">{ui("Come risparmiare ancora")}</Label>
           {currentPlan.savingTips.slice(0, 4).map((tip, i) => (
             <View key={i} style={styles.tipRow}>
               <Ionicons name="checkmark" size={16} color={colors.primary} style={styles.tipIcon} />
@@ -249,7 +252,7 @@ export default function RisultatiScreen() {
 
       {/* Onestà sui prezzi: obbligatoria, e va vista senza cercarla */}
       <Card style={styles.disclaimerCard}>
-        <Label icon="information-circle-outline">Come leggere questi numeri</Label>
+        <Label icon="information-circle-outline">{ui("Come leggere questi numeri")}</Label>
         <Body style={styles.small}>
           {loading
             ? "Sto calcolando i prezzi…"

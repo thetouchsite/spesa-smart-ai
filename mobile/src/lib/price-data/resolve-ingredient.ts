@@ -29,6 +29,7 @@
  */
 
 import { GENERATED_INGREDIENT_MAP } from "./ingredient-map.generated";
+import { LABEL_INDEX } from "./labels";
 import { CATALOG_BY_KEY } from "./sources/manual/catalog";
 
 export function normalise(s: string): string {
@@ -395,8 +396,22 @@ export function resolveIngredientKey(ingredient: string): string | null {
   return lookup(ingredient);
 }
 
-/** Risoluzione di un singolo termine, senza scomposizione. */
+/**
+ * Risoluzione di un singolo termine, senza scomposizione.
+ *
+ * L'ordine delle fonti non e' casuale:
+ *   1. eccezioni scritte a mano — le piu' affidabili
+ *   2. etichette del catalogo in tutte e 5 le lingue — 120 prodotti per
+ *      lingua, ed e' cio' che fa funzionare liste spagnole, francesi e
+ *      tedesche. Prima c'erano sei eccezioni per lingua e una lista
+ *      spagnola risolveva al 60%, sotto la soglia per mostrare un totale
+ *   3. tassonomia Open Food Facts — la piu' ampia, ma anche la piu' generica
+ */
 function lookup(ingredient: string): string | null {
+  for (const c of candidates(ingredient)) {
+    const byLabel = LABEL_INDEX[c];
+    if (byLabel) return byLabel;
+  }
   for (const c of candidates(ingredient)) {
     const override = OVERRIDE_INDEX[c];
     if (override) return override;

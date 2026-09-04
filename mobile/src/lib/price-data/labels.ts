@@ -318,3 +318,28 @@ const CATEGORIES: Record<string, Partial<Record<LabelLang, string>>> = {
 export function categoryLabel(category: string, lang: LabelLang = "en"): string {
   return CATEGORIES[category]?.[lang] ?? category;
 }
+
+/**
+ * Indice inverso: etichetta normalizzata, in QUALSIASI lingua, → chiave del
+ * catalogo.
+ *
+ * È ciò che permette di dare un prezzo a una lista della spesa generata in
+ * spagnolo o francese. Senza, il resolver aveva sei eccezioni per lingua e
+ * una lista spagnola si fermava al 60% di copertura — sotto la soglia per
+ * mostrare un totale, quindi schermata a zero.
+ *
+ * Costruito una volta al caricamento del modulo: 120 prodotti × 5 lingue.
+ */
+export const LABEL_INDEX: Record<string, string> = (() => {
+  const idx: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(LABELS)) {
+    for (const value of Object.values(entry)) {
+      if (!value) continue;
+      const n = norm(value);
+      // La prima lingua che rivendica un termine lo tiene: evita che
+      // "Pasta" (identico in più lingue) rimbalzi fra chiavi diverse.
+      if (n && !idx[n]) idx[n] = key;
+    }
+  }
+  return idx;
+})();

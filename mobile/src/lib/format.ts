@@ -105,3 +105,30 @@ export function deviceDefaults(): { language: LabelLang; country: string; curren
 
   return { language, country, currency: CURRENCY[country] ?? "EUR" };
 }
+
+/**
+ * Lingua parlata in un paese, per le ricerche di prodotto.
+ *
+ * NON è la lingua dell'interfaccia, ed è una distinzione che serve davvero.
+ *
+ * Un utente inglese che vive a Napoli legge l'app in inglese, ma sugli
+ * scaffali dei negozi italiani i prodotti si chiamano in italiano. Cercare
+ * "Potatoes" su Google Shopping Italia dà risultati scarsi; cercare
+ * "Patatas" — perché l'utente aveva scelto lo spagnolo — dà una marca
+ * italiana di patatine gourmet chiamata "Patatas Nana", che con le patate
+ * non c'entra nulla.
+ *
+ * Quindi: interfaccia nella lingua dell'utente, ricerca nella lingua del
+ * paese in cui fa la spesa.
+ */
+const COUNTRY_LANGUAGE: Record<string, LabelLang> = {
+  IT: "it",
+  FR: "fr", BE: "fr", LU: "fr",
+  ES: "es", MX: "es", AR: "es", CL: "es", CO: "es",
+  DE: "de", AT: "de", CH: "de",
+  GB: "en", IE: "en", US: "en", CA: "en", AU: "en", NZ: "en",
+};
+
+export function languageOfCountry(country: string): LabelLang {
+  return COUNTRY_LANGUAGE[(country || "").toUpperCase()] ?? "en";
+}

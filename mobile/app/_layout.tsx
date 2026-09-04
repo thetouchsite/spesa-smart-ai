@@ -29,8 +29,13 @@ import { I18nProvider } from "../src/lib/i18n";
 import { hydrate } from "../src/lib/kv";
 import { useSession } from "../src/lib/state/session";
 import { colors, font, spacing } from "../src/theme";
+import { uiText } from "../src/lib/ui-strings";
+import { useI18n } from "../src/lib/i18n";
 
 export default function RootLayout() {
+  const { language } = useI18n();
+  /** Testo nella lingua scelta dall'utente. */
+  const ui = (t: string) => uiText(t, language);
   const [ready, setReady] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -58,7 +63,7 @@ export default function RootLayout() {
   if (!ready) {
     return (
       <View style={styles.splash}>
-        <Text style={styles.splashTitle}>Spesa Smart</Text>
+        <Text style={styles.splashTitle}>{ui("Spesa Smart")}</Text>
         <ActivityIndicator color={colors.primaryForeground} />
       </View>
     );

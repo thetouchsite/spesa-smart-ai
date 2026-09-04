@@ -24,12 +24,15 @@ import {
   Screen,
   Subtitle,
   Title,
+  TopBar,
 } from "../src/components/ui";
 import { ping } from "../src/api/client";
 import { useSession } from "../src/lib/state/session";
 import { QuotaBanner } from "../src/components/quota-banner";
 import { deviceDefaults } from "../src/lib/format";
 import { colors, font, radius, spacing } from "../src/theme";
+import { uiText } from "../src/lib/ui-strings";
+import { useI18n } from "../src/lib/i18n";
 
 const STEPS = [
   {
@@ -50,6 +53,9 @@ const STEPS = [
 ];
 
 export default function Home() {
+  const { language } = useI18n();
+  /** Testo nella lingua scelta dall'utente. */
+  const ui = (t: string) => uiText(t, language);
   const router = useRouter();
   const { currentPlan, profile } = useSession();
   // La classifica catene viene da un'indagine sul solo mercato italiano.
@@ -86,22 +92,19 @@ export default function Home() {
         </View>
       }
     >
+      <TopBar />
+
       <QuotaBanner />
 
       <View style={styles.hero}>
-        <Pill tone="success" icon="leaf-outline">
-          Spesa Smart
-        </Pill>
+        <Pill tone="success" icon="leaf-outline">{ui("Spesa Smart")}</Pill>
         <Title>Mangia bene{"\n"}spendendo meno</Title>
-        <Subtitle>
-          Rispondi a sei domande e ricevi un menù settimanale con la lista della spesa già
-          organizzata, dentro il tuo budget.
-        </Subtitle>
+        <Subtitle>{ui("Rispondi a sei domande e ricevi un menù settimanale con la lista della spesa già organizzata, dentro il tuo budget.")}</Subtitle>
       </View>
 
       {currentPlan ? (
         <GradientCard>
-          <Body style={styles.resumeLabel}>Hai un piano in corso</Body>
+          <Body style={styles.resumeLabel}>{ui("Hai un piano in corso")}</Body>
           <Body style={styles.resumeValue}>
             {profile.city || "Il tuo piano"} · {profile.household || "4"} persone
           </Body>
@@ -112,7 +115,7 @@ export default function Home() {
       ) : null}
 
       <Card>
-        <Label icon="list-outline">Come funziona</Label>
+        <Label icon="list-outline">{ui("Come funziona")}</Label>
         {STEPS.map((s, i) => (
           <View key={s.title} style={styles.step}>
             <View style={styles.stepNum}>
@@ -120,9 +123,9 @@ export default function Home() {
             </View>
             <View style={styles.stepBody}>
               <Body style={styles.stepTitle}>
-                {i + 1}. {s.title}
+                {i + 1}. {ui(s.title)}
               </Body>
-              <Body style={styles.stepText}>{s.text}</Body>
+              <Body style={styles.stepText}>{ui(s.text)}</Body>
             </View>
           </View>
         ))}
@@ -140,7 +143,7 @@ export default function Home() {
         {isItaly ? (
         <ListRow
             icon="trophy-outline"
-            title="Le catene più economiche"
+            title={ui("Le catene più economiche")}
             subtitle="Indagine Altroconsumo 2026"
             onPress={() => router.push("/dove-conviene")}
           />
@@ -154,9 +157,8 @@ export default function Home() {
       </Card>
 
       <Card style={styles.disclaimer}>
-        <Label icon="information-circle-outline">I prezzi mostrati</Label>
-        <Body style={styles.small}>
-          Sono <Body style={styles.bold}>stime indicative</Body> basate su una tabella di
+        <Label icon="information-circle-outline">{ui("I prezzi mostrati")}</Label>
+        <Body style={styles.small}>{ui("Sono")}<Body style={styles.bold}>stime indicative</Body> basate su una tabella di
           riferimento per il tuo paese, non rilevazioni dai supermercati. Dalla lista della spesa
           puoi aprire la pagina del prodotto sul sito del negozio.
         </Body>
@@ -164,7 +166,7 @@ export default function Home() {
 
       {__DEV__ && api ? (
         <Card style={styles.disclaimer}>
-          <Label icon="pulse-outline">Diagnostica (solo sviluppo)</Label>
+          <Label icon="pulse-outline">{ui("Diagnostica (solo sviluppo)")}</Label>
           <Body style={styles.diag}>
             backend {api.ok ? "raggiungibile" : "NON raggiungibile"} · AI{" "}
             {api.aiConfigured ? "configurata" : "assente"} · database{" "}

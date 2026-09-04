@@ -49,6 +49,7 @@ import { money, deviceDefaults } from "../src/lib/format";
 import { useI18n } from "../src/lib/i18n";
 import { PriceCheckSheet } from "../src/components/price-check";
 import { colors, font, radius, spacing } from "../src/theme";
+import { uiText } from "../src/lib/ui-strings";
 
 interface Row {
   name: string;
@@ -58,6 +59,8 @@ interface Row {
 }
 
 export default function ListaScreen() {
+  /** Testo nella lingua scelta dall'utente. */
+  const ui = (t: string) => uiText(t, language);
   const router = useRouter();
   const { currentPlan, profile } = useSession();
   const { language } = useI18n();
@@ -130,8 +133,8 @@ export default function ListaScreen() {
     return (
       <Screen>
         <View style={styles.empty}>
-          <Title>Nessuna lista</Title>
-          <Subtitle>Crea prima un piano.</Subtitle>
+          <Title>{ui("Nessuna lista")}</Title>
+          <Subtitle>{ui("Crea prima un piano.")}</Subtitle>
           <Button label="Comincia" onPress={() => router.replace("/onboarding/citta")} />
         </View>
       </Screen>
@@ -178,15 +181,15 @@ export default function ListaScreen() {
     <Screen
       footer={
         <View style={styles.actions}>
-          <Button label="Condividi la lista" icon="share-social-outline" onPress={() => void shareList()} />
-          <Button label="Torna ai risultati" variant="ghost" onPress={() => router.back()} />
+          <Button label={ui("Condividi la lista")} icon="share-social-outline" onPress={() => void shareList()} />
+          <Button label={ui("Torna ai risultati")} variant="ghost" onPress={() => router.back()} />
         </View>
       }
     >
-      <TopBar title="Lista della spesa" onBack={() => router.back()} />
+      <TopBar title={ui("Lista della spesa")} onBack={() => router.back()} />
 
       <View style={styles.head}>
-        <Title>Lista della spesa</Title>
+        <Title>{ui("Lista della spesa")}</Title>
         <Subtitle>
           {rows.length} prodotti
           {total > 0 ? ` · totale stimato ${money(total, cur, language)}` : ""}
@@ -198,7 +201,7 @@ export default function ListaScreen() {
         ) : null}
       </View>
 
-      {loading ? <Loading text="Calcolo i prezzi…" /> : null}
+      {loading ? <Loading text={ui("Calcolo i prezzi…")} /> : null}
 
       {groups.map(([category, items]) => (
         <Card key={category}>
@@ -257,17 +260,15 @@ export default function ListaScreen() {
             key="apri-negozio"
             icon="open-outline"
             title={`Apri ${retailer.name}`}
-            subtitle="Cerca il primo prodotto della lista sul sito del negozio"
+            subtitle={ui("Cerca il primo prodotto della lista sul sito del negozio")}
             onPress={() => void buyOnline(items[0]?.name ?? rows[0]?.name ?? "")}
           />
         ))}
       </Card>
 
       <Card style={styles.note}>
-        <Label icon="information-circle-outline">Sui prezzi e sui link</Label>
-        <Body style={styles.small}>
-          I prezzi in elenco sono stime indicative basate sui valori medi del tuo paese.
-          L'icona accanto a ogni prodotto cerca il <Body style={styles.bold}>prezzo reale</Body>:
+        <Label icon="information-circle-outline">{ui("Sui prezzi e sui link")}</Label>
+        <Body style={styles.small}>{ui("I prezzi in elenco sono stime indicative basate sui valori medi del tuo paese. L'icona accanto a ogni prodotto cerca il")}<Body style={styles.bold}>prezzo reale</Body>:
           prodotto, importo e venditore veri, con il link per comprarlo. Puoi anche aprire
           direttamente {retailer.name}.
         </Body>

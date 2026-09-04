@@ -28,20 +28,16 @@ import {
 import { fetchRecipe, type ContentSource } from "../src/lib/content";
 import type { Recipe } from "../src/lib/recipes/types";
 import { useSession } from "../src/lib/state/session";
+import { localDay } from "../src/lib/days";
 import { useI18n } from "../src/lib/i18n";
 import { productLabel } from "../src/lib/price-data/labels";
 import { colors, font, radius, spacing } from "../src/theme";
+import { uiText } from "../src/lib/ui-strings";
 
 const DIFFICULTY: Record<string, string> = {
   easy: "facile",
   medium: "media",
   hard: "impegnativa",
-};
-
-/** Il motore pasti produce i giorni in inglese ("Tuesday"). */
-const DAY_IT: Record<string, string> = {
-  Monday: "Lunedì", Tuesday: "Martedì", Wednesday: "Mercoledì", Thursday: "Giovedì",
-  Friday: "Venerdì", Saturday: "Sabato", Sunday: "Domenica",
 };
 
 const MEAL_LABEL: Record<string, string> = {
@@ -51,6 +47,8 @@ const MEAL_LABEL: Record<string, string> = {
 };
 
 export default function RicettaScreen() {
+  /** Testo nella lingua scelta dall'utente. */
+  const ui = (t: string) => uiText(t, language);
   const router = useRouter();
   const { profile } = useSession();
   const { language } = useI18n();
@@ -95,7 +93,7 @@ export default function RicettaScreen() {
     return (
       <Screen>
         <TopBar onBack={() => router.back()} />
-        <Loading text="Preparo la ricetta…" />
+        <Loading text={ui("Preparo la ricetta…")} />
       </Screen>
     );
   }
@@ -104,16 +102,16 @@ export default function RicettaScreen() {
     return (
       <Screen>
         <View style={styles.empty}>
-          <Title>Ricetta non trovata</Title>
-          <Subtitle>Torna al menù e scegli un piatto.</Subtitle>
-          <Button label="Torna al menù" onPress={() => router.back()} />
+          <Title>{ui("Ricetta non trovata")}</Title>
+          <Subtitle>{ui("Torna al menù e scegli un piatto.")}</Subtitle>
+          <Button label={ui("Torna al menù")} onPress={() => router.back()} />
         </View>
       </Screen>
     );
   }
 
   return (
-    <Screen footer={<Button label="Torna al menù" onPress={() => router.back()} />}>
+    <Screen footer={<Button label={ui("Torna al menù")} onPress={() => router.back()} />}>
       <Image
         source={{ uri: recipe.image }}
         style={styles.photo}
@@ -124,7 +122,7 @@ export default function RicettaScreen() {
       <View style={styles.head}>
         {params.giorno ? (
           <Body style={styles.eyebrow}>
-            {DAY_IT[params.giorno] ?? params.giorno} · {MEAL_LABEL[mealType] ?? ""}
+            {localDay(params.giorno, language)} · {MEAL_LABEL[mealType] ?? ""}
           </Body>
         ) : null}
         <Title>{recipe.title}</Title>
@@ -135,7 +133,7 @@ export default function RicettaScreen() {
         <Fact value={`${recipe.prepMinutes}′`} label="preparazione" />
         <Fact value={`${recipe.cookMinutes}′`} label="cottura" />
         <Fact value={`${recipe.servings}`} label={recipe.servings === 1 ? "porzione" : "porzioni"} />
-        <Fact value={DIFFICULTY[recipe.difficulty] ?? recipe.difficulty} label="difficoltà" />
+        <Fact value={DIFFICULTY[recipe.difficulty] ?? recipe.difficulty} label={ui("difficoltà")} />
       </View>
 
       <Card>
@@ -149,7 +147,7 @@ export default function RicettaScreen() {
       </Card>
 
       <Card>
-        <Label>Come si prepara</Label>
+        <Label>{ui("Come si prepara")}</Label>
         {recipe.steps.map((step, i) => (
           <View key={i} style={styles.step}>
             <View style={styles.stepNum}>
@@ -162,7 +160,7 @@ export default function RicettaScreen() {
 
       {recipe.nutrition ? (
         <Card>
-          <Label>Valori per porzione</Label>
+          <Label>{ui("Valori per porzione")}</Label>
           <View style={styles.facts}>
             <Fact value={`${Math.round(recipe.nutrition.calories)}`} label="kcal" />
             <Fact value={`${Math.round(recipe.nutrition.protein)} g`} label="proteine" />
@@ -188,7 +186,7 @@ export default function RicettaScreen() {
       {/* Onestà sulla fonte: questa ricetta è costruita dall'app, non presa
           da un sito. Dirlo evita che un link porti altrove. */}
       <Card style={styles.note}>
-        <Label icon="information-circle-outline">Da dove viene questa ricetta</Label>
+        <Label icon="information-circle-outline">{ui("Da dove viene questa ricetta")}</Label>
         <Body style={styles.small}>
           {source === "ai"
             ? "Generata su misura per le tue preferenze, con ingredienti e dosi adattati al numero di persone."

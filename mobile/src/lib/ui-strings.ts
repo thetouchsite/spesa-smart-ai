@@ -1,0 +1,161 @@
+/**
+ * Testi delle schermate mobile, in tutte le lingue dell app.
+ *
+ * PERCHÉ ESISTE, VISTO CHE C È GIÀ i18n/translations.ts
+ * ----------------------------------------------------
+ * Quel file ha 1.795 chiavi ed è la traduzione del prototipo web. Le
+ * schermate mobile sono nuove — ricetta, negozi vicini, impostazioni,
+ * classifica catene, verifica prezzo — e i loro testi lì non ci sono.
+ * Aggiungerli in mezzo alle altre significherebbe toccare un file che
+ * funziona, per stringhe che riguardano solo il mobile.
+ *
+ * LA CHIAVE È IL TESTO ITALIANO
+ * -----------------------------
+ * Scelta deliberata: nel codice si legge  invece di
+ * . Chi apre il file capisce cosa comparirà a schermo senza
+ * aprire il dizionario, e una chiave mai tradotta degrada nell italiano
+ * originale invece che in una stringa tecnica.
+ *
+ * Traduzioni generate una volta sola e revisionabili: sono qui, in chiaro.
+ */
+
+import type { LabelLang } from "./price-data/labels";
+
+type Entry = Record<LabelLang, string>;
+
+const UI: Record<string, Entry> = {
+  "A persona / giorno": {"it": "A persona / giorno", "en": "Per person / day", "fr": "Par personne / jour", "es": "Por persona / día", "de": "Pro Person / Tag"},
+  "A settimana": {"it": "A settimana", "en": "Per week", "fr": "Par semaine", "es": "Por semana", "de": "Pro Woche"},
+  "Budget": {"it": "Budget", "en": "Budget", "fr": "Budget", "es": "Presupuesto", "de": "Budget"},
+  "Budget troppo basso": {"it": "Budget troppo basso", "en": "Budget too low", "fr": "Budget trop bas", "es": "Presupuesto muy bajo", "de": "Budget zu niedrig"},
+  "Budget usato quasi tutto": {"it": "Budget usato quasi tutto", "en": "Budget almost used up", "fr": "Budget presque épuisé", "es": "Presupuesto casi agotado", "de": "Budget fast aufgebraucht"},
+  "Calcolo i prezzi…": {"it": "Calcolo i prezzi…", "en": "Calculating prices…", "fr": "Calcul des prix…", "es": "Calculando precios…", "de": "Preise werden berechnet…"},
+  "Ci dici come mangi": {"it": "Ci dici come mangi", "en": "Tell us how you eat", "fr": "Dites-nous ce que vous mangez", "es": "Cuéntanos cómocomes", "de": "Sag uns, wie du isst"},
+  "Città": {"it": "Città", "en": "City", "fr": "Ville", "es": "Ciudad", "de": "Stadt"},
+  "Città, persone, budget, stile, allergie.": {"it": "Città, persone, budget, stile, allergie.", "en": "City, people, budget, style, allergies.", "fr": "Ville, personnes, budget, style, allergies.", "es": "Ciudad, personas, presupuesto, estilo, alergias.", "de": "Stadt, Personen, Budget, Stil, Allergien."},
+  "Come funziona": {"it": "Come funziona", "en": "How it works", "fr": "Comment ça marche", "es": "Cómo funciona", "de": "Wie es funktioniert"},
+  "Come leggere questi numeri": {"it": "Come leggere questi numeri", "en": "How to read these numbers", "fr": "Comment lire ces chiffres", "es": "Cómo leer estos números", "de": "So liest man diese Zahlen"},
+  "Come risparmiare ancora": {"it": "Come risparmiare ancora", "en": "How to save even more", "fr": "Comment économiser encore plus", "es": "Cómo ahorrar aún más", "de": "Wie man noch mehr spart"},
+  "Come si prepara": {"it": "Come si prepara", "en": "How to prepare it", "fr": "Comment préparer", "es": "Cómo se prepara", "de": "Zubereitung"},
+  "Come vi piace mangiare?": {"it": "Come vi piace mangiare?", "en": "How do you like to eat?", "fr": "Comment aimez-vous manger ?", "es": "¿Cómo os gusta comer?", "de": "Wie esst ihr am liebsten?"},
+  "Crea il piano": {"it": "Crea il piano", "en": "Create plan", "fr": "Créer le plan", "es": "Crear plan", "de": "Plan erstellen"},
+  "Diagnostica (solo sviluppo)": {"it": "Diagnostica (solo sviluppo)", "en": "Diagnostics (dev only)", "fr": "Diagnostics (développement uniquement)", "es": "Diagnóstico (solo desarrollo)", "de": "Diagnose (nur Entwicklung)"},
+  "Es. non mangiamo funghi, niente pesce crudo…": {"it": "Es. non mangiamo funghi, niente pesce crudo…", "en": "E.g. no mushrooms, no raw fish…", "fr": "Ex. pas de champignons, pas de poisson cru…", "es": "Ej. no comemos champiñones, nada de pescado crudo…", "de": "Z. B. keine Pilze, kein roher Fisch…"},
+  "Fai la spesa": {"it": "Fai la spesa", "en": "Go shopping", "fr": "Faire les courses", "es": "Hacer la compra", "de": "Einkaufen gehen"},
+  "Famiglia, spesa contenuta": {"it": "Famiglia, spesa contenuta", "en": "Family, budget-friendly", "fr": "Famille, courses économiques", "es": "Familia, compra económica", "de": "Familie, budgetfreundlich"},
+  "I prezzi che vedrai sono stime basate su una tabella di riferimento per il tuo paese. Dalla lista della spesa potrai verificare il prezzo reale di ogni prodotto.": {"it": "I prezzi che vedrai sono stime basate su una tabella di riferimento per il tuo paese. Dalla lista della spesa potrai verificare il prezzo reale di ogni prodotto.", "en": "The prices you'll see are estimates based on a reference table for your country. You can check the actual price of each item from the shopping list.", "fr": "Les prix affichés sont des estimations basées sur une grille de référence pour votre pays. Vous pourrez vérifier le prix réel de chaque produit depuis la liste de courses.", "es": "Los precios que verás son estimaciones basadas en una tabla de referencia para tu país. Desde la lista de la compra podrás comprobar el precio real de cada producto.", "de": "Die Preise sind Schätzungen auf Basis einer Referenztabelle für dein Land. In der Einkaufsliste kannst du den tatsächlichen Preis jedes Produkts überprüfen."},
+  "I prezzi in elenco sono stime indicative basate sui valori medi del tuo paese. L'icona accanto a ogni prodotto cerca il": {"it": "I prezzi in elenco sono stime indicative basate sui valori medi del tuo paese. L'icona accanto a ogni prodotto cerca il", "en": "Listed prices are rough estimates based on average values in your country. The icon next to each product searches for", "fr": "Les prix indiqués sont des estimations basées sur les moyennes de votre pays. L'icône à côté de chaque produit recherche", "es": "Los precios de la lista son estimaciones orientativas basadas en los valores medios de tu país. El icono junto a cada producto busca", "de": "Die aufgelisteten Preise sind Richtwerte basierend auf den Durchschnittswerten deines Landes. Das Symbol neben jedem Produkt sucht nach"},
+  "I prezzi mostrati": {"it": "I prezzi mostrati", "en": "Displayed prices", "fr": "Prix affichés", "es": "Precios mostrados", "de": "Angezeigte Preise"},
+  "I tuoi dati": {"it": "I tuoi dati", "en": "Your data", "fr": "Vos données", "es": "Tus datos", "de": "Deine Daten"},
+  "Indice 100 = la catena più economica della rilevazione. 117 significa prezzi mediamente del 17% più alti.": {"it": "Indice 100 = la catena più economica della rilevazione. 117 significa prezzi mediamente del 17% più alti.", "en": "Index 100 = cheapest chain in the survey. 117 means prices are 17% higher on average.", "fr": "Indice 100 = l'enseigne la moins chère de l'enquête. 117 signifie des prix 17 % plus élevés en moyenne.", "es": "Índice 100 = la cadena más barata del estudio. 117 significa que los precios son un 17% más altos de media.", "de": "Index 100 = günstigste Kette der Erhebung. 117 bedeutet, dass die Preise im Durchschnitt 17 % höher sind."},
+  "La fonte": {"it": "La fonte", "en": "The source", "fr": "La source", "es": "La fuente", "de": "Die Quelle"},
+  "Lista aggregata, con le quantità già arrotondate.": {"it": "Lista aggregata, con le quantità già arrotondate.", "en": "Aggregated list, with quantities rounded up.", "fr": "Liste agrégée, avec des quantités déjà arrondies.", "es": "Lista agregada, con las cantidades ya redondeadas.", "de": "Zusammengefasste Liste mit bereits gerundeten Mengen."},
+  "Nessun piano": {"it": "Nessun piano", "en": "No plan", "fr": "Aucun plan", "es": "Ningún plan", "de": "Kein Plan"},
+  "Nessuna lista": {"it": "Nessuna lista", "en": "No list", "fr": "Aucune liste", "es": "Ninguna lista", "de": "Keine Liste"},
+  "Ogni quanto": {"it": "Ogni quanto", "en": "How often", "fr": "À quelle fréquence", "es": "Cada cuánto", "de": "Wie oft"},
+  "Persone": {"it": "Persone", "en": "People", "fr": "Personnes", "es": "Personas", "de": "Personen"},
+  "Più proteine e verdure, meno pasta e pane": {"it": "Più proteine e verdure, meno pasta e pane", "en": "More protein and veggies, less pasta and bread", "fr": "Plus de protéines et de légumes, moins de pâtes et de pain", "es": "Más proteínas y verduras, menos pasta y pan", "de": "Mehr Protein und Gemüse, weniger Pasta und Brot"},
+  "Prepariamo il menù": {"it": "Prepariamo il menù", "en": "Preparing your menu", "fr": "Préparation du menu", "es": "Preparando el menú", "de": "Menü wird erstellt"},
+  "Prezzi e venditori da Google Shopping, aggiornati al momento della ricerca. Toccando una riga si apre la pagina del negozio.": {"it": "Prezzi e venditori da Google Shopping, aggiornati al momento della ricerca. Toccando una riga si apre la pagina del negozio.", "en": "Prices and sellers from Google Shopping, updated at the time of search. Tap a row to open the store page.", "fr": "Prix et vendeurs issus de Google Shopping, mis à jour lors de la recherche. Appuyez sur une ligne pour ouvrir la page du magasin.", "es": "Precios y vendedores de Google Shopping, actualizados en el momento de la búsqueda. Toca una fila para abrir la página de la tienda.", "de": "Preise und Verkäufer von Google Shopping, aktualisiert zum Zeitpunkt der Suche. Tippe auf eine Zeile, um die Shop-Seite zu öffnen."},
+  "Prezzi non disponibili": {"it": "Prezzi non disponibili", "en": "Prices not available", "fr": "Prix non disponibles", "es": "Precios no disponibles", "de": "Preise nicht verfügbar"},
+  "Rispondi a sei domande e ricevi un menù settimanale con la lista della spesa già organizzata, dentro il tuo budget.": {"it": "Rispondi a sei domande e ricevi un menù settimanale con la lista della spesa già organizzata, dentro il tuo budget.", "en": "Answer six questions and get a weekly menu with an organized shopping list, within your budget.", "fr": "Répondez à six questions et obtenez un menu de la semaine avec une liste de courses organisée, selon votre budget.", "es": "Responde a seis preguntas y recibe un menú semanal con la lista de la compra ya organizada, dentro de tu presupuesto.", "de": "Beantworte sechs Fragen und erhalte einen Wochenplan mit organisierter Einkaufsliste, passend zu deinem Budget."},
+  "Sei dentro il budget": {"it": "Sei dentro il budget", "en": "You're within budget", "fr": "Vous êtes dans le budget", "es": "Estás dentro del presupuesto", "de": "Du bist im Budget"},
+  "Senza glutine": {"it": "Senza glutine", "en": "Gluten-free", "fr": "Sans gluten", "es": "Sin gluten", "de": "Glutenfrei"},
+  "Senza lattosio": {"it": "Senza lattosio", "en": "Lactose-free", "fr": "Sans lactose", "es": "Sin lactosa", "de": "Laktosefrei"},
+  "Sette giorni di pasti completi": {"it": "Sette giorni di pasti completi", "en": "Seven days of full meals", "fr": "Sept jours de repas complets", "es": "Siete días de comidas completas", "de": "Sieben Tage vollwertige Mahlzeiten"},
+  "Sette giorni di pasti pensati per il tuo budget.": {"it": "Sette giorni di pasti pensati per il tuo budget.", "en": "Seven days of meals designed for your budget.", "fr": "Sept jours de repas pensés pour votre budget.", "es": "Siete días de comidas pensadas para tu presupuesto.", "de": "Sieben Tage Mahlzeiten, abgestimmt auf dein Budget."},
+  "Sono": {"it": "Sono", "en": "I am", "fr": "Je suis", "es": "Soy", "de": "Ich bin"},
+  "Sopra il budget": {"it": "Sopra il budget", "en": "Over budget", "fr": "Hors budget", "es": "Supera el presupuesto", "de": "Über dem Budget"},
+  "Spesa Smart": {"it": "Spesa Smart", "en": "Smart Grocery", "fr": "Courses Smart", "es": "Compra Smart", "de": "Smart Einkaufen"},
+  "Sui prezzi e sui link": {"it": "Sui prezzi e sui link", "en": "About prices and links", "fr": "À propos des prix et des liens", "es": "Sobre precios y enlaces", "de": "Zu Preisen und Links"},
+  "Torna ai risultati": {"it": "Torna ai risultati", "en": "Back to results", "fr": "Retour aux résultats", "es": "Volver a los resultados", "de": "Zurück zu den Ergebnissen"},
+  "Torna indietro": {"it": "Torna indietro", "en": "Go back", "fr": "Retour", "es": "Volver atrás", "de": "Zurück"},
+  "Un giorno con avanzi e quello che c'è in casa": {"it": "Un giorno con avanzi e quello che c'è in casa", "en": "A day using leftovers and pantry staples", "fr": "Un jour avec des restes et les placards", "es": "Un día con sobras y lo que hay en casa", "de": "Ein Tag mit Resten und Vorräten aus dem Haus"},
+  "Un piano di 30 giorni": {"it": "Un piano di 30 giorni", "en": "A 30-day plan", "fr": "Un plan de 30 jours", "es": "Un plan de 30 días", "de": "Ein 30-Tage-Plan"},
+  "Un piano di 7 giorni": {"it": "Un piano di 7 giorni", "en": "A 7-day plan", "fr": "Un plan de 7 jours", "es": "Un plan de 7 días", "de": "Ein 7-Tage-Plan"},
+  "città": {"it": "città", "en": "city", "fr": "ville", "es": "ciudad", "de": "Stadt"},
+  "più economica sul paniere dell'indagine. Non dicono quanto costa la tua lista in un negozio preciso: i prezzi cambiano per punto vendita, offerta e periodo.": {"it": "più economica sul paniere dell'indagine. Non dicono quanto costa la tua lista in un negozio preciso: i prezzi cambiano per punto vendita, offerta e periodo.", "en": "cheapest for the surveyed basket. They don't reflect the exact cost of your list at a specific store: prices vary by location, deals, and time of year.", "fr": "la moins chère pour le panier de l'enquête. Ils n'indiquent pas le coût exact de votre liste dans un magasin précis : les prix varient selon le point de vente, les offres et la période.", "es": "más económica de la cesta del estudio. No indican cuánto cuesta tu lista en un establecimiento concreto: los precios varían según el punto de venta, la oferta y el periodo.", "de": "am günstigsten für den Warenkorb der Umfrage. Sie spiegeln nicht die genauen Kosten deiner Liste in einem bestimmten Geschäft wider: Preise variieren je nach Filiale, Angebot und Zeitraum."},
+  "prezzi rilevati": {"it": "prezzi rilevati", "en": "recorded prices", "fr": "prix constatés", "es": "precios registrados", "de": "ermittelte Preise"},
+  "risparmiati rispetto al tuo budget attuale": {"it": "risparmiati rispetto al tuo budget attuale", "en": "saved compared to your current budget", "fr": "économisés par rapport à votre budget actuel", "es": "ahorrados respecto a tu presupuesto actual", "de": "gespart im Vergleich zu deinem aktuellen Budget"},
+  "spesa zero": {"it": "spesa zero", "en": "zero spend", "fr": "dépense zéro", "es": "gasto cero", "de": "Null-Ausgaben"},
+  "Continua": {"it": "Continua", "en": "Continue", "fr": "Continuer", "es": "Continuar", "de": "Weiter"},
+  "Scegli lingua e paese per cominciare": {"it": "Scegli lingua e paese per cominciare", "en": "Choose language and country to get started", "fr": "Choisissez la langue et le pays pour commencer", "es": "Elige idioma y paÃ­s para empezar", "de": "WÃ¤hle Sprache und Land, um zu beginnen"},
+  "Lingua": {"it": "Lingua", "en": "Language", "fr": "Langue", "es": "Idioma", "de": "Sprache"},
+  "Paese": {"it": "Paese", "en": "Country", "fr": "Pays", "es": "PaÃ­s", "de": "Land"},
+  "Serve per i prezzi di riferimento e i negozi vicini.": {"it": "Serve per i prezzi di riferimento e i negozi vicini.", "en": "Used for reference prices and nearby stores.", "fr": "UtilisÃ© pour les prix de rÃ©fÃ©rence et les magasins proches.", "es": "Se usa para precios de referencia y tiendas cercanas.", "de": "Wird fÃ¼r Referenzpreise und GeschÃ¤fte in der NÃ¤he verwendet."},
+  "Potrai cambiarli quando vuoi dalle impostazioni.": {"it": "Potrai cambiarli quando vuoi dalle impostazioni.", "en": "You can change them anytime in settings.", "fr": "Vous pouvez les modifier Ã  tout moment dans les paramÃ¨tres.", "es": "Puedes cambiarlos cuando quieras en los ajustes.", "de": "Du kannst sie jederzeit in den Einstellungen Ã¤ndern."},
+  "Cerca i negozi alimentari intorno alla tua posizione": {"it": "Cerca i negozi alimentari intorno alla tua posizione", "en": "Search for grocery stores near your location", "fr": "Rechercher des épiceries près de chez vous", "es": "Buscar tiendas de comestibles cerca de tu ubicación", "de": "Lebensmittelgeschäfte in deiner Nähe suchen"},
+  "Cerca il primo prodotto della lista sul sito del negozio": {"it": "Cerca il primo prodotto della lista sul sito del negozio", "en": "Search for the first item on the list on the store's website", "fr": "Rechercher le premier article de la liste sur le site du magasin", "es": "Buscar el primer producto de la lista en la web de la tienda", "de": "Suche nach dem ersten Artikel der Liste auf der Website des Shops"},
+  "Cerca la tua città": {"it": "Cerca la tua città", "en": "Search for your city", "fr": "Rechercher votre ville", "es": "Busca tu ciudad", "de": "Suche deine Stadt"},
+  "Cerco il prodotto…": {"it": "Cerco il prodotto…", "en": "Searching for product…", "fr": "Recherche du produit…", "es": "Buscando producto…", "de": "Suche Produkt…"},
+  "Classifica delle catene italiane per convenienza, su rilevazione indipendente.": {"it": "Classifica delle catene italiane per convenienza, su rilevazione indipendente.", "en": "Ranking of Italian chains by value, based on independent surveys.", "fr": "Classement des enseignes italiennes par prix, basé sur des enquêtes indépendantes.", "es": "Ranking de cadenas italianas por precio, basado en estudios independientes.", "de": "Ranking der italienischen Ketten nach Preis-Leistung, basierend auf unabhängigen Erhebungen."},
+  "Condividi il piano": {"it": "Condividi il piano", "en": "Share the plan", "fr": "Partager le plan", "es": "Compartir el plan", "de": "Plan teilen"},
+  "Condividi la lista": {"it": "Condividi la lista", "en": "Share the list", "fr": "Partager la liste", "es": "Compartir la lista", "de": "Liste teilen"},
+  "Consumo dei servizi (solo sviluppo)": {"it": "Consumo dei servizi (solo sviluppo)", "en": "Service usage (development only)", "fr": "Consommation des services (développement uniquement)", "es": "Consumo de servicios (solo desarrollo)", "de": "Dienstnutzung (nur Entwicklung)"},
+  "Cosa dicono questi numeri": {"it": "Cosa dicono questi numeri", "en": "What these numbers mean", "fr": "Que signifient ces chiffres", "es": "Qué significan estos números", "de": "Was diese Zahlen bedeuten"},
+  "Cosa non vi piace": {"it": "Cosa non vi piace", "en": "What you don't like", "fr": "Ce que vous n'aimez pas", "es": "Lo que no os gusta", "de": "Was ihr nicht mögt"},
+  "Crea prima un piano.": {"it": "Crea prima un piano.", "en": "Create a plan first.", "fr": "Créez d'abord un plan.", "es": "Crea un plan primero.", "de": "Erstelle zuerst einen Plan."},
+  "Da dove viene questa ricetta": {"it": "Da dove viene questa ricetta", "en": "Where this recipe comes from", "fr": "D'où vient cette recette", "es": "De dónde viene esta receta", "de": "Woher dieses Rezept stammt"},
+  "Dicono quale catena è": {"it": "Dicono quale catena è", "en": "Show which chain it is", "fr": "Indiquer de quelle enseigne il s'agit", "es": "Indican qué cadena es", "de": "Zeigt, welche Kette es ist"},
+  "Dove conviene": {"it": "Dove conviene", "en": "Where to save", "fr": "Où c'est moins cher", "es": "Dónde conviene", "de": "Wo es am günstigsten ist"},
+  "Dove conviene fare la spesa": {"it": "Dove conviene fare la spesa", "en": "Where to shop to save money", "fr": "Où faire ses courses au meilleur prix", "es": "Dónde conviene hacer la compra", "de": "Wo man am besten einkauft"},
+  "Dove fai la spesa?": {"it": "Dove fai la spesa?", "en": "Where do you shop?", "fr": "Où faites-vous vos courses ?", "es": "¿Dónde haces la compra?", "de": "Wo kaufst du ein?"},
+  "Dove fare la spesa": {"it": "Dove fare la spesa", "en": "Where to shop", "fr": "Où faire ses courses", "es": "Dónde hacer la compra", "de": "Wo einkaufen"},
+  "Escluderemo questi ingredienti da tutte le ricette. Puoi anche non scegliere nulla.": {"it": "Escluderemo questi ingredienti da tutte le ricette. Puoi anche non scegliere nulla.", "en": "We will exclude these ingredients from all recipes. You can also leave this empty.", "fr": "Nous exclurons ces ingrédients de toutes les recettes. Vous pouvez aussi ne rien sélectionner.", "es": "Excluiremos estos ingredientes de todas las recetas. También puedes no elegir nada.", "de": "Wir schließen diese Zutaten aus allen Rezepten aus. Du kannst auch nichts auswählen."},
+  "Hai un piano in corso": {"it": "Hai un piano in corso", "en": "You have an active plan", "fr": "Vous avez un plan en cours", "es": "Tienes un plan en curso", "de": "Du hast einen laufenden Plan"},
+  "Il menù": {"it": "Il menù", "en": "The menu", "fr": "Le menu", "es": "El menú", "de": "Das Menü"},
+  "Il tuo piano": {"it": "Il tuo piano", "en": "Your plan", "fr": "Votre plan", "es": "Tu plan", "de": "Dein Plan"},
+  "Il tuo profilo": {"it": "Il tuo profilo", "en": "Your profile", "fr": "Votre profil", "es": "Tu perfil", "de": "Dein Profil"},
+  "Importo del budget": {"it": "Importo del budget", "en": "Budget amount", "fr": "Montant du budget", "es": "Importe del presupuesto", "de": "Budgetbetrag"},
+  "Ingredienti che non vi piacciono": {"it": "Ingredienti che non vi piacciono", "en": "Ingredients you don't like", "fr": "Ingrédients que vous n'aimez pas", "es": "Ingredientes que no os gustan", "de": "Zutaten, die ihr nicht mögt"},
+  "La classifica": {"it": "La classifica", "en": "The ranking", "fr": "Le classement", "es": "El ranking", "de": "Das Ranking"},
+  "La tua settimana": {"it": "La tua settimana", "en": "Your week", "fr": "Votre semaine", "es": "Tu semana", "de": "Deine Woche"},
+  "Le catene più economiche": {"it": "Le catene più economiche", "en": "The cheapest chains", "fr": "Les enseignes les moins chères", "es": "Las cadenas más económicas", "de": "Die günstigsten Ketten"},
+  "Lingua dell'app, dati del tuo profilo e gestione delle informazioni.": {"it": "Lingua dell'app, dati del tuo profilo e gestione delle informazioni.", "en": "App language, profile data, and information management.", "fr": "Langue de l'application, données de profil et gestion des informations.", "es": "Idioma de la app, datos de perfil y gestión de información.", "de": "App-Sprache, Profildaten und Informationsverwaltung."},
+  "Lista della spesa": {"it": "Lista della spesa", "en": "Shopping list", "fr": "Liste de courses", "es": "Lista de la compra", "de": "Einkaufsliste"},
+  "Manda menù e lista a chi fa la spesa con te": {"it": "Manda menù e lista a chi fa la spesa con te", "en": "Send the menu and list to whoever shops with you", "fr": "Envoyez le menu et la liste à la personne qui fait les courses avec vous", "es": "Envía el menú y la lista a quien hace la compra contigo", "de": "Sende Menü und Liste an denjenigen, der mit dir einkauft"},
+  "Negozi alimentari intorno a te, con distanza": {"it": "Negozi alimentari intorno a te, con distanza", "en": "Grocery stores near you, with distance", "fr": "Épiceries autour de vous, avec la distance", "es": "Tiendas de alimentación a tu alrededor, con distancia", "de": "Lebensmittelgeschäfte in deiner Nähe mit Entfernung"},
+  "Nessun menù": {"it": "Nessun menù", "en": "No menu", "fr": "Aucun menu", "es": "Ningún menú", "de": "Kein Menü"},
+  "Nessuna città trovata. Prova con un nome più completo.": {"it": "Nessuna città trovata. Prova con un nome più completo.", "en": "No city found. Try entering a fuller name.", "fr": "Aucune ville trouvée. Essayez avec un nom plus complet.", "es": "No se ha encontrado ninguna ciudad. Prueba con un nombre más completo.", "de": "Keine Stadt gefunden. Versuche es mit einem vollständigeren Namen."},
+  "Non lo supereremo. Se il budget non basta per mangiare bene, te lo diciamo.": {"it": "Non lo supereremo. Se il budget non basta per mangiare bene, te lo diciamo.", "en": "We won't exceed it. If the budget isn't enough to eat well, we'll let you know.", "fr": "Nous ne le dépasserons pas. Si le budget ne suffit pas pour bien manger, nous vous le dirons.", "es": "No lo superaremos. Si el presupuesto no basta para comer bien, te avisaremos.", "de": "Wir werden ihn nicht überschreiten. Wenn das Budget nicht reicht, um gut zu essen, sagen wir dir Bescheid."},
+  "Oppure cerca la città": {"it": "Oppure cerca la città", "en": "Or search for the city", "fr": "Ou recherchez la ville", "es": "O busca la ciudad", "de": "Oder suche die Stadt"},
+  "Per il costo reale dei tuoi prodotti, usa la verifica prezzo dalla lista della spesa.": {"it": "Per il costo reale dei tuoi prodotti, usa la verifica prezzo dalla lista della spesa.", "en": "For actual product prices, use the price check from the shopping list.", "fr": "Pour le coût réel de vos produits, utilisez la vérification des prix depuis la liste de courses.", "es": "Para el coste real de tus productos, usa la verificación de precios desde la lista de la compra.", "de": "Nutze die Preisprüfung in der Einkaufsliste für den tatsächlichen Preis deiner Produkte."},
+  "Per quante persone?": {"it": "Per quante persone?", "en": "How many people?", "fr": "Pour combien de personnes ?", "es": "¿Para cuántas personas?", "de": "Für wie viele Personen?"},
+  "Più care:": {"it": "Più care:", "en": "Most expensive:", "fr": "Les plus chères :", "es": "Más caras:", "de": "Am teuersten:"},
+  "Più conveniente": {"it": "Più conveniente", "en": "Best value", "fr": "Le plus avantageux", "es": "Más económico", "de": "Günstigste"},
+  "Più economiche:": {"it": "Più economiche:", "en": "Cheapest:", "fr": "Les moins chères :", "es": "Más económicas:", "de": "Am günstigsten:"},
+  "Preparo la ricetta…": {"it": "Preparo la ricetta…", "en": "Preparing the recipe…", "fr": "Préparation de la recette…", "es": "Preparando receta…", "de": "Bereite Rezept vor…"},
+  "Qualcosa non ha funzionato": {"it": "Qualcosa non ha funzionato", "en": "Something went wrong", "fr": "Un problème est survenu", "es": "Algo no ha funcionado", "de": "Etwas ist schiefgelaufen"},
+  "Quanto pesa la regione": {"it": "Quanto pesa la regione", "en": "How much the region affects pricing", "fr": "Impact de la région sur les prix", "es": "Cuánto influye la región", "de": "Einfluss der Region"},
+  "Ricetta non trovata": {"it": "Ricetta non trovata", "en": "Recipe not found", "fr": "Recette introuvable", "es": "Receta no encontrada", "de": "Rezept nicht gefunden"},
+  "Rifai il piano": {"it": "Rifai il piano", "en": "Redo the plan", "fr": "Refaire le plan", "es": "Volver a hacer el plan", "de": "Plan neu erstellen"},
+  "Sceglieremo i piatti dentro questo stile per tutta la settimana.": {"it": "Sceglieremo i piatti dentro questo stile per tutta la settimana.", "en": "We'll pick dishes in this style for the whole week.", "fr": "Nous choisirons des plats de ce style pour toute la semaine.", "es": "Elegiremos platos dentro de este estilo para toda la semana.", "de": "Wir wählen die Gerichte in diesem Stil für die ganze Woche aus."},
+  "Se continui così per un anno": {"it": "Se continui così per un anno", "en": "If you keep this up for a year", "fr": "Si vous continuez ainsi pendant un an", "es": "Si sigues así durante un año", "de": "Wenn du das ein Jahr lang machst"},
+  "Serve a calcolare le porzioni delle ricette e la spesa a testa.": {"it": "Serve a calcolare le porzioni delle ricette e la spesa a testa.", "en": "Used to calculate recipe portions and cost per person.", "fr": "Sert à calculer les portions des recettes et le budget par personne.", "es": "Sirve para calcular las porciones de las recetas y la compra por persona.", "de": "Dient zur Berechnung von Rezeptportionen und Kosten pro Person."},
+  "Serve per usare i prezzi di riferimento del tuo paese e trovare i negozi vicini.": {"it": "Serve per usare i prezzi di riferimento del tuo paese e trovare i negozi vicini.", "en": "Used to apply your country's reference prices and find nearby stores.", "fr": "Permet d'utiliser les prix de référence de votre pays et de trouver les magasins proches.", "es": "Sirve para usar los precios de referencia de tu país y encontrar tiendas cercanas.", "de": "Wird verwendet, um die Referenzpreise deines Landes zu nutzen und nahegelegene Geschäfte zu finden."},
+  "Sto preparando il tuo piano": {"it": "Sto preparando il tuo piano", "en": "Preparing your plan", "fr": "Préparation de votre plan", "es": "Preparando tu plan", "de": "Dein Plan wird erstellt"},
+  "Sì, mettiamolo": {"it": "Sì, mettiamolo", "en": "Yes, let's add it", "fr": "Oui, ajoutons-le", "es": "Sí, pongámoslo", "de": "Ja, hinzufügen"},
+  "Torna al menù": {"it": "Torna al menù", "en": "Back to menu", "fr": "Retour au menu", "es": "Volver al menú", "de": "Zurück zum Menü"},
+  "Torna al menù e scegli un piatto.": {"it": "Torna al menù e scegli un piatto.", "en": "Go back to the menu and choose a dish.", "fr": "Retournez au menu et choisissez un plat.", "es": "Vuelve al menú y elige un plato.", "de": "Gehe zurück zum Menü und wähle ein Gericht."},
+  "Un giorno a spesa zero?": {"it": "Un giorno a spesa zero?", "en": "A zero-spend day?", "fr": "Un jour sans courses ?", "es": "¿Un día de gasto cero?", "de": "Ein Tag ohne Ausgaben?"},
+  "Un giorno alla settimana si cucina solo con avanzi e dispensa. Si risparmia parecchio.": {"it": "Un giorno alla settimana si cucina solo con avanzi e dispensa. Si risparmia parecchio.", "en": "Cook using only leftovers and pantry items one day a week to save a lot.", "fr": "Un jour par semaine, cuisinez uniquement avec les restes et les placards. Vous économiserez beaucoup.", "es": "Un día a la semana se cocina solo con sobras y despensa. Se ahorra bastante.", "de": "Koche einmal die Woche nur mit Resten und Vorräten. Das spart einiges."},
+  "Valori per porzione": {"it": "Valori per porzione", "en": "Per serving", "fr": "Valeurs par portion", "es": "Valores por porción", "de": "Nährwerte pro Portion"},
+  "Vedi il menù": {"it": "Vedi il menù", "en": "View menu", "fr": "Voir le menu", "es": "Ver el menú", "de": "Menü ansehen"},
+  "Verifica i prezzi della tua lista": {"it": "Verifica i prezzi della tua lista", "en": "Check your list's prices", "fr": "Vérifier les prix de votre liste", "es": "Verifica los precios de tu lista", "de": "Preise deiner Liste prüfen"},
+  "difficoltà": {"it": "difficoltà", "en": "difficulty", "fr": "difficulté", "es": "dificultad", "de": "Schwierigkeit"},
+};
+
+/**
+ * Testo nella lingua richiesta.
+ *
+ * Se la stringa non è in tabella si restituisce così com è: meglio una
+ * frase in italiano che una chiave tecnica o uno spazio vuoto.
+ */
+export function uiText(italian: string, lang: LabelLang = "it"): string {
+  const entry = UI[italian];
+  if (!entry) return italian;
+  return entry[lang] ?? entry.it ?? italian;
+}
+
+/** Quante stringhe conosciamo: usato dai controlli di completezza. */
+export const UI_STRING_COUNT = Object.keys(UI).length;

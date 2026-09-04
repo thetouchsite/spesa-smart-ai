@@ -8,29 +8,34 @@
 import { useRouter } from "expo-router";
 import { Choice, Note, Step } from "../../src/components/onboarding";
 import { useSession } from "../../src/lib/state/session";
+import { uiText } from "../../src/lib/ui-strings";
+import { useI18n } from "../../src/lib/i18n";
 
 export default function ExtraScreen() {
+  const { language } = useI18n();
+  /** Testo nella lingua scelta dall'utente. */
+  const ui = (t: string) => uiText(t, language);
   const router = useRouter();
   const { profile, updateProfile } = useSession();
 
   return (
     <Step
       step="extra"
-      title="Un giorno a spesa zero?"
-      subtitle="Un giorno alla settimana si cucina solo con avanzi e dispensa. Si risparmia parecchio."
+      title={ui("Un giorno a spesa zero?")}
+      subtitle={ui("Un giorno alla settimana si cucina solo con avanzi e dispensa. Si risparmia parecchio.")}
       canNext
-      nextLabel="Crea il piano"
+      nextLabel={ui("Crea il piano")}
       onNext={() => router.replace("/elaborazione")}
     >
       <Choice
-        label="Sì, mettiamolo"
-        hint="Un giorno con avanzi e quello che c'è in casa"
+        label={ui("Sì, mettiamolo")}
+        hint={ui("Un giorno con avanzi e quello che c'è in casa")}
         selected={profile.zeroSpendDay === true}
         onPress={() => updateProfile({ zeroSpendDay: true })}
       />
       <Choice
         label="No, grazie"
-        hint="Sette giorni di pasti completi"
+        hint={ui("Sette giorni di pasti completi")}
         selected={profile.zeroSpendDay === false}
         onPress={() => updateProfile({ zeroSpendDay: false })}
       />

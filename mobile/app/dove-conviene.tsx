@@ -39,6 +39,7 @@ import {
 import { moneyRounded, number } from "../src/lib/format";
 import { useI18n } from "../src/lib/i18n";
 import { colors, font, radius, spacing } from "../src/theme";
+import { uiText } from "../src/lib/ui-strings";
 
 const KIND_LABEL: Record<string, string> = {
   discount: "discount",
@@ -47,6 +48,8 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 export default function DoveConvieneScreen() {
+  /** Testo nella lingua scelta dall'utente. */
+  const ui = (t: string) => uiText(t, language);
   const router = useRouter();
   const { profile } = useSession();
   const { language } = useI18n();
@@ -72,22 +75,20 @@ export default function DoveConvieneScreen() {
     <Screen
       footer={
         <Button
-          label="Verifica i prezzi della tua lista"
+          label={ui("Verifica i prezzi della tua lista")}
           icon="pricetag-outline"
           onPress={() => router.push("/lista")}
         />
       }
     >
-      <TopBar title="Dove conviene" onBack={() => router.back()} />
+      <TopBar title={ui("Dove conviene")} onBack={() => router.back()} />
 
       <View style={styles.head}>
         <Pill tone="success" icon="stats-chart-outline">
           Indagine {SURVEY.source} 2026
         </Pill>
-        <Title>Dove conviene fare la spesa</Title>
-        <Subtitle>
-          Classifica delle catene italiane per convenienza, su rilevazione indipendente.
-        </Subtitle>
+        <Title>{ui("Dove conviene fare la spesa")}</Title>
+        <Subtitle>{ui("Classifica delle catene italiane per convenienza, su rilevazione indipendente.")}</Subtitle>
       </View>
 
       {/* Il dato che colpisce, ma riferito al budget di chi guarda */}
@@ -107,11 +108,8 @@ export default function DoveConvieneScreen() {
       </GradientCard>
 
       <Card>
-        <Label icon="trophy-outline">La classifica</Label>
-        <Body style={styles.small}>
-          Indice 100 = la catena più economica della rilevazione. 117 significa prezzi mediamente
-          del 17% più alti.
-        </Body>
+        <Label icon="trophy-outline">{ui("La classifica")}</Label>
+        <Body style={styles.small}>{ui("Indice 100 = la catena più economica della rilevazione. 117 significa prezzi mediamente del 17% più alti.")}</Body>
 
         {CHAIN_RANKING.map((chain, i) => {
           const tone = i === 0 ? "success" : i === CHAIN_RANKING.length - 1 ? "danger" : "neutral";
@@ -156,36 +154,28 @@ export default function DoveConvieneScreen() {
       </Card>
 
       <Card>
-        <Label icon="map-outline">Quanto pesa la regione</Label>
-        <Body>
-          Più economiche: <Body style={styles.bold}>{REGION_SPEND.cheapest.regions.join(" e ")}</Body>,
+        <Label icon="map-outline">{ui("Quanto pesa la regione")}</Label>
+        <Body>{ui("Più economiche:")}<Body style={styles.bold}>{REGION_SPEND.cheapest.regions.join(" e ")}</Body>,
           circa {euro(REGION_SPEND.cheapest.annual)} l'anno a famiglia.
         </Body>
-        <Body>
-          Più care: <Body style={styles.bold}>{REGION_SPEND.dearest.regions.join(" e ")}</Body>,
+        <Body>{ui("Più care:")}<Body style={styles.bold}>{REGION_SPEND.dearest.regions.join(" e ")}</Body>,
           circa {euro(REGION_SPEND.dearest.annual)} — il {REGION_SPEND.dearest.deltaPercent}% in più.
         </Body>
       </Card>
 
       {/* Il limite di questi dati, detto senza girarci intorno */}
       <Card style={styles.note}>
-        <Label icon="information-circle-outline">Cosa dicono questi numeri</Label>
-        <Body style={styles.small}>
-          Dicono quale catena è <Body style={styles.bold}>mediamente</Body> più economica sul
-          paniere dell'indagine. Non dicono quanto costa la tua lista in un negozio preciso: i
-          prezzi cambiano per punto vendita, offerta e periodo.
-        </Body>
-        <Body style={styles.small}>
-          Per il costo reale dei tuoi prodotti, usa la verifica prezzo dalla lista della spesa.
-        </Body>
+        <Label icon="information-circle-outline">{ui("Cosa dicono questi numeri")}</Label>
+        <Body style={styles.small}>{ui("Dicono quale catena è")}<Body style={styles.bold}>mediamente</Body>{ui("più economica sul paniere dell'indagine. Non dicono quanto costa la tua lista in un negozio preciso: i prezzi cambiano per punto vendita, offerta e periodo.")}</Body>
+        <Body style={styles.small}>{ui("Per il costo reale dei tuoi prodotti, usa la verifica prezzo dalla lista della spesa.")}</Body>
       </Card>
 
       <Card>
-        <Label icon="document-text-outline">La fonte</Label>
+        <Label icon="document-text-outline">{ui("La fonte")}</Label>
         <View style={styles.facts}>
-          <Fact value={`${number(SURVEY.pricesCompared / 1_000_000, language)} mln`} label="prezzi rilevati" />
+          <Fact value={`${number(SURVEY.pricesCompared / 1_000_000, language)} mln`} label={ui("prezzi rilevati")} />
           <Fact value={String(SURVEY.stores)} label="punti vendita" />
-          <Fact value={String(SURVEY.cities)} label="città" />
+          <Fact value={String(SURVEY.cities)} label={ui("città")} />
         </View>
         <Body style={styles.small}>
           {SURVEY.source} · {SURVEY.title} · rilevazione {SURVEY.fieldwork} su {SURVEY.categories}{" "}

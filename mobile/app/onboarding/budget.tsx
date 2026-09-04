@@ -17,6 +17,8 @@ import { Label } from "../../src/components/ui";
 import { useSession } from "../../src/lib/state/session";
 import { loadResolvedLocation } from "../../src/lib/location/store";
 import { colors, font, radius, spacing } from "../../src/theme";
+import { uiText } from "../../src/lib/ui-strings";
+import { useI18n } from "../../src/lib/i18n";
 
 /** Valute proposte. La prima è quella del paese scelto, se riconosciuta. */
 const COMMON = ["EUR", "GBP", "USD", "CHF"];
@@ -34,6 +36,9 @@ function symbolOf(code: string): string {
 }
 
 export default function BudgetScreen() {
+  const { language } = useI18n();
+  /** Testo nella lingua scelta dall'utente. */
+  const ui = (t: string) => uiText(t, language);
   const router = useRouter();
   const { profile, updateProfile } = useSession();
   const [amount, setAmount] = useState(profile.budget);
@@ -42,7 +47,9 @@ export default function BudgetScreen() {
   // partenza, ma solo finché l'utente non l'ha cambiata a mano.
   useEffect(() => {
     const loc = loadResolvedLocation();
-    if (loc?.currency && !profile.budget) {
+    // Solo se il profilo non ha ancora una valuta: adesso la imposta il
+    // passo della citta', che e' il posto giusto.
+    if (loc?.currency && !profile.currency) {
       updateProfile({ currency: loc.currency as never, city: loc.city, country: loc.countryCode });
     }
   }, []);
@@ -65,7 +72,7 @@ export default function BudgetScreen() {
     <Step
       step="budget"
       title="Quanto vuoi spendere?"
-      subtitle="Non lo supereremo. Se il budget non basta per mangiare bene, te lo diciamo."
+      subtitle={ui("Non lo supereremo. Se il budget non basta per mangiare bene, te lo diciamo.")}
       canNext={valid}
       onNext={next}
     >
@@ -81,7 +88,7 @@ export default function BudgetScreen() {
           placeholderTextColor={colors.mutedForeground}
           keyboardType="decimal-pad"
           style={styles.input}
-          accessibilityLabel="Importo del budget"
+          accessibilityLabel={ui("Importo del budget")}
         />
       </View>
 
@@ -96,24 +103,21 @@ export default function BudgetScreen() {
         ))}
       </View>
 
-      <Label>Ogni quanto</Label>
+      <Label>{ui("Ogni quanto")}</Label>
       <Choice
-        label="A settimana"
-        hint="Un piano di 7 giorni"
+        label={ui("A settimana")}
+        hint={ui("Un piano di 7 giorni")}
         selected={profile.frequency === "weekly"}
         onPress={() => updateProfile({ frequency: "weekly" })}
       />
       <Choice
         label="Al mese"
-        hint="Un piano di 30 giorni"
+        hint={ui("Un piano di 30 giorni")}
         selected={profile.frequency === "monthly"}
         onPress={() => updateProfile({ frequency: "monthly" })}
       />
 
-      <Note>
-        I prezzi che vedrai sono stime basate su una tabella di riferimento per il tuo paese.
-        Dalla lista della spesa potrai verificare il prezzo reale di ogni prodotto.
-      </Note>
+      <Note>{ui("I prezzi che vedrai sono stime basate su una tabella di riferimento per il tuo paese. Dalla lista della spesa potrai verificare il prezzo reale di ogni prodotto.")}</Note>
     </Step>
   );
 }

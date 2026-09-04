@@ -10,7 +10,7 @@
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Body, Button, Screen, Subtitle, Title } from "./ui";
+import { Body, Button, Screen, Subtitle, Title, TopBar } from "./ui";
 import { colors, font, radius, spacing } from "../theme";
 
 /** I sei passi, nell'ordine. Serve a numerare e a tornare indietro. */
@@ -39,12 +39,17 @@ export function Step({
   children: ReactNode;
 }) {
   const index = STEPS.indexOf(step);
+  const router = useRouter();
   return (
     <Screen
       footer={
         <Button label={nextLabel ?? "Continua"} onPress={onNext} disabled={!canNext} />
       }
     >
+      {/* La lingua si puo' cambiare anche a meta' onboarding: chi si
+          accorge di non capire le domande non deve ricominciare. */}
+      <TopBar onBack={index > 0 ? () => router.back() : undefined} />
+
       <View style={styles.head}>
         <Progress current={index} />
         <Text style={styles.stepLabel}>
