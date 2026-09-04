@@ -8,6 +8,14 @@
  * Quest'ultimo punto non e' un dettaglio: il prototipo attribuiva a siti reali
  * anche le ricette inventate dal modello, e un investitore che tocca il link
  * se ne accorge. Qui la fonte e' dichiarata per quello che e'.
+ *
+ * SCORCIATOIA: LA RICETTA CE L'ABBIAMO GIA'
+ * -----------------------------------------
+ * Quando il piano viene dal motore con ricerca, le ricette delle cene sono
+ * gia' arrivate insieme al menu', nella lingua giusta e con le dosi calcolate
+ * sul numero di persone del profilo. In quel caso non si chiama nessuno: la
+ * schermata si apre subito invece di far aspettare dieci secondi per
+ * riottenere qualcosa che e' gia' in memoria.
  */
 
 import { useEffect, useState } from "react";
@@ -27,6 +35,8 @@ import {
 } from "../src/components/ui";
 import { fetchRecipe, type ContentSource } from "../src/lib/content";
 import type { Recipe } from "../src/lib/recipes/types";
+import type { Recipe as GeneratedRecipe } from "../src/lib/plan-full";
+import { unsplashFoodImage } from "../src/lib/recipes/unsplash";
 import { useSession } from "../src/lib/state/session";
 import { localDay } from "../src/lib/days";
 import { useI18n } from "../src/lib/i18n";
@@ -46,11 +56,76 @@ const MEAL_LABEL: Record<string, string> = {
   dinner: "Cena",
 };
 
+/**
+ * Cerca fra le ricette gia' generate quella del piatto richiesto.
+ *
+ * Il confronto e' sul nome normalizzato perche' il menu' e la ricetta possono
+ * scriverlo in modo leggermente diverso — "Pasta al pomodoro e basilico" nel
+ * menu', "Pasta al pomodoro" nella ricetta. Si accetta anche quando uno
+ * contiene l'altro, che copre quasi tutti i casi senza inventare accostamenti.
+ */
+function matchGenerated(
+  ricette: GeneratedRecipe[] | undefined,
+  dish: string,
+): GeneratedRecipe | null {
+  if (!ricette?.length || !dish) return null;
+  const norm = (t: string) =>
+    t
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9 ]/g, "")
+      .trim();
+
+  const target = norm(dish);
+  return (
+    ricette.find((r) => norm(r.piatto) === target) ??
+    ricette.find((r) => {
+      const p = norm(r.piatto);
+      return p.length > 6 && (p.includes(target) || target.includes(p));
+    }) ??
+    null
+  );
+}
+
+/**
+ * Traduce la ricetta del motore nella forma che la schermata gia' usa.
+ *
+ * `sourceUrl` resta vuoto di proposito: la ricetta l'ha scritta il modello, e
+ * attribuirla a un sito che non l'ha pubblicata sarebbe la stessa bugia del
+ * prototipo. La schermata dichiara "generata dall'assistente" ed e' la verita'.
+ */
+function toRecipe(g: GeneratedRecipe, dish: string, servings: number): Recipe {
+  const total = (g.prep_minuti ?? 0) + (g.cottura_minuti ?? 0);
+  return {
+    id: `gen-${norm32(g.piatto || dish)}`,
+    title: g.piatto || dish,
+    image: unsplashFoodImage(g.piatto || dish),
+    servings: g.porzioni || servings,
+    prepMinutes: g.prep_minuti ?? 0,
+    cookMinutes: g.cottura_minuti ?? 0,
+    // Una soglia grossolana ma onesta: sotto la mezz'ora e' roba da tutti i
+    // giorni, oltre l'ora richiede impegno.
+    difficulty: total <= 30 ? "easy" : total <= 60 ? "medium" : "hard",
+    ingredients: (g.ingredienti ?? []).map((i) => ({ name: i.nome, quantity: i.quantita })),
+    steps: g.passaggi ?? [],
+    nutrition: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+    allergens: [],
+    source: "ai",
+    sourceUrl: "",
+  };
+}
+
+/** Identificatore stabile a partire dal nome del piatto. */
+function norm32(t: string): string {
+  return t.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 32) || "ricetta";
+}
+
 export default function RicettaScreen() {
   /** Testo nella lingua scelta dall'utente. */
   const ui = (t: string) => uiText(t, language);
   const router = useRouter();
-  const { profile } = useSession();
+  const { profile, planExtra } = useSession();
   const { language } = useI18n();
   const params = useLocalSearchParams<{ piatto?: string; pasto?: string; giorno?: string }>();
 
@@ -67,6 +142,16 @@ export default function RicettaScreen() {
       setLoading(false);
       return;
     }
+    // Se il piano con ricerca ha gia' portato questa ricetta, si usa quella:
+    // niente attesa, niente chiamata, e il testo e' gia' nella lingua giusta.
+    const gia = matchGenerated(planExtra?.ricette, dish);
+    if (gia) {
+      setRecipe(toRecipe(gia, dish, servings));
+      setSource("ai");
+      setLoading(false);
+      return;
+    }
+
     let alive = true;
     setLoading(true);
     (async () => {
@@ -87,7 +172,7 @@ export default function RicettaScreen() {
     return () => {
       alive = false;
     };
-  }, [dish, servings, mealType, profile.country, language]);
+  }, [dish, servings, mealType, profile.country, language, planExtra]);
 
   if (loading) {
     return (

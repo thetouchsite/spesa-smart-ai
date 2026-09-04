@@ -23,6 +23,8 @@
  *   POST /ai/recipe-web      ricerca web + estrazione strutturata
  *   POST /ai/chef            rifinitura "da chef" (non tocca gli ingredienti)
  *   POST /ai/plan            piano alimentare completo
+ *   POST /ai/plan-full       piano + ricette + confronto supermercati + prezzi
+ *                            veri, in UNA chiamata con ricerca Google
  */
 
 import process from "node:process";
@@ -36,7 +38,9 @@ import { fetchPageContext, rankHits, searchProvider } from "./search.js";
 import { cache, isDbConfigured, plans, users } from "./db.js";
 import { hashPassword, issueToken, requireUser, verifyPassword } from "./auth.js";
 import { isShoppingConfigured, searchShopping } from "./shopping.js";
-import { quotaStatus, recordUse } from "./quota.js";
+import { budgetExhausted, quotaStatus, recordCost, recordUse, spendStatus } from "./quota.js";
+import { generateMenu, generatePrices, GROUNDED_MODEL, MENU_MODEL } from "./plan-grounded.js";
+import { groupByProduct, pickBestStore, verifyPrices } from "./price-page.js";
 import {
   AiRecipeInput,
   ChefInput,
@@ -180,6 +184,9 @@ async function generate<T extends z.ZodTypeAny>(
 app.get("/health", async () => ({
   ok: true,
   model: MODEL_ID,
+  // Il motore vero dell'app: il modello con ricerca Google.
+  menuModel: MENU_MODEL,
+  groundedModel: GROUNDED_MODEL,
   // Dichiara la verità: se manca una chiave lo deve sapere il monitoraggio,
   // non l'utente che riceve un errore.
   aiConfigured: isConfigured(),
@@ -189,6 +196,8 @@ app.get("/health", async () => ({
   // Consumo delle chiavi gratuite: l'app lo legge e avvisa a schermo prima
   // che la quota finisca a meta' di una dimostrazione.
   quota: quotaStatus(),
+  // Quanto e' costato finora questo processo, e quanto manca al tetto.
+  spesa: spendStatus(),
 }));
 
 /* ───────────────────────────── Account ───────────────────────────── */
@@ -348,6 +357,227 @@ app.post("/ai/recipe-web", async (body) => {
   return generate("recipe-syn", WebRecipeSchema, webSynthesizePrompt(data), data);
 });
 
+/* ──────────────── Piano completo con ricerca (il motore) ──────────────── */
+
+const GroundedInput = z.object({
+  city: z.string().max(80).default(""),
+  country: z.string().max(40).default("Italia"),
+  household: z.string().max(40).default("2 persone"),
+  budget: z.number().min(1).max(100_000).default(100),
+  currency: z.string().min(3).max(3).default("EUR"),
+  frequency: z.enum(["weekly", "monthly"]).default("weekly"),
+  style: z.string().max(80).default("mediterraneo"),
+  allergies: z.array(z.string().max(40)).max(20).default([]),
+  dislikes: z.string().max(200).default(""),
+  language: z.string().max(5).default("it"),
+  withRecipes: z.boolean().default(true),
+});
+
+/**
+ * Il motore dell'app: una chiamata, tutto il piano.
+ *
+ * Menù, ricette, lista della spesa, confronto fra supermercati e prezzi reali
+ * con link. Misurato: 28-40 secondi, 0,018 $, prezzi e link verificati uno
+ * per uno. Sostituisce /ai/plan + /ai/recipe-web + /product/shopping.
+ *
+ * DUE GARANZIE, ED È QUI CHE STA IL VALORE
+ *
+ * 1. I prezzi sono cercati sul web durante la generazione, non ricordati.
+ *    Senza ricerca il modello inventa numeri plausibili con link inesistenti:
+ *    è stato misurato, non temuto.
+ *
+ * 2. Ogni link viene APERTO da questo server prima di rispondere. Quelli che
+ *    non si aprono perdono prezzo e link. Serve perché il modello, quando una
+ *    catena ha il catalogo dietro login, ricostruisce gli indirizzi a mano —
+ *    ed è successo: dodici 404 su dodici in una prova.
+ *
+ * La cache è condivisa fra tutti gli utenti: due famiglie con lo stesso
+ * profilo pagano una generazione sola. È ciò che tiene il costo sostenibile
+ * quando gli utenti crescono.
+ */
+app.post("/ai/plan-full", async (body) => {
+  const data = parse(GroundedInput, body);
+  if (!isConfigured()) throw new HttpError(503, "Servizio AI non configurato su questo ambiente");
+
+  const key = cacheKey("plan-full", data);
+
+  const local = memoryGet(key);
+  if (local !== undefined) {
+    console.info(`[cache] HIT memoria ${key}`);
+    return local;
+  }
+  if (isDbConfigured()) {
+    try {
+      const hit = await (await cache()).findOne({ _id: key });
+      if (hit) {
+        console.info(`[cache] HIT database ${key}`);
+        memorySet(key, hit.value);
+        return hit.value;
+      }
+    } catch (err) {
+      console.warn("[cache] lettura fallita, proseguo senza:", err);
+    }
+  }
+
+  // Il freno a mano: sopra il tetto si smette di chiamare invece di consumare
+  // il credito fino all'ultimo centesimo. 402 e non 500: non e' un guasto, e'
+  // una scelta, e il client puo' spiegarla all'utente.
+  if (budgetExhausted()) {
+    const s = spendStatus();
+    throw new HttpError(
+      402,
+      `Tetto di spesa raggiunto ($${s.usd} su $${s.limitUsd}). ` +
+        `Alza SPESA_MAX_USD o riavvia il servizio per ripartire.`,
+    );
+  }
+
+  /* FASE 1 — menu', ricette e lista. Nessuna ricerca, quindi nessun costo di
+     grounding: puo' girare sulla chiave gratuita. */
+  recordUse("gemini");
+  const fase1 = await generateMenu(data);
+  recordCost(fase1.cost);
+  console.info(
+    `[plan-full] fase 1 ${fase1.model}: ${fase1.seconds.toFixed(0)}s, ` +
+      `$${fase1.cost.toFixed(4)}, ${fase1.data.menu.length} giorni, ` +
+      `${fase1.data.lista.length} voci in lista`,
+  );
+
+  /* FASE 2 — prezzi. Prompt corto sulla sola lista della spesa: e' l'unico modo
+     perche' il modello cerchi davvero, ed e' l'unica fase che si paga. */
+  const items = fase1.data.lista.map((v) => `${v.nome} ${v.quantita}`.trim()).slice(0, 18);
+
+  let prezziGrezzi: Awaited<ReturnType<typeof generatePrices>>["data"]["prezzi"] = [];
+  let fase2Secondi = 0;
+  let fase2Costo = 0;
+  let ricerche = 0;
+  let hacercato = false;
+
+  try {
+    recordUse("gemini");
+    recordUse("grounding");
+    const fase2 = await generatePrices(items, data.city, data.country, data.currency);
+    prezziGrezzi = fase2.data.prezzi;
+    fase2Secondi = fase2.seconds;
+    fase2Costo = fase2.cost;
+    ricerche = fase2.data.searches;
+    recordCost(fase2.cost);
+    hacercato = fase2.data.grounded;
+    console.info(
+      `[plan-full] fase 2 ${fase2.model}: ${fase2.seconds.toFixed(0)}s, ` +
+        `$${fase2.cost.toFixed(4)}, ${ricerche} ricerche, ${prezziGrezzi.length} prezzi`,
+    );
+  } catch (err) {
+    // Senza prezzi il piano resta utile: menu', ricette e lista ci sono. Molto
+    // meglio di un errore che lascia l'utente a mani vuote.
+    console.warn("[plan-full] fase 2 fallita, restituisco il piano senza prezzi:", err);
+  }
+
+  // Il controllo dei link: gratis, e trasforma "il modello dice" in "l'abbiamo
+  // aperto". Sei per volta: con due catene ci sono trenta o quaranta pagine.
+  const checked = await verifyPrices(prezziGrezzi, 6);
+  console.info(`[plan-full] pagine aperte con esito ${checked.verificati}/${checked.totali}`);
+
+  // Le offerte dello stesso prodotto affiancate, come nel prototipo del cliente:
+  // non un supermercato imposto, ma le alternative con la piu' economica in
+  // testa. I prezzi delle altre insegne sono gia' stati pagati in questa stessa
+  // chiamata: tenerne uno solo sarebbe uno spreco.
+  const prodotti = groupByProduct(checked.rows);
+  const conAlternative = prodotti.filter((p) => p.offerte.length > 1).length;
+
+  // Il piu' economico per ogni prodotto: e' quello che la lista mostra.
+  // `groupByProduct` mette in testa i verificati, quindi offerte[0] e' il
+  // migliore fra quelli di cui abbiamo aperto la pagina, quando ce n'e' uno.
+  const migliori = prodotti.map((p) => ({
+    ...p.offerte[0],
+    prodotto: p.prodotto,
+    alternative: p.offerte.length - 1,
+  }));
+
+  // Il confronto per insegna, per chi preferisce fare tutta la spesa in un posto
+  // solo. Vince la piu' economica FRA QUELLE VERIFICABILI: il modello propone,
+  // la scelta si fa sui prezzi controllati.
+  const confronto = pickBestStore(checked.rows);
+  for (const c of confronto.catene) {
+    console.info(
+      `[plan-full]   ${c.negozio}: ${c.totale} (${c.verificati}/${c.proposti} verificati)` +
+        `${c.utilizzabile ? "" : " — scartata, troppi link rotti"}`,
+    );
+  }
+
+  const offerte = migliori.filter((r) => r.risparmio && r.risparmio > 0).length;
+
+  // Nel totale entrano SOLO i prezzi verificati. Un prezzo che non abbiamo
+  // potuto controllare resta visibile come alternativa, ma non deve finire in
+  // una somma che l'utente prende per buona: sommare cio' che non si e'
+  // verificato e' il modo piu' rapido per dare un numero sbagliato con l'aria
+  // di essere esatto.
+  const contati = migliori.filter((r) => r.verifica !== "non-raggiungibile");
+  const totaleMigliore =
+    Math.round(contati.reduce((s, r) => s + (r.prezzo ?? 0), 0) * 100) / 100;
+
+  console.info(
+    `[plan-full] ${prodotti.length} prodotti prezzati, ${conAlternative} con alternative, ` +
+      `${offerte} in promozione — totale al meglio ${totaleMigliore} ${data.currency}`,
+  );
+
+  const result = {
+    ...fase1.data,
+    // Il piu' economico per ogni prodotto: la lista della spesa.
+    prezzi: migliori,
+    // Tutte le offerte per prodotto: l'utente tocca una voce e vede dove altro
+    // si trova e a quanto.
+    prodotti,
+    // Il confronto per insegna: la prova che il risparmio esiste.
+    catene: confronto.catene,
+    vincitore: confronto.vincitore,
+    risparmioVsPiuCara: confronto.risparmio,
+    totali: {
+      spesaAlMiglioPrezzo: totaleMigliore,
+      budget: data.budget,
+      valuta: data.currency,
+      // Dichiarato apertamente: senza, un totale parziale sembrerebbe un
+      // affare e sarebbe solo un conto incompleto.
+      // Le voci che nessun negozio ha saputo prezzare in modo controllabile.
+      prodottiSenzaPrezzo: Math.max(0, fase1.data.lista.length - contati.length),
+      prodottiPrezzoVerificato: contati.length,
+      vociInLista: fase1.data.lista.length,
+    },
+    meta: {
+      motoreMenu: fase1.model,
+      motorePrezzi: GROUNDED_MODEL,
+      secondi: Math.round(fase1.seconds + fase2Secondi),
+      secondiMenu: Math.round(fase1.seconds),
+      secondiPrezzi: Math.round(fase2Secondi),
+      ricerche,
+      // Se e' falso, i prezzi vengono dalla memoria del modello: va detto.
+      ricercaEffettuata: hacercato,
+      costoStimatoUsd: Number((fase1.cost + fase2Costo).toFixed(4)),
+      prezziVerificati: checked.verificati,
+      prezziTotali: checked.totali,
+      insegneConfrontate: confronto.catene.length,
+      prodottiConAlternative: conAlternative,
+      prodottiInOfferta: offerte,
+      generatoIl: new Date().toISOString(),
+    },
+  };
+
+  memorySet(key, result);
+  if (isDbConfigured()) {
+    try {
+      await (await cache()).insertOne({
+        _id: key,
+        value: result,
+        createdAt: new Date(),
+        // Sette giorni e non trenta: i prezzi invecchiano, le ricette no.
+        expiresAt: new Date(Date.now() + 7 * 86_400_000),
+      });
+    } catch {
+      /* chiave gia' presente per una richiesta concorrente: va bene cosi' */
+    }
+  }
+  return result;
+});
+
 /* ───────────────────── Prezzo reale del prodotto ───────────────────── */
 
 const ShoppingInput = z.object({
@@ -417,6 +647,26 @@ app.post("/product/shopping", async (body) => {
 });
 
 /* ─────────────────────────────── Avvio ─────────────────────────────── */
+
+/**
+ * Rete di sicurezza.
+ *
+ * Un errore non gestito da qualche parte nel codice asincrono fa terminare il
+ * processo Node, e con esso il backend: durante una sessione di prove significa
+ * che la prima richiesta strana fa cadere tutte quelle dopo, che falliscono con
+ * "connessione rifiutata" senza spiegazione. E' successo provando i paesi
+ * stranieri, dove il piano francese ha portato giu' anche Spagna, Olanda e
+ * Germania, che non sono nemmeno partite.
+ *
+ * Meglio annotare e restare in piedi: una singola richiesta persa e' molto meno
+ * grave di un servizio spento.
+ */
+process.on("unhandledRejection", (reason) => {
+  console.error("[server] promessa non gestita, resto in piedi:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[server] eccezione non gestita, resto in piedi:", err);
+});
 
 const port = Number(process.env.PORT ?? 3000);
 if (!isConfigured()) console.warn("ATTENZIONE: GOOGLE_GENERATIVE_AI_API_KEY assente — /ai/* risponde 503.");

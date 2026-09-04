@@ -12,9 +12,15 @@
  * importi. Leggere la lista grezza faceva mostrare "—" su ogni riga anche
  * quando la copertura era del 100%.
  *
- * `pricePlan` oggi legge la tabella di riferimento inclusa nell'app: nessuna
- * rete, risposta immediata. Quando il backend sarà in linea la stessa
- * funzione userà le fonti reali, e questa schermata non cambia.
+ * Da settembre 2026 c'è una fonte migliore: quando il piano è stato generato
+ * dal motore con ricerca web, `planExtra.prodotti` porta i prezzi VERI di oggi
+ * nei negozi della città dell'utente, con il link alla pagina del prodotto e
+ * le alternative negli altri supermercati. Il server ha già aperto ogni pagina
+ * per controllare che esista, quindi ciò che arriva qui è verificato.
+ *
+ * Quei prezzi hanno la precedenza. `pricePlan()` resta come ripiego: legge la
+ * tabella di riferimento inclusa nell'app — nessuna rete, risposta immediata,
+ * ma sono stime, e vengono etichettate come tali.
  *
  * Le spunte vivono solo in questa sessione: legarle al piano salvato ha senso
  * quando ci sarà l'account, così una lista iniziata sul telefono si ritrova
@@ -66,13 +72,33 @@ interface Row {
   quantity: string;
   category: string;
   cost: number;
+  /**
+   * Da dove viene il prezzo.
+   *
+   * "reale" = trovato oggi sul sito del negozio e verificato aprendo la
+   * pagina; "stima" = calcolato dalla tabella interna. La differenza va detta
+   * all'utente, perché su un prezzo reale può contare e su una stima no.
+   */
+  kind: "reale" | "stima";
+  /** Il negozio, quando il prezzo è reale. */
+  store?: string;
+  /** Link alla pagina del prodotto: solo se il server è riuscito ad aprirla. */
+  link?: string;
+  /** Quanti altri negozi hanno lo stesso prodotto a un prezzo diverso. */
+  alternatives?: number;
+  /** Quanto separa il prezzo migliore dal peggiore fra i negozi. */
+  spread?: number | null;
+  /** Presenti quando il prodotto è in promozione. */
+  wasPrice?: number;
+  discountPercent?: number;
+  offerUntil?: string;
 }
 
 export default function ListaScreen() {
   /** Testo nella lingua scelta dall'utente. */
   const ui = (t: string) => uiText(t, language);
   const router = useRouter();
-  const { currentPlan, profile } = useSession();
+  const { currentPlan, planExtra, profile } = useSession();
   const { language } = useI18n();
   const [pricing, setPricing] = useState<PricingResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,6 +118,10 @@ export default function ListaScreen() {
     let alive = true;
     (async () => {
       try {
+        // Con i prezzi veri del motore le stime non servono: sarebbero
+        // scartate subito, e intanto la schermata mostrerebbe "Calcolo i
+        // prezzi" per niente.
+        if (planExtra?.prodotti?.length) return;
         const result = await pricePlan(currentPlan, city, country);
         if (alive) setPricing(result);
       } catch (err) {
@@ -104,7 +134,7 @@ export default function ListaScreen() {
     return () => {
       alive = false;
     };
-  }, [currentPlan, city, country]);
+  }, [currentPlan, city, country, planExtra]);
 
   /**
    * Righe con il prezzo risolto. Il motore prezzi restituisce le stesse voci
@@ -113,6 +143,53 @@ export default function ListaScreen() {
    */
   const rows: Row[] = useMemo(() => {
     if (!currentPlan) return [];
+
+    // Prima scelta: i prezzi veri del motore con ricerca. Sono gia' nella
+    // lingua e nella valuta giuste, gia' confrontati fra i negozi della citta'
+    // e gia' verificati aprendo la pagina — non c'e' niente di meglio da
+    // mostrare, e nessuna traduzione da fare.
+    if (planExtra?.prodotti?.length) {
+      const byName = new Map(
+        planExtra.prodotti.map((p) => [p.prodotto.trim().toLowerCase(), p]),
+      );
+
+      return currentPlan.groceryList.map((g) => {
+        const key = `${g.name} ${g.quantity}`.trim().toLowerCase();
+        const found = byName.get(key) ?? byName.get(g.name.trim().toLowerCase());
+        const best = found?.offerte?.[0];
+
+        if (!best) {
+          // Nessun prezzo verificato per questa voce: si mostra senza importo.
+          // Un trattino e' onesto, un numero inventato no.
+          return {
+            name: g.name,
+            source: g.name,
+            quantity: g.quantity,
+            category: g.category || "—",
+            cost: 0,
+            kind: "reale" as const,
+          };
+        }
+
+        return {
+          name: g.name,
+          source: g.name,
+          quantity: g.quantity,
+          category: g.category || "—",
+          cost: best.prezzo,
+          kind: "reale" as const,
+          store: best.negozio,
+          link: best.link || undefined,
+          alternatives: Math.max(0, (found?.offerte.length ?? 1) - 1),
+          spread: found?.differenza ?? null,
+          wasPrice: best.prezzoListino,
+          discountPercent: best.scontoPercento,
+          offerUntil: best.offertaFinoAl,
+        };
+      });
+    }
+
+    // Ripiego: le stime della tabella interna.
     if (pricing?.items?.length) {
       return pricing.items.map((i) => ({
         name: productLabel(i.name, language) ?? i.name,
@@ -120,6 +197,7 @@ export default function ListaScreen() {
         quantity: i.packQuantity ?? i.quantity,
         category: categoryLabel(i.category || "Other", language),
         cost: i.estimatedCost ?? 0,
+        kind: "stima" as const,
       }));
     }
     return currentPlan.groceryList.map((g) => ({
@@ -128,8 +206,9 @@ export default function ListaScreen() {
       quantity: g.quantity,
       category: categoryLabel(g.category || "Other", language),
       cost: g.estimatedCost ?? 0,
+      kind: "stima" as const,
     }));
-  }, [currentPlan, pricing]);
+  }, [currentPlan, pricing, planExtra, language]);
 
   const groups = useMemo(() => {
     const map = new Map<string, Row[]>();
@@ -154,6 +233,10 @@ export default function ListaScreen() {
   }
 
   const total = rows.reduce((sum, r) => sum + r.cost, 0);
+  const realPrices = rows.some((r) => r.kind === "reale" && r.cost > 0);
+  // Dichiarato sempre: un totale parziale spacciato per completo sembrerebbe
+  // un affare e sarebbe solo un conto incompleto.
+  const senzaPrezzo = rows.filter((r) => r.cost <= 0).length;
   const checked = Object.values(done).filter(Boolean).length;
   const retailer = defaultRetailerFor(country);
 
@@ -204,8 +287,21 @@ export default function ListaScreen() {
         <Title>{ui("Lista della spesa")}</Title>
         <Subtitle>
           {rows.length} prodotti
-          {total > 0 ? ` · totale stimato ${money(total, cur, language)}` : ""}
+          {total > 0
+            ? ` · ${realPrices ? "totale" : "totale stimato"} ${money(total, cur, language)}`
+            : ""}
         </Subtitle>
+        {/* La provenienza dei prezzi non e' un dettaglio tecnico: cambia
+            quanto l'utente puo' fidarsi del numero che legge. */}
+        {realPrices ? (
+          <Body style={styles.realNote}>
+            {ui("Prezzi reali di oggi")}
+            {planExtra?.meta?.insegneConfrontate
+              ? ` · ${planExtra.meta.insegneConfrontate} supermercati confrontati`
+              : ""}
+            {senzaPrezzo > 0 ? ` · ${senzaPrezzo} voci senza prezzo` : ""}
+          </Body>
+        ) : null}
         {checked > 0 ? (
           <Body style={styles.progress}>
             {checked} di {rows.length} nel carrello
@@ -235,22 +331,53 @@ export default function ListaScreen() {
                 </View>
                 <View style={styles.rowText}>
                   <Body style={[styles.name, isDone && styles.nameDone]}>{item.name}</Body>
-                  <Body style={styles.qty}>{item.quantity}</Body>
+                  <Body style={styles.qty}>
+                    {item.quantity}
+                    {item.store ? ` · ${item.store}` : ""}
+                  </Body>
+                  {/* Le alternative sono il motivo per cui il confronto esiste:
+                      va detto in chiaro quanto si risparmia scegliendo qui. */}
+                  {item.alternatives ? (
+                    <Body style={styles.alt}>
+                      {item.spread
+                        ? `${item.alternatives} altri negozi · fino a ${money(item.spread, cur, language)} in più`
+                        : `disponibile in altri ${item.alternatives} negozi`}
+                    </Body>
+                  ) : null}
                 </View>
                 <View style={styles.rowRight}>
                   {item.cost > 0 ? (
-                    <Body style={styles.price}>{money(item.cost, cur, language)}</Body>
+                    <>
+                      <Body style={styles.price}>{money(item.cost, cur, language)}</Body>
+                      {/* Il prezzo barrato accanto allo sconto: e' il modo in
+                          cui un'offerta si riconosce a colpo d'occhio. */}
+                      {item.wasPrice && item.discountPercent ? (
+                        <Body style={styles.offer}>
+                          <Body style={styles.was}>{money(item.wasPrice, cur, language)}</Body>
+                          {`  −${item.discountPercent}%`}
+                        </Body>
+                      ) : null}
+                    </>
                   ) : (
                     <Body style={styles.noPrice}>—</Body>
                   )}
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`Verifica il prezzo reale di ${item.name}`}
-                    onPress={() => setChecking(item.source)}
+                    onPress={() => {
+                      // Con un link verificato si va dritti alla pagina del
+                      // prodotto; senza, si ricade sulla ricerca del prezzo.
+                      if (item.link) void WebBrowser.openBrowserAsync(item.link);
+                      else setChecking(item.source);
+                    }}
                     hitSlop={10}
                     style={({ pressed }) => [styles.buyBtn, pressed && styles.rowPressed]}
                   >
-                    <Ionicons name="pricetag-outline" size={16} color={colors.primary} />
+                    <Ionicons
+                      name={item.link ? "open-outline" : "pricetag-outline"}
+                      size={16}
+                      color={colors.primary}
+                    />
                   </Pressable>
                 </View>
               </Pressable>
@@ -290,6 +417,29 @@ export default function ListaScreen() {
 }
 
 const styles = StyleSheet.create({
+  /** Il negozio alternativo: informazione utile, non deve gridare. */
+  alt: {
+    fontSize: font.size.xs,
+    color: colors.primary,
+    marginTop: 2,
+  },
+  /** Il prezzo pieno, barrato accanto allo sconto. */
+  offer: {
+    fontSize: font.size.xs,
+    color: colors.muted,
+    marginTop: 2,
+  },
+  was: {
+    fontSize: font.size.xs,
+    color: colors.muted,
+    textDecorationLine: "line-through",
+  },
+  /** La riga che dichiara la provenienza dei prezzi. */
+  realNote: {
+    fontSize: font.size.xs,
+    color: colors.primary,
+    marginTop: spacing.xs,
+  },
   head: { gap: spacing.sm, paddingTop: spacing.sm },
   empty: { gap: spacing.lg, paddingTop: spacing.xxxl, alignItems: "flex-start" },
   progress: { fontSize: font.size.sm, color: colors.primary, fontWeight: font.weight.semibold },

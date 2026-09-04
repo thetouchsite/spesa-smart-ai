@@ -10,6 +10,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { UserProfile } from "@/lib/models";
 import type { Plan } from "@/lib/models/plan-schema";
+import type { PlanExtra } from "@/lib/plan-full";
 
 export type SessionStatus = "idle" | "generating" | "ready" | "error";
 
@@ -29,12 +30,20 @@ export const DEFAULT_PROFILE: UserProfile = {
 interface SessionState {
   profile: UserProfile;
   currentPlan: Plan | null;
+  /**
+   * Ciò che il motore con ricerca restituisce oltre al piano: offerte per
+   * prodotto, confronto fra supermercati, ricette e promozioni in corso.
+   *
+   * Nullo quando il piano viene dal motore locale o da quello AI senza
+   * prezzi: le schermate lo controllano e mostrano quel che c'è.
+   */
+  planExtra: PlanExtra | null;
   variantSeed: number;
   status: SessionStatus;
   error: string | null;
   updateProfile: (patch: Partial<UserProfile>) => void;
   resetProfile: () => void;
-  setPlan: (plan: Plan | null) => void;
+  setPlan: (plan: Plan | null, extra?: PlanExtra | null) => void;
   setStatus: (status: SessionStatus, error?: string | null) => void;
   bumpSeed: () => number;
 }
@@ -44,6 +53,7 @@ export const useSession = create<SessionState>()(
     (set, get) => ({
       profile: DEFAULT_PROFILE,
       currentPlan: null,
+      planExtra: null,
       variantSeed: 1,
       status: "idle",
       error: null,
@@ -64,9 +74,9 @@ export const useSession = create<SessionState>()(
             keys.forEach((k) => localStorage.removeItem(k));
           } catch { /* quota / private mode — ignore */ }
         }
-        set({ profile: DEFAULT_PROFILE, currentPlan: null, variantSeed: 1, status: "idle", error: null });
+        set({ profile: DEFAULT_PROFILE, currentPlan: null, planExtra: null, variantSeed: 1, status: "idle", error: null });
       },
-      setPlan: (plan) => set({ currentPlan: plan }),
+      setPlan: (plan, extra = null) => set({ currentPlan: plan, planExtra: extra }),
       setStatus: (status, error = null) => set({ status, error }),
       bumpSeed: () => {
         const next = get().variantSeed + 1;

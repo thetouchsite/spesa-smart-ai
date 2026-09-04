@@ -31,6 +31,7 @@ import { buildDeterministicRecipe } from "./recipes/deterministic-recipe";
 import type { Recipe } from "./recipes/types";
 import type { Plan } from "./models/plan-schema";
 import type { UserProfile } from "./models";
+import { fetchPlanFull, type PlanExtra } from "./plan-full";
 import { deviceDefaults } from "./format";
 
 /** Oltre questo tempo si smette di aspettare e si usa il locale. */
@@ -117,6 +118,11 @@ export async function fetchRecipe(
 export interface PlanResult {
   plan: Plan;
   source: ContentSource;
+  /**
+   * Presente solo quando ha risposto il motore con ricerca: offerte per
+   * prodotto, confronto fra supermercati, ricette e promozioni.
+   */
+  extra?: PlanExtra;
 }
 
 /**
@@ -136,6 +142,20 @@ export async function fetchPlan(
   const budget = Number(profile.budget);
   if (!Number.isFinite(budget) || budget <= 0) return local();
 
+  // Prima scelta: il motore con ricerca web. E' l'unico che porta prezzi VERI
+  // dei negozi della citta' dell'utente, con il link per comprare, e li ha
+  // gia' confrontati fra piu' supermercati. Costa una trentina di secondi in
+  // piu' degli altri, e li vale: e' la cosa che distingue l'app da un
+  // generatore di menu'.
+  try {
+    const { plan, extra } = await fetchPlanFull(profile, language);
+    return { plan, source: "ai", extra };
+  } catch (err) {
+    console.info("[contenuti] motore con ricerca non disponibile:", (err as Error).message);
+  }
+
+  // Ripiego: il piano AI senza prezzi reali. Il menu' e' buono, la spesa e'
+  // stimata dal listino interno come faceva il prototipo.
   try {
     const plan = await withTimeout(
       post<Plan>("/ai/plan", {

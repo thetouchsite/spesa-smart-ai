@@ -71,10 +71,26 @@ export default function ElaborazioneScreen() {
       // Prova il backend; se non risponde usa il motore locale. Vedi
       // `lib/content.ts`: il ripiego e' il comportamento normale finche' il
       // backend non e' pubblicato, non un errore.
-      const { plan, source } = await fetchPlan({ ...profile, household, country }, variantSeed, language);
-      if (__DEV__) console.info(`[elaborazione] piano generato da: ${source}`);
+      const { plan, source, extra } = await fetchPlan(
+        { ...profile, household, country },
+        variantSeed,
+        language,
+      );
+      if (__DEV__) {
+        console.info(`[elaborazione] piano generato da: ${source}`);
+        if (extra?.meta) {
+          // In sviluppo interessa sapere se il modello ha DAVVERO cercato:
+          // senza ricerca i prezzi vengono dalla sua memoria e valgono poco.
+          console.info(
+            `[elaborazione] ${extra.meta.secondi}s · ${extra.meta.ricerche} ricerche · ` +
+              `prezzi verificati ${extra.meta.prezziVerificati}/${extra.meta.prezziTotali} · ` +
+              `${extra.meta.insegneConfrontate} insegne · $${extra.meta.costoStimatoUsd}` +
+              (extra.meta.ricercaEffettuata ? "" : " · ATTENZIONE: nessuna ricerca web"),
+          );
+        }
+      }
 
-      setPlan(plan);
+      setPlan(plan, extra ?? null);
       setStatus("ready");
       router.replace("/risultati");
     } catch (err) {

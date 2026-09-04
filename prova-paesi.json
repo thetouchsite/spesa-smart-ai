@@ -1,0 +1,433 @@
+[
+  {
+    "etichetta": "Italia",
+    "body": {
+      "city": "Bologna",
+      "country": "Italia",
+      "household": "4 persone",
+      "budget": 120,
+      "currency": "EUR",
+      "frequency": "weekly",
+      "style": "mediterraneo",
+      "allergies": [],
+      "dislikes": "funghi",
+      "language": "it",
+      "withRecipes": true
+    },
+    "spia": [
+      "lunedì",
+      "martedì",
+      "mercoledì",
+      "giovedì"
+    ],
+    "errore": "Errore interno del server",
+    "secondi": 8.124
+  },
+  {
+    "etichetta": "Francia",
+    "body": {
+      "city": "Lyon",
+      "country": "France",
+      "household": "3 personnes",
+      "budget": 110,
+      "currency": "EUR",
+      "frequency": "weekly",
+      "style": "équilibré",
+      "allergies": [],
+      "dislikes": "",
+      "language": "fr",
+      "withRecipes": true
+    },
+    "spia": [
+      "lundi",
+      "mardi",
+      "mercredi",
+      "jeudi"
+    ],
+    "secondi": 54.839,
+    "meta": {
+      "motoreMenu": "gemini-3.5-flash-lite",
+      "motorePrezzi": "gemini-3-flash-preview",
+      "secondi": 52,
+      "secondiMenu": 8,
+      "secondiPrezzi": 44,
+      "ricerche": 80,
+      "ricercaEffettuata": true,
+      "costoStimatoUsd": 0.0285,
+      "prezziVerificati": 0,
+      "prezziTotali": 17,
+      "insegneConfrontate": 2,
+      "prodottiConAlternative": 0,
+      "prodottiInOfferta": 0,
+      "generatoIl": "2026-09-04T02:21:44.961Z"
+    },
+    "giorniMenu": 7,
+    "ricette": 7,
+    "lista": 24,
+    "linguaOk": 4,
+    "linguaSu": 4,
+    "esempioGiorno": {
+      "giorno": "Lundi",
+      "colazione": "Yaourt nature et muesli avec une pomme",
+      "pranzo": "Salade de lentilles, carottes râpées et vinaigrette",
+      "cena": "Poulet rôti au thym avec purée de pommes de terre maison"
+    },
+    "esempioRicetta": "Poulet rôti au thym avec purée de pommes de terre maison",
+    "conPrezzo": 0,
+    "negozi": [],
+    "conAlternative": 0,
+    "totale": 0,
+    "valuta": "EUR",
+    "senzaPrezzo": 24,
+    "catene": [
+      {
+        "negozio": "Carrefour",
+        "totale": 0,
+        "verificati": 0,
+        "proposti": 9,
+        "utilizzabile": false
+      },
+      {
+        "negozio": "Monoprix",
+        "totale": 0,
+        "verificati": 0,
+        "proposti": 8,
+        "utilizzabile": false
+      }
+    ],
+    "offerteEsempio": []
+  },
+  {
+    "etichetta": "Spagna",
+    "body": {
+      "city": "Valencia",
+      "country": "España",
+      "household": "4 personas",
+      "budget": 100,
+      "currency": "EUR",
+      "frequency": "weekly",
+      "style": "mediterránea",
+      "allergies": [],
+      "dislikes": "",
+      "language": "es",
+      "withRecipes": true
+    },
+    "spia": [
+      "lunes",
+      "martes",
+      "miércoles",
+      "jueves"
+    ],
+    "secondi": 43.006,
+    "meta": {
+      "motoreMenu": "gemini-3.5-flash-lite",
+      "motorePrezzi": "gemini-3-flash-preview",
+      "secondi": 36,
+      "secondiMenu": 8,
+      "secondiPrezzi": 28,
+      "ricerche": 18,
+      "ricercaEffettuata": true,
+      "costoStimatoUsd": 0.0259,
+      "prezziVerificati": 11,
+      "prezziTotali": 18,
+      "insegneConfrontate": 3,
+      "prodottiConAlternative": 0,
+      "prodottiInOfferta": 0,
+      "generatoIl": "2026-09-04T02:22:27.967Z"
+    },
+    "giorniMenu": 7,
+    "ricette": 7,
+    "lista": 27,
+    "linguaOk": 4,
+    "linguaSu": 4,
+    "esempioGiorno": {
+      "giorno": "Lunes",
+      "colazione": "Tostadas con aceite de oliva y tomate triturado, café con leche",
+      "pranzo": "Lentejas estofadas con verduras y chorizo",
+      "cena": "Tortilla de patatas con ensalada verde"
+    },
+    "esempioRicetta": "Tortilla de patatas con ensalada verde",
+    "conPrezzo": 11,
+    "negozi": [
+      "Consum",
+      "El Corte Inglés"
+    ],
+    "conAlternative": 0,
+    "totale": 50.08,
+    "valuta": "EUR",
+    "senzaPrezzo": 16,
+    "catene": [
+      {
+        "negozio": "Carrefour",
+        "totale": 0,
+        "verificati": 0,
+        "proposti": 7,
+        "utilizzabile": false
+      },
+      {
+        "negozio": "El Corte Inglés",
+        "totale": 18.63,
+        "verificati": 4,
+        "proposti": 4,
+        "utilizzabile": true
+      },
+      {
+        "negozio": "Consum",
+        "totale": 31.45,
+        "verificati": 7,
+        "proposti": 7,
+        "utilizzabile": true
+      }
+    ],
+    "offerteEsempio": [
+      {
+        "prodotto": "Patatas 1 bolsa de 3 kg",
+        "offerte": [
+          "Consum 4.65"
+        ]
+      },
+      {
+        "prodotto": "Zanahorias 1 bolsa de 1 kg",
+        "offerte": [
+          "El Corte Inglés 1.25"
+        ]
+      },
+      {
+        "prodotto": "Calabacín 2 unidades",
+        "offerte": [
+          "Consum 2.85"
+        ]
+      },
+      {
+        "prodotto": "Champiñones frescos 1 bandeja de 250 g",
+        "offerte": [
+          "El Corte Inglés 1.99"
+        ]
+      }
+    ]
+  },
+  {
+    "etichetta": "Paesi Bassi",
+    "body": {
+      "city": "Amsterdam",
+      "country": "Nederland",
+      "household": "2 personen",
+      "budget": 90,
+      "currency": "EUR",
+      "frequency": "weekly",
+      "style": "gebalanceerd",
+      "allergies": [],
+      "dislikes": "",
+      "language": "nl",
+      "withRecipes": true
+    },
+    "spia": [
+      "maandag",
+      "dinsdag",
+      "woensdag",
+      "donderdag"
+    ],
+    "secondi": 73.179,
+    "meta": {
+      "motoreMenu": "gemini-3.5-flash-lite",
+      "motorePrezzi": "gemini-3-flash-preview",
+      "secondi": 69,
+      "secondiMenu": 8,
+      "secondiPrezzi": 61,
+      "ricerche": 115,
+      "ricercaEffettuata": true,
+      "costoStimatoUsd": 0.0356,
+      "prezziVerificati": 16,
+      "prezziTotali": 27,
+      "insegneConfrontate": 3,
+      "prodottiConAlternative": 4,
+      "prodottiInOfferta": 0,
+      "generatoIl": "2026-09-04T02:23:41.137Z"
+    },
+    "giorniMenu": 7,
+    "ricette": 7,
+    "lista": 23,
+    "linguaOk": 4,
+    "linguaSu": 4,
+    "esempioGiorno": {
+      "giorno": "Maandag",
+      "colazione": "Havermout met banaan en kaneel",
+      "pranzo": "Volkoren boterhammen met kaas en tomaat",
+      "cena": "Stamppot boerenkool met rookworst"
+    },
+    "esempioRicetta": "Stamppot boerenkool met rookworst",
+    "conPrezzo": 12,
+    "negozi": [
+      "Jumbo",
+      "Dirk"
+    ],
+    "conAlternative": 4,
+    "totale": 30.45,
+    "valuta": "EUR",
+    "senzaPrezzo": 11,
+    "catene": [
+      {
+        "negozio": "Albert Heijn",
+        "totale": 0,
+        "verificati": 0,
+        "proposti": 11,
+        "utilizzabile": false
+      },
+      {
+        "negozio": "Jumbo",
+        "totale": 16.94,
+        "verificati": 8,
+        "proposti": 8,
+        "utilizzabile": true
+      },
+      {
+        "negozio": "Dirk",
+        "totale": 21.89,
+        "verificati": 8,
+        "proposti": 8,
+        "utilizzabile": true
+      }
+    ],
+    "offerteEsempio": [
+      {
+        "prodotto": "Aardappelen 1 zak van 1 kg",
+        "offerte": [
+          "Jumbo 1.29",
+          "Dirk 1.45"
+        ]
+      },
+      {
+        "prodotto": "Bloemkool 1 stuk",
+        "offerte": [
+          "Dirk 1.69",
+          "Jumbo 1.89"
+        ]
+      },
+      {
+        "prodotto": "Appels 4 stuks",
+        "offerte": [
+          "Jumbo 2.99"
+        ]
+      },
+      {
+        "prodotto": "Tomaten 1 tros van 500 g",
+        "offerte": [
+          "Jumbo 0.85"
+        ]
+      }
+    ]
+  },
+  {
+    "etichetta": "Germania",
+    "body": {
+      "city": "Berlin",
+      "country": "Deutschland",
+      "household": "3 Personen",
+      "budget": 110,
+      "currency": "EUR",
+      "frequency": "weekly",
+      "style": "ausgewogen",
+      "allergies": [
+        "Laktose"
+      ],
+      "dislikes": "",
+      "language": "de",
+      "withRecipes": true
+    },
+    "spia": [
+      "montag",
+      "dienstag",
+      "mittwoch",
+      "donnerstag"
+    ],
+    "secondi": 62.728,
+    "meta": {
+      "motoreMenu": "gemini-3.5-flash-lite",
+      "motorePrezzi": "gemini-3-flash-preview",
+      "secondi": 60,
+      "secondiMenu": 7,
+      "secondiPrezzi": 53,
+      "ricerche": 73,
+      "ricercaEffettuata": true,
+      "costoStimatoUsd": 0.0296,
+      "prezziVerificati": 21,
+      "prezziTotali": 25,
+      "insegneConfrontate": 3,
+      "prodottiConAlternative": 6,
+      "prodottiInOfferta": 0,
+      "generatoIl": "2026-09-04T02:24:43.876Z"
+    },
+    "giorniMenu": 7,
+    "ricette": 7,
+    "lista": 18,
+    "linguaOk": 4,
+    "linguaSu": 4,
+    "esempioGiorno": {
+      "giorno": "Montag",
+      "colazione": "Haferflocken mit laktosefreier Milch und Beeren",
+      "pranzo": "Vollkornbrot mit Frischkäse und Gurkenscheiben",
+      "cena": "Ofengemüse mit Hähnchenbrust"
+    },
+    "esempioRicetta": "Ofengemüse mit Hähnchenbrust",
+    "conPrezzo": 15,
+    "negozi": [
+      "Kaufland",
+      "REWE"
+    ],
+    "conAlternative": 6,
+    "totale": 38.9,
+    "valuta": "EUR",
+    "senzaPrezzo": 3,
+    "catene": [
+      {
+        "negozio": "Bringmeister",
+        "totale": 0,
+        "verificati": 0,
+        "proposti": 1,
+        "utilizzabile": false
+      },
+      {
+        "negozio": "Kaufland",
+        "totale": 14.08,
+        "verificati": 6,
+        "proposti": 6,
+        "utilizzabile": true
+      },
+      {
+        "negozio": "REWE",
+        "totale": 39.74,
+        "verificati": 15,
+        "proposti": 18,
+        "utilizzabile": true
+      }
+    ],
+    "offerteEsempio": [
+      {
+        "prodotto": "Hähnchenbrust 1 Packung 500 g",
+        "offerte": [
+          "Kaufland 4.99",
+          "REWE 5.49"
+        ]
+      },
+      {
+        "prodotto": "Hackfleisch gemischt 2 Packungen à 500 g",
+        "offerte": [
+          "REWE 3.99",
+          "Kaufland 3.99"
+        ]
+      },
+      {
+        "prodotto": "Lachsfilet 1 Packung 3 Stück",
+        "offerte": [
+          "REWE 12.99"
+        ]
+      },
+      {
+        "prodotto": "Würstchen 1 Packung 5 Stück",
+        "offerte": [
+          "REWE 1.49"
+        ]
+      }
+    ]
+  }
+]
