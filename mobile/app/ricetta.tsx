@@ -28,6 +28,8 @@ import {
 import { fetchRecipe, type ContentSource } from "../src/lib/content";
 import type { Recipe } from "../src/lib/recipes/types";
 import { useSession } from "../src/lib/state/session";
+import { useI18n } from "../src/lib/i18n";
+import { productLabel } from "../src/lib/price-data/labels";
 import { colors, font, radius, spacing } from "../src/theme";
 
 const DIFFICULTY: Record<string, string> = {
@@ -45,6 +47,7 @@ const MEAL_LABEL: Record<string, string> = {
 export default function RicettaScreen() {
   const router = useRouter();
   const { profile } = useSession();
+  const { language } = useI18n();
   const params = useLocalSearchParams<{ piatto?: string; pasto?: string; giorno?: string }>();
 
   const dish = params.piatto ?? "";
@@ -68,8 +71,8 @@ export default function RicettaScreen() {
       const result = await fetchRecipe(dish, {
         servings,
         mealType,
-        language: "it",
-        country: profile.country || "Italy",
+        language,
+        country: profile.country || "",
         allergies: profile.allergies,
       });
       if (!alive) return;
@@ -80,7 +83,7 @@ export default function RicettaScreen() {
     return () => {
       alive = false;
     };
-  }, [dish, servings, mealType, profile.country]);
+  }, [dish, servings, mealType, profile.country, language]);
 
   if (loading) {
     return (

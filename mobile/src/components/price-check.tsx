@@ -23,7 +23,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { Body, Button, Label, Loading, Title } from "./ui";
 import { post, ApiError } from "../api/client";
 import { filterShoppingRows } from "../lib/product-search/filters";
-import { italianLabel } from "../lib/price-data/labels";
+import { productLabel } from "../lib/price-data/labels";
+import { money } from "../lib/format";
+import { useI18n } from "../lib/i18n";
 import { colors, font, radius, spacing } from "../theme";
 
 interface ShoppingItem {
@@ -48,14 +50,6 @@ const REASONS: Record<string, string> = {
   offline: "Il servizio prezzi non risponde. L'app continua a funzionare con le stime.",
 };
 
-function money(value: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat("it-IT", { style: "currency", currency }).format(value);
-  } catch {
-    return `${value.toFixed(2)} ${currency}`;
-  }
-}
-
 export function PriceCheckSheet({
   itemName,
   country,
@@ -65,6 +59,7 @@ export function PriceCheckSheet({
   country: string;
   onClose: () => void;
 }) {
+  const { language } = useI18n();
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -81,7 +76,7 @@ export function PriceCheckSheet({
         // Il motore locale produce la lista in inglese ("Mushrooms"): cercata
         // cosi' su Google Shopping Italia torna funghi essiccati, kit di
         // coltivazione e integratori. Si cerca il nome italiano.
-        const query = italianLabel(itemName) ?? itemName;
+        const query = productLabel(itemName, language) ?? itemName;
 
         const res = await post<Result>("/product/shopping", {
           query,
@@ -114,7 +109,7 @@ export function PriceCheckSheet({
     return () => {
       alive = false;
     };
-  }, [itemName, country]);
+  }, [itemName, country, language]);
 
   const cheapest =
     result?.ok && result.items.length > 0
@@ -136,7 +131,7 @@ export function PriceCheckSheet({
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Label icon="pricetag-outline">Prezzo reale</Label>
-            <Title style={styles.title}>{itemName ? (italianLabel(itemName) ?? itemName) : ""}</Title>
+            <Title style={styles.title}>{itemName ? (productLabel(itemName, language) ?? itemName) : ""}</Title>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -163,7 +158,7 @@ export function PriceCheckSheet({
             {cheapest?.price != null ? (
               <View style={styles.best}>
                 <Body style={styles.bestLabel}>Più conveniente</Body>
-                <Body style={styles.bestPrice}>{money(cheapest.price, cheapest.currency)}</Body>
+                <Body style={styles.bestPrice}>{money(cheapest.price, cheapest.currency, language)}</Body>
                 <Body style={styles.bestSource}>da {cheapest.source}</Body>
               </View>
             ) : null}
@@ -191,7 +186,7 @@ export function PriceCheckSheet({
                 </View>
                 <View style={styles.rowRight}>
                   <Body style={styles.rowPrice}>
-                    {item.price != null ? money(item.price, item.currency) : "—"}
+                    {item.price != null ? money(item.price, item.currency, language) : "—"}
                   </Body>
                   <Ionicons name="open-outline" size={15} color={colors.primary} />
                 </View>

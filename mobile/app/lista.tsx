@@ -44,7 +44,9 @@ import type { PricingResult } from "../src/lib/price-data";
 import { buildShoppingLink } from "../src/lib/shopping-links";
 import { defaultRetailerFor } from "../src/lib/shopping-links/retailers";
 import { buildWhatsAppMessage } from "../src/lib/export/whatsapp-share";
-import { italianLabel, italianCategory } from "../src/lib/price-data/labels";
+import { productLabel, categoryLabel } from "../src/lib/price-data/labels";
+import { money, deviceDefaults } from "../src/lib/format";
+import { useI18n } from "../src/lib/i18n";
 import { PriceCheckSheet } from "../src/components/price-check";
 import { colors, font, radius, spacing } from "../src/theme";
 
@@ -55,26 +57,22 @@ interface Row {
   cost: number;
 }
 
-function money(value: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat("it-IT", { style: "currency", currency }).format(value);
-  } catch {
-    return `${value.toFixed(2)} ${currency}`;
-  }
-}
-
 export default function ListaScreen() {
   const router = useRouter();
   const { currentPlan, profile } = useSession();
+  const { language } = useI18n();
   const [pricing, setPricing] = useState<PricingResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [done, setDone] = useState<Record<string, boolean>>({});
   // Prodotto per cui si sta verificando il prezzo reale: null = riquadro chiuso.
   const [checking, setChecking] = useState<string | null>(null);
 
-  const cur = profile.currency || "EUR";
-  const city = profile.city || "Bologna";
-  const country = profile.country || "IT";
+  // Nessun valore italiano scritto a mano: se il profilo e' vuoto si
+  // guarda il dispositivo, cosi' un utente spagnolo non trova l'Italia.
+  const fallback = deviceDefaults();
+  const cur = profile.currency || fallback.currency;
+  const city = profile.city || "";
+  const country = profile.country || fallback.country;
 
   useEffect(() => {
     if (!currentPlan) return;
@@ -104,16 +102,16 @@ export default function ListaScreen() {
     if (!currentPlan) return [];
     if (pricing?.items?.length) {
       return pricing.items.map((i) => ({
-        name: italianLabel(i.name) ?? i.name,
+        name: productLabel(i.name, language) ?? i.name,
         quantity: i.packQuantity ?? i.quantity,
-        category: italianCategory(i.category || "Altro"),
+        category: categoryLabel(i.category || "Other", language),
         cost: i.estimatedCost ?? 0,
       }));
     }
     return currentPlan.groceryList.map((g) => ({
-      name: italianLabel(g.name) ?? g.name,
+      name: productLabel(g.name, language) ?? g.name,
       quantity: g.quantity,
-      category: italianCategory(g.category || "Altro"),
+      category: categoryLabel(g.category || "Other", language),
       cost: g.estimatedCost ?? 0,
     }));
   }, [currentPlan, pricing]);
@@ -168,7 +166,7 @@ export default function ListaScreen() {
         profile,
         estimatedSpend: total,
         savings: Math.max(0, (Number(profile.budget) || 0) - total),
-        language: "it",
+        language,
       });
       await Share.share({ message });
     } catch (err) {
@@ -191,7 +189,7 @@ export default function ListaScreen() {
         <Title>Lista della spesa</Title>
         <Subtitle>
           {rows.length} prodotti
-          {total > 0 ? ` · totale stimato ${money(total, cur)}` : ""}
+          {total > 0 ? ` · totale stimato ${money(total, cur, language)}` : ""}
         </Subtitle>
         {checked > 0 ? (
           <Body style={styles.progress}>
@@ -226,7 +224,7 @@ export default function ListaScreen() {
                 </View>
                 <View style={styles.rowRight}>
                   {item.cost > 0 ? (
-                    <Body style={styles.price}>{money(item.cost, cur)}</Body>
+                    <Body style={styles.price}>{money(item.cost, cur, language)}</Body>
                   ) : (
                     <Body style={styles.noPrice}>—</Body>
                   )}

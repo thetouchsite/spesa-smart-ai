@@ -31,6 +31,7 @@ import { buildDeterministicRecipe } from "./recipes/deterministic-recipe";
 import type { Recipe } from "./recipes/types";
 import type { Plan } from "./models/plan-schema";
 import type { UserProfile } from "./models";
+import { deviceDefaults } from "./format";
 
 /** Oltre questo tempo si smette di aspettare e si usa il locale. */
 const AI_TIMEOUT_MS = 12_000;
@@ -125,7 +126,11 @@ export interface PlanResult {
  * invece dei nomi generici dei panieri; per una dimostrazione la differenza
  * si vede subito.
  */
-export async function fetchPlan(profile: UserProfile, seed = 1): Promise<PlanResult> {
+export async function fetchPlan(
+  profile: UserProfile,
+  seed = 1,
+  language = "en",
+): Promise<PlanResult> {
   const local = () => ({ plan: generateMealPlan({ profile, seed }).plan, source: "locale" as const });
 
   const budget = Number(profile.budget);
@@ -134,12 +139,12 @@ export async function fetchPlan(profile: UserProfile, seed = 1): Promise<PlanRes
   try {
     const plan = await withTimeout(
       post<Plan>("/ai/plan", {
-        city: profile.city || "Bologna",
-        country: profile.country || "IT",
-        language: "it",
+        city: profile.city || "",
+        country: profile.country || deviceDefaults().country,
+        language,
         household: profile.household || "4",
         budget,
-        currency: profile.currency || "EUR",
+        currency: profile.currency || deviceDefaults().currency,
         frequency: profile.frequency,
         style: profile.style || "Family Budget",
         allergies: profile.allergies ?? [],

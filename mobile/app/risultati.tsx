@@ -34,19 +34,9 @@ import { computeResults } from "../src/lib/results/compute-results";
 import { pricePlan } from "../src/lib/price-data/price-engine";
 import type { PricingResult } from "../src/lib/price-data";
 import { buildWhatsAppMessage } from "../src/lib/export/whatsapp-share";
+import { money, deviceDefaults } from "../src/lib/format";
+import { useI18n } from "../src/lib/i18n";
 import { colors, font, radius, spacing } from "../src/theme";
-
-function money(value: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat("it-IT", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `${value.toFixed(2)} ${currency}`;
-  }
-}
 
 const STATUS: Record<string, { label: string; tone: "success" | "warning" | "danger"; icon: string }> = {
   comfortable: { label: "Sei dentro il budget", tone: "success", icon: "checkmark-circle-outline" },
@@ -59,11 +49,15 @@ const STATUS: Record<string, { label: string; tone: "success" | "warning" | "dan
 export default function RisultatiScreen() {
   const router = useRouter();
   const { profile, currentPlan } = useSession();
+  const { language } = useI18n();
   const [pricing, setPricing] = useState<PricingResult | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const city = profile.city || "Bologna";
-  const country = profile.country || "IT";
+  const fallback = deviceDefaults();
+  const city = profile.city || "";
+  const country = profile.country || fallback.country;
+  // La classifica catene viene da un'indagine sul solo mercato italiano.
+  const isItaly = country.toUpperCase() === "IT";
 
   useEffect(() => {
     if (!currentPlan) return;
@@ -104,7 +98,7 @@ export default function RisultatiScreen() {
     );
   }
 
-  const cur = profile.currency || "EUR";
+  const cur = profile.currency || fallback.currency;
   // Con un totale parziale lo stato del budget e' comunque significativo:
   // dire "prezzi non disponibili" sopra un numero valido confonde.
   const st =
@@ -119,7 +113,7 @@ export default function RisultatiScreen() {
         profile,
         estimatedSpend: results!.estimatedSpend,
         savings: results!.savings,
-        language: "it",
+        language,
       });
       await Share.share({ message });
     } catch (err) {
@@ -145,13 +139,26 @@ export default function RisultatiScreen() {
         title="Il tuo piano"
         onBack={() => router.replace("/")}
         right={
-          <Button
-            label=""
-            icon="settings-outline"
-            variant="ghost"
-            style={styles.iconBtn}
-            onPress={() => router.push("/impostazioni")}
-          />
+          <View style={styles.topActions}>
+            {/* Approfondimento, non un passaggio del flusso: un'icona, non
+                una riga che occupa spazio nella schermata principale. */}
+            {isItaly ? (
+              <Button
+                label=""
+                icon="trophy-outline"
+                variant="ghost"
+                style={styles.iconBtn}
+                onPress={() => router.push("/dove-conviene")}
+              />
+            ) : null}
+            <Button
+              label=""
+              icon="settings-outline"
+              variant="ghost"
+              style={styles.iconBtn}
+              onPress={() => router.push("/impostazioni")}
+            />
+          </View>
         }
       />
 
@@ -175,11 +182,11 @@ export default function RisultatiScreen() {
             ? "Spesa prevista (parziale)"
             : "Spesa prevista"}
         </Body>
-        <Body style={styles.heroValue}>{money(results.estimatedSpend, cur)}</Body>
+        <Body style={styles.heroValue}>{money(results.estimatedSpend, cur, language)}</Body>
         <Body style={styles.heroSub}>
-          su {money(results.budget, cur)} di budget
-          {results.savings > 0 ? ` · ti restano ${money(results.savings, cur)}` : ""}
-          {results.overBudgetAmount > 0 ? ` · sfori di ${money(results.overBudgetAmount, cur)}` : ""}
+          su {money(results.budget, cur, language)} di budget
+          {results.savings > 0 ? ` · ti restano ${money(results.savings, cur, language)}` : ""}
+          {results.overBudgetAmount > 0 ? ` · sfori di ${money(results.overBudgetAmount, cur, language)}` : ""}
         </Body>
         <View style={styles.bar}>
           <View
@@ -192,14 +199,14 @@ export default function RisultatiScreen() {
       </GradientCard>
 
       <View style={styles.grid}>
-        <Stat icon="person-outline" label="A persona / giorno" value={money(results.costPerPersonPerDay, cur)} />
+        <Stat icon="person-outline" label="A persona / giorno" value={money(results.costPerPersonPerDay, cur, language)} />
         <Stat icon="ribbon-outline" label="Punteggio" value={`${results.score.total}/100`} />
       </View>
 
       {results.annualSavings > 0 ? (
         <Card>
           <Label icon="trending-up-outline">Se continui così per un anno</Label>
-          <Body style={styles.bigNumber}>{money(results.annualSavings, cur)}</Body>
+          <Body style={styles.bigNumber}>{money(results.annualSavings, cur, language)}</Body>
           <Body style={styles.muted}>risparmiati rispetto al tuo budget attuale</Body>
         </Card>
       ) : null}
@@ -207,12 +214,7 @@ export default function RisultatiScreen() {
 
       <Card>
         <Label icon="compass-outline">Vai a</Label>
-        <ListRow
-          icon="trophy-outline"
-          title="Dove conviene fare la spesa"
-          subtitle="Classifica delle catene · indagine Altroconsumo 2026"
-          onPress={() => router.push("/dove-conviene")}
-        />
+
         <ListRow
           icon="map-outline"
           title="Supermercati vicini"
@@ -277,6 +279,7 @@ const styles = StyleSheet.create({
   empty: { gap: spacing.lg, paddingTop: spacing.xxxl, alignItems: "flex-start" },
   actions: { gap: spacing.sm },
   iconBtn: { minHeight: 38, width: 38, paddingHorizontal: 0 },
+  topActions: { flexDirection: "row", gap: 2 },
 
   heroLabel: { color: "rgba(255,255,255,0.85)", fontSize: font.size.sm },
   heroValue: {

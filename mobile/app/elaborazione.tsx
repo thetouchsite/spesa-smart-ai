@@ -18,6 +18,8 @@ import { useRouter } from "expo-router";
 import { Body, Button, Loading, Screen, Subtitle, Title } from "../src/components/ui";
 import { useSession } from "../src/lib/state/session";
 import { fetchPlan, type ContentSource } from "../src/lib/content";
+import { deviceDefaults } from "../src/lib/format";
+import { useI18n } from "../src/lib/i18n";
 import { colors, font, spacing } from "../src/theme";
 
 /** Messaggi mostrati a rotazione: la generazione è quasi istantanea, ma una
@@ -32,6 +34,7 @@ const BEATS = [
 export default function ElaborazioneScreen() {
   const router = useRouter();
   const { profile, updateProfile, setPlan, setStatus, variantSeed } = useSession();
+  const { language } = useI18n();
   const [beat, setBeat] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,13 +60,15 @@ export default function ElaborazioneScreen() {
       // Il motore pretende questi due campi: se l'onboarding è stato saltato
       // o interrotto si usano valori sensati invece di fallire.
       const household = profile.household || "4";
-      const country = profile.country || "IT";
+      // Paese dal dispositivo se il profilo e' vuoto: l'app non e'
+      // riservata all'Italia.
+      const country = profile.country || deviceDefaults().country;
       updateProfile({ household, country });
 
       // Prova il backend; se non risponde usa il motore locale. Vedi
       // `lib/content.ts`: il ripiego e' il comportamento normale finche' il
       // backend non e' pubblicato, non un errore.
-      const { plan, source } = await fetchPlan({ ...profile, household, country }, variantSeed);
+      const { plan, source } = await fetchPlan({ ...profile, household, country }, variantSeed, language);
       if (__DEV__) console.info(`[elaborazione] piano generato da: ${source}`);
 
       setPlan(plan);

@@ -28,6 +28,7 @@ import {
 import { ping } from "../src/api/client";
 import { useSession } from "../src/lib/state/session";
 import { QuotaBanner } from "../src/components/quota-banner";
+import { deviceDefaults } from "../src/lib/format";
 import { colors, font, radius, spacing } from "../src/theme";
 
 const STEPS = [
@@ -51,6 +52,8 @@ const STEPS = [
 export default function Home() {
   const router = useRouter();
   const { currentPlan, profile } = useSession();
+  // La classifica catene viene da un'indagine sul solo mercato italiano.
+  const isItaly = (profile.country || deviceDefaults().country).toUpperCase() === "IT";
   const [api, setApi] = useState<{
     ok: boolean;
     aiConfigured: boolean;
@@ -132,12 +135,16 @@ export default function Home() {
           subtitle="Lingua, profilo, dati"
           onPress={() => router.push("/impostazioni")}
         />
+        {/* L'indagine Altroconsumo copre solo il mercato italiano:
+            mostrarla a un utente francese sarebbe fuorviante. */}
+        {isItaly ? (
         <ListRow
-          icon="trophy-outline"
-          title="Dove conviene"
-          subtitle="Le catene più economiche d'Italia"
-          onPress={() => router.push("/dove-conviene")}
-        />
+            icon="trophy-outline"
+            title="Le catene più economiche"
+            subtitle="Indagine Altroconsumo 2026"
+            onPress={() => router.push("/dove-conviene")}
+          />
+        ) : null}
         <ListRow
           icon="map-outline"
           title="Supermercati vicini"

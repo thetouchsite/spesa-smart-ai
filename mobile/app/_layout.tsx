@@ -78,7 +78,12 @@ export default function RootLayout() {
             contentStyle: { backgroundColor: colors.background },
             animation: "slide_from_right",
           }}
-        />
+        >
+          {/* La classifica catene e' un approfondimento, non un passaggio
+              del flusso: si apre come foglio dal basso e si chiude con uno
+              scorrimento, senza portare l'utente via da dove si trova. */}
+          <Stack.Screen name="dove-conviene" options={{ presentation: "modal" }} />
+        </Stack>
       </I18nProvider>
     </SafeAreaProvider>
   );

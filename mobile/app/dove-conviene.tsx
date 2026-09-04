@@ -36,6 +36,8 @@ import {
   annualSaving,
   annualSpendFrom,
 } from "../src/lib/price-data/chain-ranking";
+import { moneyRounded, number } from "../src/lib/format";
+import { useI18n } from "../src/lib/i18n";
 import { colors, font, radius, spacing } from "../src/theme";
 
 const KIND_LABEL: Record<string, string> = {
@@ -44,21 +46,13 @@ const KIND_LABEL: Record<string, string> = {
   ipermercato: "ipermercato",
 };
 
-function euro(value: number): string {
-  try {
-    return new Intl.NumberFormat("it-IT", {
-      style: "currency",
-      currency: "EUR",
-      maximumFractionDigits: 0,
-    }).format(value);
-  } catch {
-    return `${Math.round(value)} €`;
-  }
-}
-
 export default function DoveConvieneScreen() {
   const router = useRouter();
   const { profile } = useSession();
+  const { language } = useI18n();
+  // Indagine sul mercato italiano: gli importi restano in euro, ma le
+  // convenzioni di scrittura seguono la lingua di chi legge.
+  const euro = (v: number) => moneyRounded(v, "EUR", language);
 
   const cheapest = CHAIN_RANKING[0];
   const dearest = CHAIN_RANKING[CHAIN_RANKING.length - 1];
@@ -189,7 +183,7 @@ export default function DoveConvieneScreen() {
       <Card>
         <Label icon="document-text-outline">La fonte</Label>
         <View style={styles.facts}>
-          <Fact value={`${(SURVEY.pricesCompared / 1_000_000).toLocaleString("it-IT")} mln`} label="prezzi rilevati" />
+          <Fact value={`${number(SURVEY.pricesCompared / 1_000_000, language)} mln`} label="prezzi rilevati" />
           <Fact value={String(SURVEY.stores)} label="punti vendita" />
           <Fact value={String(SURVEY.cities)} label="città" />
         </View>

@@ -62,13 +62,14 @@ function makeLocalStorage(): Storage {
  *
  * `Intl` è disponibile in Hermes su React Native 0.76, quindi ricaviamo la
  * lingua da lì invece di aggiungere `expo-localization` per un solo dato.
- * Se `Intl` mancasse, "it-IT" è il default sensato per questo prodotto.
+ * Se `Intl` mancasse si usa "en-GB": l'app non e' riservata all'Italia,
+ * e l'inglese e' il ripiego meno sbagliato per un utente qualunque.
  */
 function deviceLanguage(): string {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().locale || "it-IT";
+    return Intl.DateTimeFormat().resolvedOptions().locale || "en-GB";
   } catch {
-    return "it-IT";
+    return "en-GB";
   }
 }
 
