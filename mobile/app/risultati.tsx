@@ -204,21 +204,15 @@ export default function RisultatiScreen() {
         </Card>
       ) : null}
 
-      {results.cheapestSupermarket ? (
-        <Card>
-          <Label icon="storefront-outline">Dove conviene</Label>
-          <Body>
-            Per questa lista risulta più conveniente{" "}
-            <Body style={styles.bold}>{results.cheapestSupermarket.name}</Body>
-          </Body>
-          <Body style={styles.small}>
-            Stima sui prezzi medi di catena, non su rilevazioni in negozio.
-          </Body>
-        </Card>
-      ) : null}
 
       <Card>
         <Label icon="compass-outline">Vai a</Label>
+        <ListRow
+          icon="trophy-outline"
+          title="Dove conviene fare la spesa"
+          subtitle="Classifica delle catene · indagine Altroconsumo 2026"
+          onPress={() => router.push("/dove-conviene")}
+        />
         <ListRow
           icon="map-outline"
           title="Supermercati vicini"

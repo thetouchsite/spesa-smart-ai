@@ -133,6 +133,12 @@ export default function Home() {
           onPress={() => router.push("/impostazioni")}
         />
         <ListRow
+          icon="trophy-outline"
+          title="Dove conviene"
+          subtitle="Le catene più economiche d'Italia"
+          onPress={() => router.push("/dove-conviene")}
+        />
+        <ListRow
           icon="map-outline"
           title="Supermercati vicini"
           subtitle="Negozi alimentari intorno a te"
