@@ -149,7 +149,10 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
   try {
     const res = await fetch(url, {
       redirect: "follow",
-      signal: AbortSignal.timeout(12_000),
+      // Otto secondi e non dodici: una pagina di supermercato che non
+      // risponde entro otto non risponderà, e intanto tiene fermo un posto
+      // nella coda dei controlli.
+      signal: AbortSignal.timeout(8_000),
       headers: { "User-Agent": UA, Accept: "text/html" },
     });
     if (!res.ok) {
@@ -203,8 +206,10 @@ export interface CheckedRow {
 /**
  * Controlla tutte le righe di prezzo di un piano.
  *
- * In parallelo ma a piccoli gruppi: dodici richieste simultanee allo stesso
- * sito si prendono un blocco, e comunque non è educato.
+ * In parallelo ma a gruppi: troppe richieste simultanee allo stesso sito si
+ * prendono un blocco, e comunque non è educato. Il gruppo procede al passo
+ * del più lento, quindi il tempo massimo per pagina conta quanto la
+ * concorrenza.
  *
  * Le righe non raggiungibili non vengono buttate — il nome del prodotto resta
  * utile nella lista della spesa — ma perdono link e prezzo: meglio "prezzo non
@@ -223,7 +228,7 @@ export async function verifyPrices(
     negozio: string;
     link: string;
   }>,
-  batchSize = 4,
+  batchSize = 10,
 ): Promise<{ rows: CheckedRow[]; verificati: number; totali: number }> {
   const out: CheckedRow[] = [];
 

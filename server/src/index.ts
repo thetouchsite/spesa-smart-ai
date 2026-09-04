@@ -39,7 +39,7 @@ import { cache, isDbConfigured, plans, users } from "./db.js";
 import { hashPassword, issueToken, requireUser, verifyPassword } from "./auth.js";
 import { isShoppingConfigured, searchShopping } from "./shopping.js";
 import { budgetExhausted, quotaStatus, recordCost, recordUse, spendStatus } from "./quota.js";
-import { generateMenu, generatePrices, GROUNDED_MODEL, MENU_MODEL } from "./plan-grounded.js";
+import { generateMenu, generatePricesParallel, GROUNDED_MODEL, MENU_MODEL } from "./plan-grounded.js";
 import { groupByProduct, pickBestStore, verifyPrices } from "./price-page.js";
 import {
   AiRecipeInput,
@@ -446,7 +446,7 @@ app.post("/ai/plan-full", async (body) => {
      perche' il modello cerchi davvero, ed e' l'unica fase che si paga. */
   const items = fase1.data.lista.map((v) => `${v.nome} ${v.quantita}`.trim()).slice(0, 18);
 
-  let prezziGrezzi: Awaited<ReturnType<typeof generatePrices>>["data"]["prezzi"] = [];
+  let prezziGrezzi: Awaited<ReturnType<typeof generatePricesParallel>>["data"]["prezzi"] = [];
   let fase2Secondi = 0;
   let fase2Costo = 0;
   let ricerche = 0;
@@ -455,7 +455,7 @@ app.post("/ai/plan-full", async (body) => {
   try {
     recordUse("gemini");
     recordUse("grounding");
-    const fase2 = await generatePrices(items, data.city, data.country, data.currency);
+    const fase2 = await generatePricesParallel(items, data.city, data.country, data.currency);
     prezziGrezzi = fase2.data.prezzi;
     fase2Secondi = fase2.seconds;
     fase2Costo = fase2.cost;
@@ -474,7 +474,7 @@ app.post("/ai/plan-full", async (body) => {
 
   // Il controllo dei link: gratis, e trasforma "il modello dice" in "l'abbiamo
   // aperto". Sei per volta: con due catene ci sono trenta o quaranta pagine.
-  const checked = await verifyPrices(prezziGrezzi, 6);
+  const checked = await verifyPrices(prezziGrezzi, 10);
   console.info(`[plan-full] pagine aperte con esito ${checked.verificati}/${checked.totali}`);
 
   // Le offerte dello stesso prodotto affiancate, come nel prototipo del cliente:

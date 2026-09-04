@@ -501,8 +501,9 @@ export function pricesPrompt(
 PRODOTTI
 ${items.map((n, i) => `${i + 1}. ${n}`).join("\n")}
 
-Cerca ogni prodotto su ${stores} catene diverse con listino online pubblico,
-così i prezzi si possono confrontare.
+Cerca ogni prodotto su ${stores} catene diverse — non di più: oltre quel
+numero la risposta diventa lunga da scrivere e l'utente aspetta. Bastano due
+o tre insegne perché il confronto abbia senso.
 
 Conta soprattutto una cosa: che il LINK SI APRA e mostri QUEL prodotto.
 Scegli quindi negozi alimentari online le cui pagine si aprono senza login,
@@ -561,6 +562,75 @@ export async function generatePrices(
     data: { prezzi: parsed.prezzi, searches: r.searches, grounded: r.grounded },
     seconds: r.seconds,
     cost: r.cost,
+    model: GROUNDED_MODEL,
+  };
+}
+
+/**
+ * La fase 2, spezzata in due chiamate che vanno insieme.
+ *
+ * PERCHÉ
+ * ------
+ * Il tempo di questa fase non lo fa la ricerca: lo fa la scrittura. Il modello
+ * cerca in fretta, poi deve comporre una riga per ogni prodotto e per ogni
+ * negozio — con diciassette prodotti su tre insegne sono cinquanta righe, con
+ * nomi commerciali lunghi e indirizzi interi. Misurato a Zurigo: 53 secondi
+ * per 51 prezzi, contro i 38 di una lista da 22.
+ *
+ * Dividendo la lista a metà, le due chiamate scrivono venticinque righe
+ * ciascuna e lo fanno nello stesso momento: il tempo totale è quello della più
+ * lenta, non la somma.
+ *
+ * Costa una tariffa di ricerca in più — il grounding si paga a chiamata — cioè
+ * circa un centesimo. Vale la pena: mezzo minuto di attesa in meno su una
+ * schermata dove l'utente sta fermo a guardare.
+ *
+ * Se una delle due fallisce si tiene l'altra: mezza lista prezzata è molto
+ * meglio di un errore.
+ */
+export async function generatePricesParallel(
+  items: string[],
+  city: string,
+  country: string,
+  currency: string,
+  stores = 3,
+): Promise<PhaseResult<PricesResult>> {
+  // Sotto le otto voci non conviene: due chiamate corte non sono più veloci
+  // di una, e si pagherebbe una ricerca in più per niente.
+  if (items.length < 8) return generatePrices(items, city, country, currency, stores);
+
+  const meta = Math.ceil(items.length / 2);
+  const parti = [items.slice(0, meta), items.slice(meta)];
+
+  const esiti = await Promise.allSettled(
+    parti.map((parte) => generatePrices(parte, city, country, currency, stores)),
+  );
+
+  const riusciti = esiti.filter(
+    (e): e is PromiseFulfilledResult<PhaseResult<PricesResult>> => e.status === "fulfilled",
+  );
+
+  if (!riusciti.length) {
+    // Entrambe fallite: si rilancia il primo errore, che dice cosa è successo.
+    const primo = esiti.find((e) => e.status === "rejected") as PromiseRejectedResult | undefined;
+    throw primo?.reason ?? new Error("ricerca prezzi non riuscita");
+  }
+
+  if (riusciti.length < parti.length) {
+    console.warn(`[prezzi] una metà della lista non è stata prezzata, tengo l'altra`);
+  }
+
+  return {
+    data: {
+      prezzi: riusciti.flatMap((r) => r.value.data.prezzi),
+      searches: riusciti.reduce((s, r) => s + r.value.data.searches, 0),
+      // Basta che una delle due abbia cercato per non essere a memoria.
+      grounded: riusciti.some((r) => r.value.data.grounded),
+    },
+    // Il tempo è quello della più lenta: sono andate insieme.
+    seconds: Math.max(...riusciti.map((r) => r.value.seconds)),
+    // Il costo invece si somma: due chiamate, due tariffe di ricerca.
+    cost: riusciti.reduce((s, r) => s + r.value.cost, 0),
     model: GROUNDED_MODEL,
   };
 }
