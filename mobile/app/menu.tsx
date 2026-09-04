@@ -28,6 +28,12 @@ import { useSession } from "../src/lib/state/session";
 import { unsplashFoodImage } from "../src/lib/recipes/unsplash";
 import { colors, font, radius, spacing } from "../src/theme";
 
+/** Il motore pasti produce i giorni in inglese. */
+const DAY_IT: Record<string, string> = {
+  Monday: "Lunedì", Tuesday: "Martedì", Wednesday: "Mercoledì", Thursday: "Giovedì",
+  Friday: "Venerdì", Saturday: "Sabato", Sunday: "Domenica",
+};
+
 const MEALS = [
   { key: "breakfast" as const, label: "Colazione", icon: "sunny-outline" as const },
   { key: "lunch" as const, label: "Pranzo", icon: "partly-sunny-outline" as const },
@@ -77,7 +83,7 @@ export default function MenuScreen() {
         return (
           <Card key={`${day.day}-${i}`}>
             <View style={styles.dayHead}>
-              <Label icon="calendar-outline">{day.day}</Label>
+              <Label icon="calendar-outline">{DAY_IT[day.day] ?? day.day}</Label>
               {zeroSpend ? <Pill tone="success" icon="leaf-outline">spesa zero</Pill> : null}
             </View>
 

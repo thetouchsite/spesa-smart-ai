@@ -26,9 +26,21 @@ interface Counter {
   windowStart: number;
 }
 
-/** Limiti dei piani gratuiti e durata della finestra. */
+/**
+ * Limiti dei piani gratuiti.
+ *
+ * Il numero di Gemini e' misurato, non stimato: la documentazione parla di
+ * migliaia di richieste al giorno, ma l'errore restituito dall'API dice
+ * "limit: 20, model: gemini-3-flash". Venti al giorno PER MODELLO, e si
+ * esauriscono in mezz'ora di prove.
+ *
+ * Cambiare modello da' una quota nuova, ed e' il motivo per cui GEMINI_MODEL
+ * e' una variabile d'ambiente. Ma per una dimostrazione seria serve la
+ * fatturazione attiva: venti richieste non bastano nemmeno per un piano
+ * completo con le sue ricette.
+ */
 const LIMITS: Record<Provider, { limit: number; windowMs: number; label: string }> = {
-  gemini: { limit: 1000, windowMs: 24 * 60 * 60 * 1000, label: "al giorno" },
+  gemini: { limit: 20, windowMs: 24 * 60 * 60 * 1000, label: "al giorno" },
   serpapi: { limit: 250, windowMs: 30 * 24 * 60 * 60 * 1000, label: "al mese" },
 };
 
@@ -53,7 +65,7 @@ export function recordUse(provider: Provider): void {
   c.used += 1;
   const { limit } = LIMITS[provider];
   const pct = Math.round((c.used / limit) * 100);
-  if (pct >= 90) console.warn(`[quota] ${provider}: ${c.used}/${limit} (${pct}%) — quasi esaurita`);
+  if (pct >= 75) console.warn(`[quota] ${provider}: ${c.used}/${limit} (${pct}%) — quasi esaurita`);
   else if (pct >= 70) console.warn(`[quota] ${provider}: ${c.used}/${limit} (${pct}%)`);
 }
 
@@ -77,7 +89,7 @@ export function quotaStatus(): QuotaStatus[] {
       used: c.used,
       limit,
       percent,
-      level: percent >= 90 ? "critico" : percent >= 70 ? "attenzione" : "ok",
+      level: percent >= 75 ? "critico" : percent >= 50 ? "attenzione" : "ok",
       window: label,
     };
   });

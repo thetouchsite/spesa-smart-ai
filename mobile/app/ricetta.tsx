@@ -38,6 +38,12 @@ const DIFFICULTY: Record<string, string> = {
   hard: "impegnativa",
 };
 
+/** Il motore pasti produce i giorni in inglese ("Tuesday"). */
+const DAY_IT: Record<string, string> = {
+  Monday: "Lunedì", Tuesday: "Martedì", Wednesday: "Mercoledì", Thursday: "Giovedì",
+  Friday: "Venerdì", Saturday: "Sabato", Sunday: "Domenica",
+};
+
 const MEAL_LABEL: Record<string, string> = {
   breakfast: "Colazione",
   lunch: "Pranzo",
@@ -118,7 +124,7 @@ export default function RicettaScreen() {
       <View style={styles.head}>
         {params.giorno ? (
           <Body style={styles.eyebrow}>
-            {params.giorno} · {MEAL_LABEL[mealType] ?? ""}
+            {DAY_IT[params.giorno] ?? params.giorno} · {MEAL_LABEL[mealType] ?? ""}
           </Body>
         ) : null}
         <Title>{recipe.title}</Title>
@@ -128,7 +134,7 @@ export default function RicettaScreen() {
       <View style={styles.facts}>
         <Fact value={`${recipe.prepMinutes}′`} label="preparazione" />
         <Fact value={`${recipe.cookMinutes}′`} label="cottura" />
-        <Fact value={`${recipe.servings}`} label="porzioni" />
+        <Fact value={`${recipe.servings}`} label={recipe.servings === 1 ? "porzione" : "porzioni"} />
         <Fact value={DIFFICULTY[recipe.difficulty] ?? recipe.difficulty} label="difficoltà" />
       </View>
 
@@ -136,7 +142,7 @@ export default function RicettaScreen() {
         <Label>Ingredienti</Label>
         {recipe.ingredients.map((ing, i) => (
           <View key={`${ing.name}-${i}`} style={styles.ingredient}>
-            <Body style={styles.ingName}>{ing.name}</Body>
+            <Body style={styles.ingName}>{productLabel(ing.name, language) ?? ing.name}</Body>
             <Body style={styles.ingQty}>{ing.quantity}</Body>
           </View>
         ))}

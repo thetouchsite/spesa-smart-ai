@@ -21,18 +21,49 @@ function baseUrl(): string {
   const fromConfig = (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl;
   const configured = (fromEnv || fromConfig || "http://localhost:3000").replace(/\/+$/, "");
 
-  // In sviluppo su un telefono fisico, "localhost" è il telefono stesso: il
-  // backend gira sul computer e non risponderebbe mai. Metro conosce già
-  // l'indirizzo di rete della macchina, quindi lo riusiamo. Evita di dover
-  // scrivere a mano l'IP in app.json a ogni cambio di rete.
+  // In sviluppo su un telefono fisico, "localhost" e' il telefono stesso: il
+  // backend gira sul computer e non risponderebbe mai. L'indirizzo di rete
+  // della macchina lo conosce gia' Metro, ma DOVE lo tenga cambia da una
+  // versione di Expo all'altra — per questo si provano piu' fonti invece di
+  // fidarsi di una sola. Senza, ogni chiamata AI falliva e l'app ricadeva
+  // sempre sul motore locale: ricette generiche, in inglese.
   if (__DEV__ && /^https?:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(configured)) {
-    const metroHost = Constants.expoConfig?.hostUri?.split(":")[0];
-    if (metroHost && metroHost !== "localhost" && metroHost !== "127.0.0.1") {
-      const port = configured.split(":")[2] ?? "3000";
-      return `http://${metroHost}:${port}`;
-    }
+    const port = configured.split(":")[2] ?? "3000";
+    const host = metroHost();
+    if (host) return `http://${host}:${port}`;
   }
   return configured;
+}
+
+/** Indirizzo di rete della macchina che serve il bundle, se ricavabile. */
+function metroHost(): string | null {
+  const candidates = [
+    Constants.expoConfig?.hostUri,
+    (Constants as unknown as { expoGoConfig?: { debuggerHost?: string } }).expoGoConfig
+      ?.debuggerHost,
+    (Constants as unknown as { manifest2?: { extra?: { expoGo?: { debuggerHost?: string } } } })
+      .manifest2?.extra?.expoGo?.debuggerHost,
+    Constants.experienceUrl,
+    // Ultima risorsa: l'URL da cui Metro ha caricato il bundle.
+    typeof globalThis !== "undefined"
+      ? (globalThis as { __DEV_SERVER_ORIGIN__?: string }).__DEV_SERVER_ORIGIN__
+      : undefined,
+  ];
+
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const host = String(raw)
+      .replace(/^\w+:\/\//, "")
+      .split("/")[0]
+      .split(":")[0];
+    if (host && host !== "localhost" && host !== "127.0.0.1") return host;
+  }
+  return null;
+}
+
+/** Indirizzo effettivamente usato: mostrato dalla diagnostica in sviluppo. */
+export function apiBaseUrl(): string {
+  return baseUrl();
 }
 
 /** Errore con lo status HTTP, così il chiamante distingue 401 da 503. */
