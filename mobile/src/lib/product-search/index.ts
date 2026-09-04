@@ -92,7 +92,7 @@ function isProductPageUrl(raw: string): boolean {
  *  the query token-wise; treat anything well outside the per-item bound as
  *  unreliable and drop it. The basket-aggregate price still gets a separate
  *  per-line cap in `sanitizeEstimate`. */
-function isPlausibleUnitPrice(price: number): boolean {
+export function isPlausibleUnitPrice(price: number): boolean {
   return Number.isFinite(price) && price > 0.2 && price < 60;
 }
 
@@ -124,7 +124,7 @@ function contentTokens(q: string): string[] {
  *  Requires ALL content tokens from the query to appear in the title AND
  *  no blocklisted term. Strict on purpose — a false positive means a user
  *  clicks "Buy now" and lands on the wrong product. */
-function titleMatchesQuery(title: string, query: string): boolean {
+export function titleMatchesQuery(title: string, query: string): boolean {
   const t = title.toLowerCase();
   if (TITLE_BLOCKLIST.some((bad) => t.includes(bad))) return false;
   const tokens = contentTokens(query);

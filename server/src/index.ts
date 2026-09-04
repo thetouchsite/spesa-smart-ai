@@ -353,7 +353,10 @@ app.post("/ai/recipe-web", async (body) => {
 const ShoppingInput = z.object({
   query: z.string().min(2).max(120),
   country: z.string().max(2).default("IT"),
-  limit: z.number().min(1).max(10).default(6),
+  // Il client filtra severamente (prezzo plausibile, titolo, venditore
+  // riconosciuto): servono righe grezze in abbondanza per averne abbastanza
+  // di buone dopo gli sbarramenti.
+  limit: z.number().min(1).max(20).default(10),
 });
 
 /**

@@ -44,6 +44,7 @@ import type { PricingResult } from "../src/lib/price-data";
 import { buildShoppingLink } from "../src/lib/shopping-links";
 import { defaultRetailerFor } from "../src/lib/shopping-links/retailers";
 import { buildWhatsAppMessage } from "../src/lib/export/whatsapp-share";
+import { italianLabel, italianCategory } from "../src/lib/price-data/labels";
 import { PriceCheckSheet } from "../src/components/price-check";
 import { colors, font, radius, spacing } from "../src/theme";
 
@@ -103,16 +104,16 @@ export default function ListaScreen() {
     if (!currentPlan) return [];
     if (pricing?.items?.length) {
       return pricing.items.map((i) => ({
-        name: i.name,
+        name: italianLabel(i.name) ?? i.name,
         quantity: i.packQuantity ?? i.quantity,
-        category: i.category || "Altro",
+        category: italianCategory(i.category || "Altro"),
         cost: i.estimatedCost ?? 0,
       }));
     }
     return currentPlan.groceryList.map((g) => ({
-      name: g.name,
+      name: italianLabel(g.name) ?? g.name,
       quantity: g.quantity,
-      category: g.category || "Altro",
+      category: italianCategory(g.category || "Altro"),
       cost: g.estimatedCost ?? 0,
     }));
   }, [currentPlan, pricing]);

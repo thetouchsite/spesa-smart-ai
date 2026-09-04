@@ -22,6 +22,8 @@ import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { Body, Button, Label, Loading, Title } from "./ui";
 import { post, ApiError } from "../api/client";
+import { filterShoppingRows } from "../lib/product-search/filters";
+import { italianLabel } from "../lib/price-data/labels";
 import { colors, font, radius, spacing } from "../theme";
 
 interface ShoppingItem {
@@ -40,7 +42,8 @@ type Result =
 const REASONS: Record<string, string> = {
   "not-configured":
     "La ricerca dei prezzi reali non è attiva su questo ambiente, oppure la quota gratuita del mese è esaurita.",
-  "no-results": "Nessun prodotto trovato per questa voce. Prova con un nome più comune.",
+  "no-results":
+    "Nessun prodotto attendibile trovato. I risultati fuori tema — confezioni all’ingrosso, integratori, venditori esteri — vengono scartati apposta.",
   error: "Ricerca non riuscita. Controlla la connessione e riprova.",
   offline: "Il servizio prezzi non risponde. L'app continua a funzionare con le stime.",
 };
@@ -75,12 +78,29 @@ export function PriceCheckSheet({
     setResult(null);
     (async () => {
       try {
+        // Il motore locale produce la lista in inglese ("Mushrooms"): cercata
+        // cosi' su Google Shopping Italia torna funghi essiccati, kit di
+        // coltivazione e integratori. Si cerca il nome italiano.
+        const query = italianLabel(itemName) ?? itemName;
+
         const res = await post<Result>("/product/shopping", {
-          query: itemName,
+          query,
           country,
-          limit: 6,
+          limit: 12,
         });
-        if (alive) setResult(res);
+
+        // Stessi sbarramenti che il prototipo applicava e che avevo
+        // scavalcato chiamando l'endpoint direttamente.
+        const filtered: Result = res.ok
+          ? (() => {
+              const rows = filterShoppingRows(res.items, query, country);
+              return rows.length > 0
+                ? { ok: true, items: rows.slice(0, 6) }
+                : { ok: false, reason: "no-results" };
+            })()
+          : res;
+
+        if (alive) setResult(filtered);
       } catch (err) {
         if (!alive) return;
         // 503 = chiave assente o quota finita: e' uno stato previsto, non un
@@ -116,7 +136,7 @@ export function PriceCheckSheet({
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Label icon="pricetag-outline">Prezzo reale</Label>
-            <Title style={styles.title}>{itemName}</Title>
+            <Title style={styles.title}>{itemName ? (italianLabel(itemName) ?? itemName) : ""}</Title>
           </View>
           <Pressable
             accessibilityRole="button"
