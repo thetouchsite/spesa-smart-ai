@@ -20,6 +20,7 @@
  */
 
 import { Linking, Modal, Pressable, StyleSheet, View } from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { Body, Button, Label, Title } from "./ui";
 import type { ProductOffers } from "../lib/plan-full";
@@ -110,6 +111,16 @@ export function PriceCheckSheet({
                 onPress={() => o.link && Linking.openURL(o.link).catch(() => {})}
                 style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               >
+                {/* La foto del prodotto, quando la fonte la dà: con Google
+                    Shopping è il modo più rapido per accorgersi che il
+                    risultato non è il prodotto che si cercava. */}
+                {o.immagine ? (
+                  <Image source={{ uri: o.immagine }} style={styles.thumb} contentFit="contain" />
+                ) : (
+                  <View style={[styles.thumb, styles.thumbEmpty]}>
+                    <Ionicons name="cube-outline" size={18} color={colors.mutedForeground} />
+                  </View>
+                )}
                 <View style={styles.rowText}>
                   <Body style={styles.rowTitle} numberOfLines={2}>
                     {o.nome}
@@ -201,6 +212,8 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   rowPressed: { opacity: 0.6 },
+  thumb: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.card },
+  thumbEmpty: { alignItems: "center", justifyContent: "center", backgroundColor: colors.muted },
   rowText: { flex: 1, gap: 1 },
   rowTitle: { fontSize: font.size.sm, color: colors.foreground, lineHeight: 19 },
   rowSource: { fontSize: font.size.xs, color: colors.mutedForeground },

@@ -31,6 +31,8 @@ import type { PricedItem, PricingResult } from "@/lib/price-data/types";
 /** Un prezzo trovato in un negozio, già controllato dal server. */
 export interface Offer {
   negozio: string;
+  /** Miniatura del prodotto, quando la fonte la fornisce. */
+  immagine?: string;
   /** Il nome del prodotto come appare sul sito di quel negozio. */
   nome: string;
   prezzo: number;
@@ -85,6 +87,8 @@ export interface PlanMeta {
   /** Quale strada ha prodotto questi prezzi: cambia quanto valgono. */
   fontePrezzi?: "ai" | "serpapi";
   secondi: number;
+  /** Quanto è durata la sola ricerca prezzi. */
+  secondiPrezzi?: number;
   ricerche: number;
   /** Falso quando il modello non ha interrogato il web: prezzi meno affidabili. */
   ricercaEffettuata: boolean;
@@ -114,19 +118,32 @@ export interface PlanExtra {
   meta: PlanMeta;
 }
 
-interface ServerResponse {
+/** Risposta di `/ai/menu`: il piano senza prezzi. */
+interface MenuResponse {
   menu: Array<{ giorno: string; colazione: string; pranzo: string; cena: string }>;
   ricette?: Recipe[];
   lista: Array<{ nome: string; quantita: string; reparto: string }>;
+  consigli: string[];
+  meta: { motoreMenu: string; secondiMenu: number; costoStimatoUsd: number; generatoIl: string };
+}
+
+/** Risposta di `/ai/prices`: le offerte per la lista appena ricevuta. */
+interface PricesResponse {
   prezzi: Array<Offer & { prodotto: string; alternative: number }>;
   prodotti: ProductOffers[];
   catene: StoreTotal[];
   vincitore: StoreTotal | null;
   risparmioVsPiuCara: number | null;
-  totali: PlanExtra["totali"];
-  consigli: string[];
-  meta: PlanMeta;
+  totali: Omit<PlanExtra["totali"], "budget">;
+  meta: Omit<PlanMeta, "motoreMenu" | "secondi">;
 }
+
+/** Le due risposte messe insieme, com'erano quando l'endpoint era uno solo. */
+type ServerResponse = Omit<MenuResponse, "meta"> &
+  Omit<PricesResponse, "meta" | "totali"> & {
+    totali: PlanExtra["totali"];
+    meta: PlanMeta;
+  };
 
 
 /* ─────────── Abbinare le voci della lista alle offerte trovate ─────────── */
@@ -283,7 +300,16 @@ export interface PlanFullResult {
  * a Zurigo — il server aveva finito in 57 secondi con dieci prezzi verificati,
  * ma l'app aveva chiuso e ripiegato sul motore senza prezzi.
  */
-const TIMEOUT_MS = 180_000;
+/**
+ * I tempi massimi, uno per richiesta.
+ *
+ * Restano sotto i sessanta secondi che iOS concede a una connessione: oltre
+ * quella soglia è il sistema a chiudere, e nessun valore scritto qui serve.
+ * Il menù non ha bisogno di internet e torna in una decina di secondi; i
+ * prezzi, fra ricerca e verifica delle pagine, ne prendono venti o trenta.
+ */
+const MENU_TIMEOUT_MS = 45_000;
+const PRICES_TIMEOUT_MS = 55_000;
 
 /**
  * Quale strada usare per i prezzi.
@@ -315,57 +341,133 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 }
 
 /**
- * Genera il piano completo con prezzi reali.
+ * Genera il piano completo con prezzi reali, in due richieste.
  *
- * Lancia in caso di errore: chi chiama decide come ricadere: `fetchPlan`
- * prova prima questo, poi il piano AI senza prezzi, poi il motore locale.
+ * PERCHÉ DUE E NON UNA
+ * --------------------
+ * Perché iOS chiude ogni richiesta di rete dopo **sessanta secondi**, e nessun
+ * timeout scritto nel codice può allungarli. Il piano completo, quando la
+ * ricerca prezzi è lenta, ne impiega 63-65: il telefono tagliava la
+ * connessione, l'app ripiegava sul motore senza prezzi e l'utente vedeva una
+ * lista di trattini — mentre il server, ignaro, finiva il lavoro e rispondeva
+ * a nessuno. Da fuori sembrava che il motore funzionasse a intermittenza.
+ *
+ * Divise, nessuna delle due si avvicina al muro: il menù arriva in una decina
+ * di secondi, i prezzi in venti o trenta.
+ *
+ * Se la ricerca prezzi fallisce, il piano viene consegnato lo stesso: menù,
+ * ricette e lista ci sono, e valgono più di un errore.
+ *
+ * Lancia solo se fallisce il menù: senza quello non c'è niente da mostrare, e
+ * `fetchPlan` ricade sul motore locale.
  */
 export async function fetchPlanFull(
   profile: UserProfile,
   language: string,
 ): Promise<PlanFullResult> {
   const defaults = deviceDefaults();
+  const country = profile.country || defaults.country;
+  const currency = profile.currency || defaults.currency;
+  const city = profile.city || "";
 
-  const response = await withTimeout(
-    post<ServerResponse>(
-      "/ai/plan-full",
+  const menu = await withTimeout(
+    post<MenuResponse>(
+      "/ai/menu",
       {
-        city: profile.city || "",
-        country: profile.country || defaults.country,
+        city,
+        country,
         household: profile.household || "2",
         budget: Number(profile.budget) || 100,
-        currency: profile.currency || defaults.currency,
+        currency,
         frequency: profile.frequency === "monthly" ? "monthly" : "weekly",
         style: profile.style || "equilibrato",
         allergies: profile.allergies ?? [],
         dislikes: profile.dislikes ?? "",
         language,
         withRecipes: true,
-        // Omesso quando non impostato: decide il server.
-        ...(PRICE_SOURCE ? { priceSource: PRICE_SOURCE } : {}),
       },
-      TIMEOUT_MS,
+      MENU_TIMEOUT_MS,
     ),
-    TIMEOUT_MS,
+    MENU_TIMEOUT_MS,
   );
 
-  if (!response?.menu?.length || !response?.lista?.length) {
+  if (!menu?.menu?.length || !menu?.lista?.length) {
     throw new Error("il motore ha risposto senza menù o senza lista");
   }
+
+  // Le stesse voci che il server userebbe: nome e quantità insieme, perché è
+  // così che si cerca un prodotto («Passata di pomodoro 700 g»).
+  const items = menu.lista.map((v) => `${v.nome} ${v.quantita}`.trim()).slice(0, 18);
+
+  let prices: PricesResponse | null = null;
+  try {
+    prices = await withTimeout(
+      post<PricesResponse>(
+        "/ai/prices",
+        {
+          items,
+          city,
+          country,
+          currency,
+          ...(PRICE_SOURCE ? { priceSource: PRICE_SOURCE } : {}),
+        },
+        PRICES_TIMEOUT_MS,
+      ),
+      PRICES_TIMEOUT_MS,
+    );
+  } catch (err) {
+    // Il piano resta utile senza prezzi: meglio di una schermata di errore.
+    console.info("[prezzi] non disponibili:", (err as Error).message);
+  }
+
+  const budget = Number(profile.budget) || 0;
+
+  const response: ServerResponse = {
+    ...menu,
+    prezzi: prices?.prezzi ?? [],
+    prodotti: prices?.prodotti ?? [],
+    catene: prices?.catene ?? [],
+    vincitore: prices?.vincitore ?? null,
+    risparmioVsPiuCara: prices?.risparmioVsPiuCara ?? null,
+    totali: {
+      spesaAlMiglioPrezzo: prices?.totali.spesaAlMiglioPrezzo ?? 0,
+      budget,
+      valuta: currency,
+      prodottiSenzaPrezzo: prices?.totali.prodottiSenzaPrezzo ?? menu.lista.length,
+      vociInLista: menu.lista.length,
+    },
+    meta: {
+      motoreMenu: menu.meta.motoreMenu,
+      motorePrezzi: prices?.meta.motorePrezzi ?? "nessuno",
+      fontePrezzi: prices?.meta.fontePrezzi,
+      secondi: menu.meta.secondiMenu + (prices?.meta.secondiPrezzi ?? 0),
+      secondiPrezzi: prices?.meta.secondiPrezzi ?? 0,
+      ricerche: prices?.meta.ricerche ?? 0,
+      ricercaEffettuata: prices?.meta.ricercaEffettuata ?? false,
+      costoStimatoUsd: menu.meta.costoStimatoUsd + (prices?.meta.costoStimatoUsd ?? 0),
+      prezziVerificati: prices?.meta.prezziVerificati ?? 0,
+      prezziTotali: prices?.meta.prezziTotali ?? 0,
+      insegneConfrontate: prices?.meta.insegneConfrontate ?? 0,
+      prodottiConAlternative: prices?.meta.prodottiConAlternative ?? 0,
+      prodottiInOfferta: prices?.meta.prodottiInOfferta ?? 0,
+      generatoIl: menu.meta.generatoIl,
+    },
+  };
 
   return {
     plan: toPlan(response),
     extra: {
       ricette: response.ricette ?? [],
-      prodotti: response.prodotti ?? [],
-      catene: response.catene ?? [],
-      vincitore: response.vincitore ?? null,
-      risparmioVsPiuCara: response.risparmioVsPiuCara ?? null,
+      prodotti: response.prodotti,
+      catene: response.catene,
+      vincitore: response.vincitore,
+      risparmioVsPiuCara: response.risparmioVsPiuCara,
       totali: response.totali,
       meta: response.meta,
     },
   };
 }
+
 
 /* ─────────── Dal motore con ricerca alla forma che l'app conosce ─────────── */
 
@@ -378,9 +480,9 @@ export async function fetchPlanFull(
  * reali già in memoria: è successo a Zurigo, con 58,85 CHF trovati e uno zero
  * a schermo, perché il catalogo interno non ha listini svizzeri.
  *
- * Il punto è che il catalogo interno **non deve nemmeno essere interrogato**
- * quando i prezzi veri ci sono: sono migliori sotto ogni aspetto, e per i
- * paesi che il catalogo non copre sono gli unici che esistono.
+ * Il catalogo interno **non viene nemmeno interrogato** quando i prezzi veri
+ * ci sono: sono migliori sotto ogni aspetto, e per i paesi che il catalogo non
+ * copre sono gli unici che esistono.
  *
  * `resolutionTier: "city"` è la corsia di massima fiducia del motore interno,
  * e qui è meritata: questi prezzi vengono dai negozi di quella città, non da
@@ -395,15 +497,15 @@ export function pricingFromOffers(
     const best = found?.offerte?.[0];
 
     // Un prezzo che la pagina ha confermato vale più di uno solo dichiarato:
-    // la differenza finisce nella confidenza, che l'app usa per decidere quanto
-    // esporsi con i numeri.
+    // la differenza finisce nella confidenza, che l'app usa per decidere
+    // quanto esporsi con i numeri.
     const confidence = !best
       ? 0
       : best.verifica === "verificato"
         ? 1
         : best.verifica === "pagina-ok"
           ? 0.85
-          : // "bloccato": il link è buono ma il prezzo lo dice solo il modello.
+          : // "bloccato": il link è buono ma il prezzo lo dice solo la fonte.
             0.6;
 
     return {

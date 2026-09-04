@@ -439,13 +439,292 @@ function paeseIso(paese: string): string {
  * profilo pagano una generazione sola. È ciò che tiene il costo sostenibile
  * quando gli utenti crescono.
  */
+/**
+ * Prezza una lista della spesa: cerca, verifica, confronta.
+ *
+ * Condivisa dai due endpoint — `/ai/prices` per l'app, `/ai/plan-full` per gli
+ * script di prova — cosi' la logica sta in un posto solo e le due strade non
+ * possono divergere.
+ */
+async function prezzaLista(
+  items: string[],
+  city: string,
+  country: string,
+  currency: string,
+  fonte: "ai" | "serpapi",
+) {
+  let prezziGrezzi: Array<{
+    prodotto?: string;
+    nome: string;
+    prezzo: number | null;
+    valuta: string;
+    negozio: string;
+    link: string;
+  }> = [];
+  let secondi = 0;
+  let costo = 0;
+  let ricerche = 0;
+  let hacercato = false;
+
+  try {
+    if (fonte === "serpapi") {
+      // La strada del prototipo: una ricerca per prodotto su Google Shopping.
+      if (!isShoppingConfigured()) {
+        throw new HttpError(503, "SERPAPI_KEY non configurata: la strada 'serpapi' non e' disponibile");
+      }
+      const t0 = Date.now();
+      const serp = await generatePricesSerpapi(items, paeseIso(country));
+      for (let i = 0; i < serp.ricerche; i++) recordUse("serpapi");
+      prezziGrezzi = serp.prezzi;
+      secondi = (Date.now() - t0) / 1000;
+      ricerche = serp.ricerche;
+      // Google Shopping cerca sempre davvero: non ha il rischio di rispondere
+      // a memoria che ha il modello.
+      hacercato = true;
+      console.info(
+        `[prezzi] Google Shopping: ${secondi.toFixed(0)}s, ${serp.ricerche} ricerche SerpAPI, ` +
+          `${prezziGrezzi.length} prezzi, ${serp.senzaPrezzo} prodotti senza risultati`,
+      );
+    } else {
+      recordUse("gemini");
+      recordUse("grounding");
+      const fase2 = await generatePricesParallel(items, city, country, currency);
+      prezziGrezzi = fase2.data.prezzi;
+      secondi = fase2.seconds;
+      costo = fase2.cost;
+      ricerche = fase2.data.searches;
+      recordCost(fase2.cost);
+      hacercato = fase2.data.grounded;
+      console.info(
+        `[prezzi] ${fase2.model}: ${fase2.seconds.toFixed(0)}s, $${fase2.cost.toFixed(4)}, ` +
+          `${ricerche} ricerche, ${prezziGrezzi.length} prezzi`,
+      );
+    }
+  } catch (err) {
+    // Senza prezzi la lista resta utile: molto meglio di un errore.
+    console.warn("[prezzi] ricerca fallita, restituisco la lista senza prezzi:", err);
+  }
+
+  // Il controllo dei link: gratis, e trasforma "il modello dice" in "l'abbiamo
+  // aperto". Dieci per volta, con trenta o quaranta pagine da aprire.
+  const checked = await verifyPrices(prezziGrezzi, 10);
+  console.info(`[prezzi] pagine aperte con esito ${checked.verificati}/${checked.totali}`);
+
+  // Le offerte dello stesso prodotto affiancate, la piu' economica in testa.
+  const prodotti = groupByProduct(checked.rows);
+  const conAlternative = prodotti.filter((p) => p.offerte.length > 1).length;
+
+  const migliori = prodotti.map((p) => ({
+    ...p.offerte[0],
+    prodotto: p.prodotto,
+    alternative: p.offerte.length - 1,
+  }));
+
+  // Vince il negozio piu' economico FRA QUELLI VERIFICABILI: il modello
+  // propone, la scelta si fa sui prezzi controllati.
+  const confronto = pickBestStore(checked.rows);
+  for (const c of confronto.catene) {
+    console.info(
+      `[prezzi]   ${c.negozio}: ${c.totale} (${c.verificati}/${c.proposti} verificati)` +
+        `${c.utilizzabile ? "" : " — scartata, troppi link rotti"}`,
+    );
+  }
+
+  const offerte = migliori.filter((r) => r.risparmio && r.risparmio > 0).length;
+
+  // Nel totale entrano SOLO i prezzi verificati: sommare cio' che non si e'
+  // potuto controllare da' un numero sbagliato con l'aria di essere esatto.
+  const contati = migliori.filter((r) => r.verifica !== "non-raggiungibile");
+  const totale = Math.round(contati.reduce((s, r) => s + (r.prezzo ?? 0), 0) * 100) / 100;
+
+  console.info(
+    `[prezzi] ${prodotti.length} prodotti, ${conAlternative} con alternative, ` +
+      `${offerte} in promozione — totale al meglio ${totale} ${currency}`,
+  );
+
+  return {
+    prezzi: migliori,
+    prodotti,
+    catene: confronto.catene,
+    vincitore: confronto.vincitore,
+    risparmioVsPiuCara: confronto.risparmio,
+    totali: {
+      spesaAlMiglioPrezzo: totale,
+      valuta: currency,
+      prodottiSenzaPrezzo: Math.max(0, items.length - contati.length),
+      prodottiPrezzoVerificato: contati.length,
+      vociInLista: items.length,
+    },
+    meta: {
+      motorePrezzi: fonte === "serpapi" ? "Google Shopping (SerpAPI)" : GROUNDED_MODEL,
+      fontePrezzi: fonte,
+      secondiPrezzi: Math.round(secondi),
+      ricerche,
+      // Se e' falso, i prezzi vengono dalla memoria del modello: va detto.
+      ricercaEffettuata: hacercato,
+      costoStimatoUsd: Number(costo.toFixed(4)),
+      prezziVerificati: checked.verificati,
+      prezziTotali: checked.totali,
+      insegneConfrontate: confronto.catene.length,
+      prodottiConAlternative: conAlternative,
+      prodottiInOfferta: offerte,
+      generatoIl: new Date().toISOString(),
+    },
+  };
+}
+
+/**
+ * Fase 1 da sola: menu', ricette e lista della spesa.
+ *
+ * PERCHE' DUE ENDPOINT E NON UNO
+ * ------------------------------
+ * Perche' iOS chiude ogni richiesta di rete dopo SESSANTA SECONDI, e nessun
+ * timeout applicativo puo' allungarli. Il piano completo, quando la ricerca
+ * prezzi e' lenta, ne impiega 63-65: il telefono taglia la connessione, l'app
+ * ripiega sul motore senza prezzi e l'utente vede una lista di trattini —
+ * mentre il server, ignaro, finisce il lavoro e risponde a nessuno.
+ *
+ * Spezzando in due, nessuna delle due richieste si avvicina al muro: il menu'
+ * arriva in una decina di secondi, i prezzi in venti o trenta.
+ *
+ * C'e' un guadagno oltre alla robustezza: l'app puo' mostrare il menu' appena
+ * arriva, invece di tenere l'utente su una schermata di attesa per un minuto.
+ */
+app.post("/ai/menu", async (body) => {
+  const data = parse(GroundedInput, body);
+  if (!isConfigured()) throw new HttpError(503, "Servizio AI non configurato su questo ambiente");
+
+  const key = cacheKey("menu", data);
+  const local = memoryGet(key);
+  if (local !== undefined) {
+    console.info(`[cache] HIT memoria ${key}`);
+    return local;
+  }
+  if (isDbConfigured()) {
+    try {
+      const hit = await (await cache()).findOne({ _id: key });
+      if (hit) {
+        memorySet(key, hit.value);
+        return hit.value;
+      }
+    } catch {
+      /* cache irraggiungibile: si prosegue */
+    }
+  }
+
+  recordUse("gemini");
+  const fase1 = await generateMenu(data);
+  recordCost(fase1.cost);
+  console.info(
+    `[menu] ${fase1.model}: ${fase1.seconds.toFixed(0)}s, $${fase1.cost.toFixed(4)}, ` +
+      `${fase1.data.menu.length} giorni, ${fase1.data.lista.length} voci`,
+  );
+
+  const result = {
+    ...fase1.data,
+    meta: {
+      motoreMenu: fase1.model,
+      secondiMenu: Math.round(fase1.seconds),
+      costoStimatoUsd: Number(fase1.cost.toFixed(4)),
+      generatoIl: new Date().toISOString(),
+    },
+  };
+
+  memorySet(key, result);
+  if (isDbConfigured()) {
+    try {
+      await (await cache()).insertOne({
+        _id: key,
+        value: result,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + CACHE_TTL_DAYS * 86_400_000),
+      });
+    } catch {
+      /* gia' presente */
+    }
+  }
+  return result;
+});
+
+const PricesInput = z.object({
+  items: z.array(z.string().min(2).max(160)).min(1).max(24),
+  city: z.string().max(80).default(""),
+  country: z.string().max(40).default("Italia"),
+  currency: z.string().min(3).max(3).default("EUR"),
+  priceSource: z.enum(["ai", "serpapi"]).optional(),
+});
+
+/**
+ * Fase 2 da sola: prezzi, verifica dei link e confronto fra negozi.
+ *
+ * Riceve la lista della spesa gia' fatta e restituisce le offerte raggruppate
+ * per prodotto, con la piu' economica in testa. E' l'unica fase che si paga.
+ */
+app.post("/ai/prices", async (body) => {
+  const data = parse(PricesInput, body);
+  const fonte = data.priceSource ?? PRICE_SOURCE_DEFAULT;
+
+  const key = cacheKey("prices", { ...data, priceSource: fonte });
+  const local = memoryGet(key);
+  if (local !== undefined) {
+    console.info(`[cache] HIT memoria ${key}`);
+    return local;
+  }
+  if (isDbConfigured()) {
+    try {
+      const hit = await (await cache()).findOne({ _id: key });
+      if (hit) {
+        memorySet(key, hit.value);
+        return hit.value;
+      }
+    } catch {
+      /* cache irraggiungibile */
+    }
+  }
+
+  if (budgetExhausted()) {
+    const sp = spendStatus();
+    throw new HttpError(
+      402,
+      `Tetto di spesa raggiunto ($${sp.usd} su $${sp.limitUsd}). ` +
+        `Alza SPESA_MAX_USD o riavvia il servizio per ripartire.`,
+    );
+  }
+
+  const esito = await prezzaLista(data.items, data.city, data.country, data.currency, fonte);
+
+  memorySet(key, esito);
+  if (isDbConfigured()) {
+    try {
+      await (await cache()).insertOne({
+        _id: key,
+        value: esito,
+        createdAt: new Date(),
+        // Sette giorni: i prezzi invecchiano, le ricette no.
+        expiresAt: new Date(Date.now() + 7 * 86_400_000),
+      });
+    } catch {
+      /* gia' presente */
+    }
+  }
+  return esito;
+});
+
+/**
+ * Piano completo in una richiesta sola: menu' + prezzi.
+ *
+ * Comodo per gli script di prova e per chi non ha il limite dei sessanta
+ * secondi di iOS. L'app usa invece `/ai/menu` e `/ai/prices` separati, perche'
+ * su telefono una richiesta lunga viene tagliata dal sistema.
+ */
 app.post("/ai/plan-full", async (body) => {
   const data = parse(GroundedInput, body);
   if (!isConfigured()) throw new HttpError(503, "Servizio AI non configurato su questo ambiente");
 
-  // La fonte entra nella chiave: le due strade non devono servirsi
-  // a vicenda le risposte dalla cache.
-  const key = cacheKey("plan-full", data);
+  const fonte = data.priceSource ?? PRICE_SOURCE_DEFAULT;
+  // La fonte entra nella chiave: le due strade non devono servirsi a vicenda
+  // le risposte dalla cache.
+  const key = cacheKey("plan-full", { ...data, priceSource: fonte });
 
   const local = memoryGet(key);
   if (local !== undefined) {
@@ -465,20 +744,15 @@ app.post("/ai/plan-full", async (body) => {
     }
   }
 
-  // Il freno a mano: sopra il tetto si smette di chiamare invece di consumare
-  // il credito fino all'ultimo centesimo. 402 e non 500: non e' un guasto, e'
-  // una scelta, e il client puo' spiegarla all'utente.
   if (budgetExhausted()) {
-    const s = spendStatus();
+    const sp = spendStatus();
     throw new HttpError(
       402,
-      `Tetto di spesa raggiunto ($${s.usd} su $${s.limitUsd}). ` +
+      `Tetto di spesa raggiunto ($${sp.usd} su $${sp.limitUsd}). ` +
         `Alza SPESA_MAX_USD o riavvia il servizio per ripartire.`,
     );
   }
 
-  /* FASE 1 — menu', ricette e lista. Nessuna ricerca, quindi nessun costo di
-     grounding: puo' girare sulla chiave gratuita. */
   recordUse("gemini");
   const fase1 = await generateMenu(data);
   recordCost(fase1.cost);
@@ -488,149 +762,19 @@ app.post("/ai/plan-full", async (body) => {
       `${fase1.data.lista.length} voci in lista`,
   );
 
-  /* FASE 2 — prezzi. Prompt corto sulla sola lista della spesa: e' l'unico modo
-     perche' il modello cerchi davvero, ed e' l'unica fase che si paga. */
   const items = fase1.data.lista.map((v) => `${v.nome} ${v.quantita}`.trim()).slice(0, 18);
-  const fonte = data.priceSource ?? PRICE_SOURCE_DEFAULT;
-
-  let prezziGrezzi: Awaited<ReturnType<typeof generatePricesParallel>>["data"]["prezzi"] = [];
-  let fase2Secondi = 0;
-  let fase2Costo = 0;
-  let ricerche = 0;
-  let hacercato = false;
-
-  try {
-    if (fonte === "serpapi") {
-      // La strada del prototipo: una ricerca per prodotto su Google Shopping.
-      // Consuma la quota SerpAPI in fretta — 250 al mese sono una dozzina di
-      // piani — quindi si accende solo per confronto.
-      if (!isShoppingConfigured()) {
-        throw new HttpError(503, "SERPAPI_KEY non configurata: la strada 'serpapi' non e' disponibile");
-      }
-      const t0 = Date.now();
-      const serp = await generatePricesSerpapi(items, paeseIso(data.country));
-      for (let i = 0; i < serp.ricerche; i++) recordUse("serpapi");
-      prezziGrezzi = serp.prezzi;
-      fase2Secondi = (Date.now() - t0) / 1000;
-      ricerche = serp.ricerche;
-      // Google Shopping cerca davvero, sempre: non c'e' il rischio di risposte
-      // a memoria che ha il modello.
-      hacercato = true;
-      console.info(
-        `[plan-full] fase 2 Google Shopping: ${fase2Secondi.toFixed(0)}s, ` +
-          `${serp.ricerche} ricerche SerpAPI, ${prezziGrezzi.length} prezzi, ` +
-          `${serp.senzaPrezzo} prodotti senza risultati`,
-      );
-    } else {
-      recordUse("gemini");
-      recordUse("grounding");
-      const fase2 = await generatePricesParallel(items, data.city, data.country, data.currency);
-      prezziGrezzi = fase2.data.prezzi;
-      fase2Secondi = fase2.seconds;
-      fase2Costo = fase2.cost;
-      ricerche = fase2.data.searches;
-      recordCost(fase2.cost);
-      hacercato = fase2.data.grounded;
-      console.info(
-        `[plan-full] fase 2 ${fase2.model}: ${fase2.seconds.toFixed(0)}s, ` +
-          `$${fase2.cost.toFixed(4)}, ${ricerche} ricerche, ${prezziGrezzi.length} prezzi`,
-      );
-    }
-  } catch (err) {
-    // Senza prezzi il piano resta utile: menu', ricette e lista ci sono. Molto
-    // meglio di un errore che lascia l'utente a mani vuote.
-    console.warn("[plan-full] fase 2 fallita, restituisco il piano senza prezzi:", err);
-  }
-
-  // Il controllo dei link: gratis, e trasforma "il modello dice" in "l'abbiamo
-  // aperto". Sei per volta: con due catene ci sono trenta o quaranta pagine.
-  const checked = await verifyPrices(prezziGrezzi, 10);
-  console.info(`[plan-full] pagine aperte con esito ${checked.verificati}/${checked.totali}`);
-
-  // Le offerte dello stesso prodotto affiancate, come nel prototipo del cliente:
-  // non un supermercato imposto, ma le alternative con la piu' economica in
-  // testa. I prezzi delle altre insegne sono gia' stati pagati in questa stessa
-  // chiamata: tenerne uno solo sarebbe uno spreco.
-  const prodotti = groupByProduct(checked.rows);
-  const conAlternative = prodotti.filter((p) => p.offerte.length > 1).length;
-
-  // Il piu' economico per ogni prodotto: e' quello che la lista mostra.
-  // `groupByProduct` mette in testa i verificati, quindi offerte[0] e' il
-  // migliore fra quelli di cui abbiamo aperto la pagina, quando ce n'e' uno.
-  const migliori = prodotti.map((p) => ({
-    ...p.offerte[0],
-    prodotto: p.prodotto,
-    alternative: p.offerte.length - 1,
-  }));
-
-  // Il confronto per insegna, per chi preferisce fare tutta la spesa in un posto
-  // solo. Vince la piu' economica FRA QUELLE VERIFICABILI: il modello propone,
-  // la scelta si fa sui prezzi controllati.
-  const confronto = pickBestStore(checked.rows);
-  for (const c of confronto.catene) {
-    console.info(
-      `[plan-full]   ${c.negozio}: ${c.totale} (${c.verificati}/${c.proposti} verificati)` +
-        `${c.utilizzabile ? "" : " — scartata, troppi link rotti"}`,
-    );
-  }
-
-  const offerte = migliori.filter((r) => r.risparmio && r.risparmio > 0).length;
-
-  // Nel totale entrano SOLO i prezzi verificati. Un prezzo che non abbiamo
-  // potuto controllare resta visibile come alternativa, ma non deve finire in
-  // una somma che l'utente prende per buona: sommare cio' che non si e'
-  // verificato e' il modo piu' rapido per dare un numero sbagliato con l'aria
-  // di essere esatto.
-  const contati = migliori.filter((r) => r.verifica !== "non-raggiungibile");
-  const totaleMigliore =
-    Math.round(contati.reduce((s, r) => s + (r.prezzo ?? 0), 0) * 100) / 100;
-
-  console.info(
-    `[plan-full] ${prodotti.length} prodotti prezzati, ${conAlternative} con alternative, ` +
-      `${offerte} in promozione — totale al meglio ${totaleMigliore} ${data.currency}`,
-  );
+  const prezzi = await prezzaLista(items, data.city, data.country, data.currency, fonte);
 
   const result = {
     ...fase1.data,
-    // Il piu' economico per ogni prodotto: la lista della spesa.
-    prezzi: migliori,
-    // Tutte le offerte per prodotto: l'utente tocca una voce e vede dove altro
-    // si trova e a quanto.
-    prodotti,
-    // Il confronto per insegna: la prova che il risparmio esiste.
-    catene: confronto.catene,
-    vincitore: confronto.vincitore,
-    risparmioVsPiuCara: confronto.risparmio,
-    totali: {
-      spesaAlMiglioPrezzo: totaleMigliore,
-      budget: data.budget,
-      valuta: data.currency,
-      // Dichiarato apertamente: senza, un totale parziale sembrerebbe un
-      // affare e sarebbe solo un conto incompleto.
-      // Le voci che nessun negozio ha saputo prezzare in modo controllabile.
-      prodottiSenzaPrezzo: Math.max(0, fase1.data.lista.length - contati.length),
-      prodottiPrezzoVerificato: contati.length,
-      vociInLista: fase1.data.lista.length,
-    },
+    ...prezzi,
+    totali: { ...prezzi.totali, budget: data.budget },
     meta: {
+      ...prezzi.meta,
       motoreMenu: fase1.model,
-      motorePrezzi: fonte === "serpapi" ? "Google Shopping (SerpAPI)" : GROUNDED_MODEL,
-      // Dichiarata apertamente: le due strade danno risultati diversi, e chi
-      // legge i numeri deve sapere da quale vengono.
-      fontePrezzi: fonte,
-      secondi: Math.round(fase1.seconds + fase2Secondi),
       secondiMenu: Math.round(fase1.seconds),
-      secondiPrezzi: Math.round(fase2Secondi),
-      ricerche,
-      // Se e' falso, i prezzi vengono dalla memoria del modello: va detto.
-      ricercaEffettuata: hacercato,
-      costoStimatoUsd: Number((fase1.cost + fase2Costo).toFixed(4)),
-      prezziVerificati: checked.verificati,
-      prezziTotali: checked.totali,
-      insegneConfrontate: confronto.catene.length,
-      prodottiConAlternative: conAlternative,
-      prodottiInOfferta: offerte,
-      generatoIl: new Date().toISOString(),
+      secondi: Math.round(fase1.seconds + prezzi.meta.secondiPrezzi),
+      costoStimatoUsd: Number((fase1.cost + prezzi.meta.costoStimatoUsd).toFixed(4)),
     },
   };
 
@@ -641,7 +785,6 @@ app.post("/ai/plan-full", async (body) => {
         _id: key,
         value: result,
         createdAt: new Date(),
-        // Sette giorni e non trenta: i prezzi invecchiano, le ricette no.
         expiresAt: new Date(Date.now() + 7 * 86_400_000),
       });
     } catch {

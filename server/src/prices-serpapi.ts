@@ -37,6 +37,14 @@ export interface SerpPriceRow {
   valuta: string;
   negozio: string;
   link: string;
+  /**
+   * Miniatura del prodotto.
+   *
+   * Google Shopping la restituisce e l'app la mostrava gia': una foto accanto
+   * al prezzo dice a colpo d'occhio se il risultato e' il prodotto giusto —
+   * cosa che con questa fonte capita di dover verificare.
+   */
+  immagine?: string;
 }
 
 /**
@@ -110,7 +118,12 @@ export interface SerpPricesResult {
 export async function generatePricesSerpapi(
   items: string[],
   country: string,
-  gruppo = 4,
+  /**
+   * Quante ricerche insieme. Otto e non quattro: la fase impiegava cinquanta
+   * secondi e su iOS il sistema chiude la richiesta a sessanta, quindi il
+   * margine serviva. SerpAPI regge questa concorrenza senza limitare.
+   */
+  gruppo = 8,
 ): Promise<SerpPricesResult> {
   const prezzi: SerpPriceRow[] = [];
   let ricerche = 0;
@@ -138,6 +151,7 @@ export async function generatePricesSerpapi(
               valuta: it.currency,
               negozio: it.source,
               link: it.link,
+              immagine: it.thumbnail || undefined,
             }));
 
           return { voce, righe: buoni };

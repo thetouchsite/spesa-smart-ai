@@ -190,6 +190,8 @@ export interface CheckedRow {
   /** Voce della lista della spesa: uguale fra le insegne, serve a confrontarle. */
   prodotto?: string;
   nome: string;
+  /** Miniatura del prodotto, quando la fonte la fornisce. */
+  immagine?: string;
   prezzo: number | null;
   valuta: string;
   negozio: string;
@@ -227,6 +229,7 @@ export async function verifyPrices(
     valuta: string;
     negozio: string;
     link: string;
+    immagine?: string;
   }>,
   batchSize = 10,
 ): Promise<{ rows: CheckedRow[]; verificati: number; totali: number }> {
@@ -378,6 +381,8 @@ export function pickBestStore(rows: CheckedRow[], minVerified = 5): StoreCompari
 
 export interface Offer {
   negozio: string;
+  /** Miniatura del prodotto, se la fonte la fornisce (Google Shopping sì). */
+  immagine?: string;
   /* `verifica` dice quanto fidarsi: solo "verificato" e "pagina-ok" hanno un
      link, perche' solo per quelli la pagina si e' aperta davvero. */
   /** Il nome sullo scaffale di quel negozio. */
@@ -426,6 +431,7 @@ export function groupByProduct(rows: CheckedRow[]): ProductOffers[] {
     const key = (r.prodotto || r.nome).trim().toLowerCase();
     const offer: Offer = {
       negozio: r.negozio,
+      immagine: r.immagine,
       nome: r.nome,
       prezzo: r.prezzo,
       valuta: r.valuta,
