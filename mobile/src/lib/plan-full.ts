@@ -307,8 +307,12 @@ export interface PlanFullResult {
  * quella soglia è il sistema a chiudere, e nessun valore scritto qui serve.
  * Il menù non ha bisogno di internet e torna in una decina di secondi; i
  * prezzi, fra ricerca e verifica delle pagine, ne prendono venti o trenta.
+ *
+ * Il margine è largo di proposito: un menù lento ma riuscito vale molto più di
+ * un fallimento puntuale. Con 45 secondi una generazione da 50 andava persa —
+ * e il server, che l'aveva completata, la teneva in cache per nessuno.
  */
-const MENU_TIMEOUT_MS = 45_000;
+const MENU_TIMEOUT_MS = 55_000;
 const PRICES_TIMEOUT_MS = 55_000;
 
 /**
@@ -384,7 +388,17 @@ export async function fetchPlanFull(
         allergies: profile.allergies ?? [],
         dislikes: profile.dislikes ?? "",
         language,
-        withRecipes: true,
+        // Le ricette NON si generano qui.
+        //
+        // Scriverle tutte e sette raddoppia il tempo del menù — misurato:
+        // 15-28 secondi senza, 36-42 con — e su iOS, che chiude le connessioni
+        // a sessanta, quel raddoppio è la differenza fra un piano che arriva e
+        // uno che fallisce.
+        //
+        // Non si perde niente: la schermata della ricetta la genera quando
+        // l'utente apre il piatto, come faceva il prototipo. E quasi nessuno
+        // apre tutte e sette le cene, quindi si genera anche meno.
+        withRecipes: false,
       },
       MENU_TIMEOUT_MS,
     ),

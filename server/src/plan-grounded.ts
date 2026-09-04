@@ -46,9 +46,17 @@ export const GROUNDED_MODEL = process.env.GEMINI_GROUNDED_MODEL ?? "gemini-3-fla
 
 /**
  * Fase 1: il modello che scrive menù e ricette, senza cercare.
- * Leggero apposta — non deve sapere i prezzi, deve saper cucinare.
+ *
+ * Era il modello leggero, scelto perché costa un decimo. Ma con sette ricette
+ * complete l'output è lungo, e su output lunghi il leggero è incostante:
+ * misurato fra 7 e **50 secondi** per la stessa richiesta. Cinquanta sfondano
+ * il limite di iOS e fanno fallire tutta la generazione.
+ *
+ * Il modello pieno senza ricerca costa qualche millesimo in più e risponde in
+ * un tempo prevedibile. Su una fase che l'utente aspetta a schermo fermo,
+ * la costanza vale più del risparmio.
  */
-export const MENU_MODEL = process.env.GEMINI_MENU_MODEL ?? "gemini-3.5-flash-lite";
+export const MENU_MODEL = process.env.GEMINI_MENU_MODEL ?? "gemini-3-flash-preview";
 
 /** Prezzi Gemini, settembre 2026, per milione di token. RADDOPPIANO L'1/1/2027. */
 const TOKEN_PRICING: Record<string, { in: number; out: number }> = {
