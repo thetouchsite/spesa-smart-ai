@@ -52,7 +52,17 @@ import { colors, font, radius, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 
 interface Row {
+  /** Nome mostrato all'utente, nella sua lingua. */
   name: string;
+  /**
+   * Nome originale dal catalogo, in inglese.
+   *
+   * Serve tenerlo separato: la ricerca del prezzo reale deve poter risalire
+   * al prodotto, e da "Hähnchenbrustfilet" non ci riesce. Passando il nome
+   * gia' tradotto, la ricerca partiva con la parola sbagliata e restituiva
+   * negozi di esportazione a prezzi da gastronomia.
+   */
+  source: string;
   quantity: string;
   category: string;
   cost: number;
@@ -106,6 +116,7 @@ export default function ListaScreen() {
     if (pricing?.items?.length) {
       return pricing.items.map((i) => ({
         name: productLabel(i.name, language) ?? i.name,
+        source: i.name,
         quantity: i.packQuantity ?? i.quantity,
         category: categoryLabel(i.category || "Other", language),
         cost: i.estimatedCost ?? 0,
@@ -113,6 +124,7 @@ export default function ListaScreen() {
     }
     return currentPlan.groceryList.map((g) => ({
       name: productLabel(g.name, language) ?? g.name,
+      source: g.name,
       quantity: g.quantity,
       category: categoryLabel(g.category || "Other", language),
       cost: g.estimatedCost ?? 0,
@@ -234,7 +246,7 @@ export default function ListaScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`Verifica il prezzo reale di ${item.name}`}
-                    onPress={() => setChecking(item.name)}
+                    onPress={() => setChecking(item.source)}
                     hitSlop={10}
                     style={({ pressed }) => [styles.buyBtn, pressed && styles.rowPressed]}
                   >
@@ -261,7 +273,7 @@ export default function ListaScreen() {
             icon="open-outline"
             title={`Apri ${retailer.name}`}
             subtitle={ui("Cerca il primo prodotto della lista sul sito del negozio")}
-            onPress={() => void buyOnline(items[0]?.name ?? rows[0]?.name ?? "")}
+            onPress={() => void buyOnline(items[0]?.source ?? rows[0]?.source ?? "")}
           />
         ))}
       </Card>

@@ -72,5 +72,32 @@ export function filterShoppingRows<
   );
 
   const knownSellers = sane.filter((r) => !!matchRetailerForCountry(r.source, country));
-  return knownSellers.length > 0 ? knownSellers : sane;
+  if (knownSellers.length > 0) return byPrice(knownSellers);
+
+  // Nessuna catena riconosciuta. Si mostra comunque qualcosa, ma con un
+  // vaglio più severo: cercando "Parmigiano" comparivano negozi di
+  // esportazione — "Dolceterra U.S. Store", "Società Agricola Valserena" —
+  // con confezioni regalo da 33 EUR. Prezzi da gastronomia, non da spesa.
+  return byPrice(sane.filter((r) => !isSpecialistSeller(r.source) && (r.price ?? 0) <= 25));
+}
+
+/** Dal più economico: è l'ordine che l'utente si aspetta. */
+function byPrice<T extends { price: number | null }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
+}
+
+/**
+ * Venditori che non fanno la spesa quotidiana: esportatori, gastronomie,
+ * aziende agricole che vendono confezioni regalo. I loro prezzi sono reali
+ * ma non confrontabili con lo scaffale del supermercato.
+ */
+const SPECIALIST = [
+  "u.s. store", "us store", "export", "gourmet", "delicatessen", "gastronomia",
+  "azienda agricola", "societa agricola", "società agricola", "shop online",
+  "boutique", "epicerie fine", "feinkost", "delicatessen", "specialit",
+];
+
+function isSpecialistSeller(source: string): boolean {
+  const s = (source || "").toLowerCase();
+  return SPECIALIST.some((w) => s.includes(w));
 }
