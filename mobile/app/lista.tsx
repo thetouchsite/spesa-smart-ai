@@ -153,7 +153,10 @@ export default function ListaScreen() {
     // mostrare, e nessuna traduzione da fare.
     if (planExtra?.prodotti?.length) {
       return currentPlan.groceryList.map((g) => {
-        const found = findOffers(planExtra.prodotti, g.name, g.quantity);
+        // Si cerca col termine con cui i prezzi sono stati trovati: in Grecia
+        // «Pomodori maturi» non corrisponderebbe mai a «Ντομάτες».
+        const cercato = g.searchName || g.name;
+        const found = findOffers(planExtra.prodotti, cercato, g.quantity);
         const best = found?.offerte?.[0];
 
         if (!best) {
@@ -171,7 +174,7 @@ export default function ListaScreen() {
 
         return {
           name: g.name,
-          source: g.name,
+          source: cercato,
           quantity: g.quantity,
           category: g.category || "—",
           cost: best.prezzo,
@@ -399,8 +402,11 @@ export default function ListaScreen() {
 
       {/* Le offerte le abbiamo gia': arrivano col piano, gia' verificate.
           Nessuna ricerca da fare al tocco, nessun servizio a pagamento. */}
+      {/* `checking` porta gia' il termine di ricerca: le righe salvano quello
+          in `source`, non il nome mostrato. */}
       <PriceCheckSheet
-        itemName={checking}
+        itemName={rows.find((r) => r.source === checking)?.name ?? checking}
+        searchName={checking ?? undefined}
         offers={checking ? findOffers(planExtra?.prodotti ?? [], checking) : null}
         country={country}
         onClose={() => setChecking(null)}

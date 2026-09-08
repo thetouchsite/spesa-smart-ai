@@ -18,6 +18,16 @@ export const MealSchema = z.object({
 
 export const GroceryItemSchema = z.object({
   name: z.string(),
+  /**
+   * Il termine con cui questo prodotto si cerca nei negozi del paese.
+   *
+   * Diverso da `name` quando la lingua dell'utente non e' quella del posto: un
+   * italiano ad Atene legge «Pomodori maturi» ma nei negozi greci quel
+   * prodotto e' «Ντομάτες». Senza questo campo i prezzi non si attaccavano
+   * alle righe — si confrontava il nome italiano con quello greco — e in
+   * Italia il difetto non si vedeva perche' i due coincidono.
+   */
+  searchName: z.string().optional(),
   quantity: z.string(),
   /** Always derived from the Price Engine — engines must return 0 here. */
   estimatedCost: z.number().min(0),

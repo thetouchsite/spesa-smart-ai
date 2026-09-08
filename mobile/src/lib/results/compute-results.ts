@@ -124,6 +124,14 @@ export function computeResults({ profile, plan, pricing }: ComputeInput): Comput
     Number.isFinite(pricing.totalCost) &&
     pricing.totalCost > 0;
 
+  /**
+   * Copertura PIENA: ogni voce della lista ha un prezzo.
+   *
+   * Serve all'interfaccia per decidere se scrivere "totale" o "totale
+   * parziale". NON deve decidere altro: con i prezzi reali la copertura piena
+   * è rara, perché una voce su cinque non ha un catalogo online da cui
+   * leggerla.
+   */
   const savingsAvailable = hasUsableTotal && missingPrices.length === 0;
   const basketTotal = hasUsableTotal ? Math.round(pricing.totalCost * 100) / 100 : null;
   const estimatedSpend = basketTotal ?? 0;
@@ -197,20 +205,31 @@ export function computeResults({ profile, plan, pricing }: ComputeInput): Comput
   const supermarkets = savingsAvailable ? compareSupermarkets(estimatedSpend, profile.country) : [];
   const cheapest = supermarkets.find((s) => s.isCheapest) ?? null;
 
-  // ─── Score ──
-  // Budget Efficiency MUST stay in [0, 100]. Negative values mean a
-  // calculation bug upstream — clamp defensively.
-  const rawEfficiency = savingsAvailable && budget > 0
+  /* ─── Punteggio ──────────────────────────────────────────────────
+     Si aggancia a `hasUsableTotal`, non alla copertura piena.
+
+     Prima dipendeva da `savingsAvailable`, che pretende un prezzo per OGNI
+     voce della lista: con i prezzi reali non succede quasi mai — una voce su
+     cinque non ha un catalogo online da cui leggerla — e il punteggio restava
+     a zero per sempre, anche su un piano perfettamente dentro il budget.
+
+     `hasUsableTotal` chiede il 60% di copertura, che è la stessa soglia con
+     cui si decide di mostrare il totale. Se il totale è abbastanza attendibile
+     da mostrarlo, lo è anche per valutarlo.
+
+     Budget Efficiency resta fra 0 e 100: un valore negativo sarebbe un errore
+     di calcolo a monte, e si tronca per prudenza. */
+  const rawEfficiency = hasUsableTotal && budget > 0
     ? estimatedSpend <= budget
       ? Math.round(100 - Math.max(0, ratio - 0.85) * 120)
       : Math.round(Math.max(0, 100 - (ratio - 1) * 300))
     : 0;
   const budgetEfficiency = Math.max(0, Math.min(100, rawEfficiency));
-  const wasteScore = savingsAvailable ? Math.min(100, 70 + wasteReductionPct / 2) : 0;
-  const nutritionScore = savingsAvailable ? (profile.style === "Healthy Lifestyle" ? 92 : 84) : 0;
-  const simplicityScore = savingsAvailable ? 85 : 0;
+  const wasteScore = hasUsableTotal ? Math.min(100, 70 + wasteReductionPct / 2) : 0;
+  const nutritionScore = hasUsableTotal ? (profile.style === "Healthy Lifestyle" ? 92 : 84) : 0;
+  const simplicityScore = hasUsableTotal ? 85 : 0;
   const score: ComputedScore = {
-    total: savingsAvailable
+    total: hasUsableTotal
       ? Math.min(
           99,
           Math.round(

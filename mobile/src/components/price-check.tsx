@@ -34,12 +34,20 @@ import { uiText } from "../lib/ui-strings";
 
 export function PriceCheckSheet({
   itemName,
+  searchName,
   offers,
   country,
   onClose,
 }: {
   /** Nome del prodotto come compare nella lista. Null = riquadro chiuso. */
   itemName: string | null;
+  /**
+   * Il termine con cui cercarlo nei negozi, quando diverso da quello mostrato.
+   *
+   * Un italiano ad Atene legge «Uva da tavola» ma nei negozi greci si cerca
+   * «Σταφύλια»: mandando il nome italiano ad Amazon non tornava niente.
+   */
+  searchName?: string;
   /** Le offerte trovate dal motore per questo prodotto, già dalla più economica. */
   offers: ProductOffers | null;
   /** Serve a cercare sul sito Amazon giusto. */
@@ -69,7 +77,7 @@ export function PriceCheckSheet({
     let vivo = true;
     setCercandoAmazon(true);
     setAmazon([]);
-    void offerteAmazon(itemName, country)
+    void offerteAmazon(searchName || itemName, country)
       .then((o) => {
         if (vivo) setAmazon(o);
       })
@@ -79,7 +87,7 @@ export function PriceCheckSheet({
     return () => {
       vivo = false;
     };
-  }, [itemName, country]);
+  }, [itemName, searchName, country]);
 
   // Amazon si affianca alle altre e concorre allo stesso ordine: se costa meno
   // vince, se costa di più resta sotto. Nessun trattamento di favore.

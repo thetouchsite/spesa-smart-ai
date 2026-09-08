@@ -242,12 +242,19 @@ function statusOf(spent: number, budget: number): Plan["status"] {
  * un totale completo.
  */
 function toPlan(r: ServerResponse): Plan {
-  const groceryList = (r.lista ?? []).map((v) => ({
-    name: v.nome,
-    quantity: v.quantita,
-    estimatedCost: findOffers(r.prodotti ?? [], v.nome, v.quantita)?.offerte?.[0]?.prezzo ?? 0,
-    category: v.reparto,
-  }));
+  const groceryList = (r.lista ?? []).map((v) => {
+    // L'abbinamento usa il termine di RICERCA, non quello mostrato: i prezzi
+    // sono stati cercati con quello, e in Grecia «Pomodori maturi» non
+    // corrisponderebbe mai a «Ντομάτες».
+    const cercato = v.nomeLocale?.trim() || v.nome;
+    return {
+      name: v.nome,
+      searchName: v.nomeLocale?.trim() || undefined,
+      quantity: v.quantita,
+      estimatedCost: findOffers(r.prodotti ?? [], cercato, v.quantita)?.offerte?.[0]?.prezzo ?? 0,
+      category: v.reparto,
+    };
+  });
 
   const spent = r.totali?.spesaAlMiglioPrezzo ?? 0;
   const budget = r.totali?.budget ?? 0;
@@ -581,10 +588,11 @@ async function menuPrima(
  */
 export function pricingFromOffers(
   extra: PlanExtra,
-  groceryList: Array<{ name: string; quantity: string; category: string }>,
+  groceryList: Array<{ name: string; searchName?: string; quantity: string; category: string }>,
 ): PricingResult {
   const items: PricedItem[] = groceryList.map((g) => {
-    const found = findOffers(extra.prodotti, g.name, g.quantity);
+    // Si cerca col termine usato per i prezzi, non con quello mostrato.
+    const found = findOffers(extra.prodotti, g.searchName || g.name, g.quantity);
     const best = found?.offerte?.[0];
 
     // Un prezzo che la pagina ha confermato vale più di uno solo dichiarato:
