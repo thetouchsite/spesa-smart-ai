@@ -125,7 +125,7 @@ export default function RicettaScreen() {
   /** Testo nella lingua scelta dall'utente. */
   const ui = (t: string) => uiText(t, language);
   const router = useRouter();
-  const { profile, planExtra } = useSession();
+  const { profile, planExtra, currentPlan } = useSession();
   const { language } = useI18n();
   const params = useLocalSearchParams<{ piatto?: string; pasto?: string; giorno?: string }>();
 
@@ -163,6 +163,11 @@ export default function RicettaScreen() {
         language,
         country: profile.country || "",
         allergies: profile.allergies,
+        // La spesa gia' fatta. Senza, la ricetta si inventava ingredienti che
+        // nella lista non c'erano, e chi apriva il piatto non poteva cucinarlo.
+        dispensa: (currentPlan?.groceryList ?? []).map((g) =>
+          `${g.name} ${g.quantity}`.trim(),
+        ),
       });
       if (!alive) return;
       setRecipe(result.recipe);
@@ -172,7 +177,7 @@ export default function RicettaScreen() {
     return () => {
       alive = false;
     };
-  }, [dish, servings, mealType, profile.country, language, planExtra]);
+  }, [dish, servings, mealType, profile.country, language, planExtra, currentPlan]);
 
   if (loading) {
     return (

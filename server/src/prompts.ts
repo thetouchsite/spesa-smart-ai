@@ -10,6 +10,37 @@
 
 import type { AiRecipeInput, ChefInput, PlanInput, WebRecipeInput } from "./schemas.js";
 
+
+/**
+ * La regola più importante di una ricetta dentro un'app per la spesa: si deve
+ * poter cucinare con quello che si è comprato.
+ *
+ * Quando le ricette venivano generate insieme al menù, l'elenco della spesa
+ * nasceva da loro ed erano coerenti per costruzione. Spostandole su una
+ * chiamata separata — per dimezzare l'attesa iniziale — quel legame si è
+ * rotto: la ricetta chiedeva ingredienti che nella lista non c'erano, e chi
+ * apriva il piatto non poteva farlo. È il difetto peggiore possibile, perché
+ * rompe la promessa dell'app.
+ *
+ * Passandole la lista, la ricetta torna a nascere da lì. Le eccezioni sono
+ * dichiarate: sale, olio, acqua e spezie non stanno in nessuna lista della
+ * spesa e nessuno se li aspetta.
+ */
+function vincoloDispensa(dispensa: string[], porzioni: number): string {
+  if (!dispensa.length) return "";
+  const elenco = dispensa.map((v) => `- ${v}`).join("\n");
+  return `
+
+INGREDIENTI DISPONIBILI — usa SOLO questi, sono la spesa già fatta:
+${elenco}
+
+Puoi dare per scontati solo: sale, pepe, olio, acqua, aceto e spezie comuni.
+Non introdurre NESSUN altro ingrediente: chi legge ha comprato quella roba lì
+e deve poter cucinare stasera. Se il piatto normalmente vorrebbe qualcosa che
+non è nell'elenco, adatta la ricetta a ciò che c'è invece di aggiungerlo.
+Le quantità restano quelle giuste per ${porzioni} porzioni.`;
+}
+
 export function recipePrompt(d: AiRecipeInput): string {
   return `Write a realistic ${d.mealType} recipe for "${d.dishName}".
 ${d.cuisine ? `Cuisine: ${d.cuisine}. Stay strictly within this culinary tradition.` : ""}
@@ -17,7 +48,7 @@ ${d.country ? `Country context: this recipe is for a household in ${d.country}${
 Servings: ${d.servings}.
 CRITICAL LANGUAGE RULE: Write ALL text in language code "${d.language}" — the recipe title, ingredient names, step instructions and allergen labels. If the dish name "${d.dishName}" is in English, translate it naturally into ${d.language} (or replace it with the culturally equivalent local dish name in ${d.country || "the target country"}). NEVER emit any English text when the target language is not English.
 Avoid these allergens/diets: ${d.allergies.join(", ") || "none"}.
-Ingredients must be a complete, realistic list with metric quantities (g, ml, pcs). Provide 4-8 clear step-by-step instructions a home cook can follow. Provide approximate per-serving nutrition (kcal, protein g, carbs g, fat g) and any common allergens.`;
+Ingredients must be a complete, realistic list with metric quantities (g, ml, pcs). Provide 4-8 clear step-by-step instructions a home cook can follow. Provide approximate per-serving nutrition (kcal, protein g, carbs g, fat g) and any common allergens.${vincoloDispensa(d.dispensa, d.servings)}`;
 }
 
 /** Regole comuni ai due rami dell'estrazione web (pagina reale e sintesi). */
@@ -63,7 +94,7 @@ export function webSynthesizePrompt(d: WebRecipeInput): string {
   return `Write a complete, authentic recipe for "${d.dishName}".
 Synthesize the classic version of this dish as an experienced home cook would prepare it.
 Set extractionMode = "ai-assisted", sourceWebsite = "", sourceUrl = "", image = "", and cuisine = the best matching cuisine label or "".
-${webSharedRules(d)}`;
+${webSharedRules(d)}${vincoloDispensa(d.dispensa, d.servings)}`;
 }
 
 export function chefPrompt(d: ChefInput): string {

@@ -72,6 +72,8 @@ export async function fetchRecipe(
     country?: string;
     city?: string;
     allergies?: string[];
+    /** La lista della spesa del piano: la ricetta deve starci dentro. */
+    dispensa?: string[];
   } = {},
 ): Promise<RecipeResult> {
   const servings = opts.servings ?? 4;
@@ -95,6 +97,7 @@ export async function fetchRecipe(
         country: opts.country ?? "",
         city: opts.city ?? "",
         allergies: opts.allergies ?? [],
+        dispensa: opts.dispensa ?? [],
       }),
       AI_TIMEOUT_MS,
     );

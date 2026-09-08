@@ -40,6 +40,8 @@ export interface AiRecipeArgs {
   country?: string;
   city?: string;
   allergies?: string[];
+  /** La spesa gia' fatta: la ricetta deve stare dentro questa. */
+  dispensa?: string[];
   cuisine?: string;
 }
 

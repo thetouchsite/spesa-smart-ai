@@ -100,6 +100,14 @@ export interface GetRecipeOptions {
   style?: string;
   /** Pre-resolved cuisine bucket. Overrides `style` if provided. */
   cuisine?: LocalCuisine | null;
+  /**
+   * La lista della spesa del piano.
+   *
+   * Senza, la ricetta si inventa gli ingredienti: e' successo appena le
+   * ricette sono state spostate su una chiamata separata dal menu'. Chi apriva
+   * un piatto trovava una ricetta che con la spesa fatta non poteva cucinare.
+   */
+  dispensa?: string[];
 }
 
 function resolveCuisine(opts: GetRecipeOptions): LocalCuisine | null {
@@ -193,7 +201,11 @@ export async function getRecipe(dishName: string, opts: GetRecipeOptions = {}): 
   const englishOnlyOk = lang === "en";
 
   // 1. Local DB → Chef enhancement.
-  if (englishOnlyOk) {
+  //
+  // Si salta quando c'e' una lista della spesa: il ricettario locale non la
+  // conosce e proporrebbe ingredienti che l'utente non ha comprato. Meglio
+  // pagare una generazione che dare una ricetta che non si puo' fare.
+  if (englishOnlyOk && !(opts.dispensa && opts.dispensa.length > 0)) {
     const local = findLocalRecipe(dishName, { cuisine, mealType: opts.mealType });
     if (isComplete(local)) {
       const scaled = scaleRecipe(local, servings);
@@ -215,6 +227,8 @@ export async function getRecipe(dishName: string, opts: GetRecipeOptions = {}): 
         country,
         city,
         allergies: opts.allergies ?? [],
+        // La spesa gia' fatta: la ricetta deve poter essere cucinata con quella.
+        dispensa: opts.dispensa ?? [],
       },
     });
     if (web && web.ingredients.length >= 3 && web.steps.length >= 3) {
@@ -254,6 +268,8 @@ export async function getRecipe(dishName: string, opts: GetRecipeOptions = {}): 
         country,
         city,
         allergies: opts.allergies ?? [],
+        // La spesa gia' fatta: la ricetta deve poter essere cucinata con quella.
+        dispensa: opts.dispensa ?? [],
         cuisine: cuisine ?? undefined,
       },
     });

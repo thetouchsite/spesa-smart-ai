@@ -35,6 +35,16 @@ export type AiRecipe = z.infer<typeof RecipeSchema>;
 
 export const AiRecipeInput = z.object({
   dishName: z.string().min(1),
+  /**
+   * La lista della spesa del piano.
+   *
+   * Senza, la ricetta si inventa gli ingredienti: e' successo appena le
+   * ricette sono state spostate su una chiamata separata dal menu'. Chi apriva
+   * un piatto si trovava una ricetta che con la spesa fatta non poteva
+   * cucinare — il difetto peggiore, perche' rompe la promessa dell'app.
+   */
+  dispensa: z.array(z.string().max(120)).max(40).default([]),
+
   mealType: z.enum(["breakfast", "lunch", "dinner", "snack"]).default("dinner"),
   servings: z.number().min(1).max(12).default(4),
   language: z.string().default("en"),
@@ -58,6 +68,16 @@ export type WebRecipe = z.infer<typeof WebRecipeSchema>;
 
 export const WebRecipeInput = z.object({
   dishName: z.string().min(1),
+  /**
+   * La lista della spesa del piano.
+   *
+   * Senza, la ricetta si inventa gli ingredienti: e' successo appena le
+   * ricette sono state spostate su una chiamata separata dal menu'. Chi apriva
+   * un piatto si trovava una ricetta che con la spesa fatta non poteva
+   * cucinare — il difetto peggiore, perche' rompe la promessa dell'app.
+   */
+  dispensa: z.array(z.string().max(120)).max(40).default([]),
+
   cuisine: z.string().optional(),
   mealType: z.enum(["breakfast", "lunch", "dinner", "snack"]).optional(),
   servings: z.number().min(1).max(12).default(4),
