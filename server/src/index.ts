@@ -48,6 +48,7 @@ import {
   verifyPrices,
 } from "./price-page.js";
 import { generatePricesSerpapi } from "./prices-serpapi.js";
+import { cercaListaSuAmazon, isAmazonConfigured } from "./amazon.js";
 import {
   AiRecipeInput,
   ChefInput,
@@ -511,6 +512,25 @@ async function prezzaLista(
     console.warn("[prezzi] ricerca fallita, restituisco la lista senza prezzi:", err);
   }
 
+  /* AMAZON, IN PIU' E NON AL POSTO
+     Le offerte ufficiali si aggiungono a quelle trovate dal motore, cosi'
+     l'utente vede il supermercato accanto ad Amazon e sceglie. Vengono da
+     un'API, quindi hanno prezzo e indirizzo certi: niente da indovinare.
+
+     Chiederle nel prompt non basta — provato, e in quella generazione Amazon
+     non e' comparso nemmeno una volta.
+
+     La ricerca gira IN PARALLELO con la verifica dei link, che e' fatta di
+     attese di rete: cosi' non allunga il tempo che l'utente aspetta. */
+  const amazonPromise =
+    isAmazonConfigured() && items.length > 0
+      ? cercaListaSuAmazon(items, paeseIso(country).toUpperCase()).catch((err) => {
+          // Amazon che non risponde non deve far cadere il piano.
+          console.warn("[amazon] ricerca fallita, proseguo senza:", err);
+          return { offerte: [], trovati: 0, cercati: items.length };
+        })
+      : Promise.resolve({ offerte: [], trovati: 0, cercati: 0 });
+
   // Prima del controllo dei link: via cio' che non puo' essere la spesa di una
   // famiglia. Vale per entrambe le strade, perche' il difetto e' lo stesso —
   // un prezzo vero di qualcosa che non e' il prodotto della lista. Farlo qui
@@ -520,13 +540,35 @@ async function prezzaLista(
 
   // Il controllo dei link: gratis, e trasforma "il modello dice" in "l'abbiamo
   // aperto". Dieci per volta, con trenta o quaranta pagine da aprire.
-  const checked = await verifyPrices(tenute, 10);
+  const [checked, amazon] = await Promise.all([verifyPrices(tenute, 10), amazonPromise]);
   console.info(`[prezzi] pagine aperte con esito ${checked.verificati}/${checked.totali}`);
+
+  if (amazon.cercati > 0) {
+    console.info(
+      `[amazon] ${amazon.offerte.length} offerte su ${amazon.trovati}/${amazon.cercati} prodotti`,
+    );
+  }
+
+  // Le righe Amazon entrano gia' verificate: vengono dall'API ufficiale, non
+  // da un indirizzo dedotto, quindi non c'e' niente da controllare.
+  const righeComplete = [
+    ...checked.rows,
+    ...amazon.offerte.map((o) => ({
+      prodotto: o.prodotto,
+      nome: o.nome,
+      prezzo: o.prezzo,
+      valuta: o.valuta,
+      negozio: o.negozio,
+      link: o.link,
+      immagine: o.immagine,
+      verifica: "verificato" as const,
+    })),
+  ];
 
   // Le offerte dello stesso prodotto affiancate, la piu' economica in testa.
   // Le alternative fuori scala si tolgono DOPO il raggruppamento, perche' si
   // giudicano rispetto al prezzo piu' basso dello stesso prodotto.
-  const prodotti = togliOutlier(groupByProduct(checked.rows));
+  const prodotti = togliOutlier(groupByProduct(righeComplete));
   const conAlternative = prodotti.filter((p) => p.offerte.length > 1).length;
 
   const migliori = prodotti.map((p) => ({
@@ -537,7 +579,7 @@ async function prezzaLista(
 
   // Vince il negozio piu' economico FRA QUELLI VERIFICABILI: il modello
   // propone, la scelta si fa sui prezzi controllati.
-  const confronto = pickBestStore(checked.rows);
+  const confronto = pickBestStore(righeComplete);
   for (const c of confronto.catene) {
     console.info(
       `[prezzi]   ${c.negozio}: ${c.totale} (${c.verificati}/${c.proposti} verificati)` +
@@ -578,8 +620,10 @@ async function prezzaLista(
       // Se e' falso, i prezzi vengono dalla memoria del modello: va detto.
       ricercaEffettuata: hacercato,
       costoStimatoUsd: Number(costo.toFixed(4)),
-      prezziVerificati: checked.verificati,
-      prezziTotali: checked.totali,
+      prezziVerificati: checked.verificati + amazon.offerte.length,
+      prezziTotali: checked.totali + amazon.offerte.length,
+      // Quanti prodotti Amazon ha davvero: sul fresco e' quasi sempre zero.
+      prodottiSuAmazon: amazon.trovati,
       insegneConfrontate: confronto.catene.length,
       prodottiConAlternative: conAlternative,
       prodottiInOfferta: offerte,

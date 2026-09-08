@@ -513,6 +513,11 @@ ${items.map((n, i) => `${i + 1}. ${n}`).join("\n")}
 Cerca ogni prodotto presso ${stores} venditori diversi — non di più: oltre
 quel numero la risposta diventa lunga da scrivere e l'utente aspetta.
 
+AMAZON VA SEMPRE INCLUSO fra i venditori, per ogni prodotto in cui Amazon lo
+vende davvero. Non al posto dei supermercati: IN PIÙ, come confronto. Usa il
+sito Amazon del paese dell'utente. Se Amazon quel prodotto non ce l'ha — capita
+spesso col fresco, carne e verdura e latticini — salta e basta, senza forzare.
+
 DEVE ESSERE UN PRODOTTO CHE SI COMPRA ONLINE.
 Servono pagine di e-commerce con il pulsante d'acquisto: Amazon, i supermercati
 con la spesa online, i negozi alimentari che spediscono. NON volantini, NON
