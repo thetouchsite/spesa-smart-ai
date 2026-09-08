@@ -16,6 +16,21 @@
  *
  * Da qui la divisione:
  *
+ * L'ORDINE DELLE DUE FASI NON SI INVERTE MAI
+ * ------------------------------------------
+ * Il menù nasce PRIMA, da un modello che pensa solo a cosa si cucina e non sa
+ * niente di cosa sia comprabile online. I prezzi si cercano DOPO, per la lista
+ * che ne è uscita.
+ *
+ * Fare il contrario — cercare cosa si vende online e costruire il menù su
+ * quello — sembrerebbe più efficiente e produrrebbe una dieta di scatolette:
+ * i prodotti con il catalogo online migliore sono quelli a lunga conservazione.
+ * Un'app che fa mangiare conserve non la usa nessuno, per quanto siano
+ * verificati i suoi prezzi.
+ *
+ * Verificato sull'ultima lista generata: diciotto voci, di cui carne, pesce,
+ * quattro voci di ortofrutta e tre di latticini. Conserve: zero.
+ *
  *   FASE 1 — MENÙ, RICETTE E LISTA        senza ricerca, CHIAVE GRATUITA
  *   Il modello lo scrive da sé, come faceva il prototipo del cliente: non
  *   serve internet per sapere che il ragù vuole carne macinata. Niente
@@ -427,6 +442,11 @@ ingredienti, reparti, consigli. Nessun campo in un'altra lingua.
    non "370 g". Nomi generici e comprensibili, come li si cercherebbe al
    supermercato: "Passata di pomodoro 700 g", non "passata bio artigianale".
    Fra 12 e 18 voci: è la base su cui verranno cercati i prezzi.
+
+   CIBO VERO. Carne, pesce, verdura, frutta e latticini freschi devono esserci
+   come in qualunque spesa di famiglia. Le conserve e i surgelati stanno in una
+   dispensa normale, ma non possono sostituire il fresco: un menù fatto di
+   scatolette è sbagliato anche se costa poco.
 ${recipeBlock}
 ${d.withRecipes ? "4" : "3"}. CONSIGLI — 3 o 4 modi concreti per spendere meno con questa lista.
 
