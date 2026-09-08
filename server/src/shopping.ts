@@ -80,7 +80,11 @@ export async function searchShopping(
   url.searchParams.set("api_key", key);
 
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+    // Trenta secondi e non quindici: lanciando otto ricerche insieme, SerpAPI
+    // le mette in coda e le ultime tornano tardi. Con quindici ne scadevano
+    // sei su diciotto — un terzo dei prodotti restava senza prezzo, e la
+    // ricerca era gia' stata pagata lo stesso.
+    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
     if (res.status === 401 || res.status === 403) {
       throw new HttpError(503, "Chiave SerpAPI non valida o quota esaurita");
     }

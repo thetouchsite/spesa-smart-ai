@@ -119,11 +119,14 @@ export async function generatePricesSerpapi(
   items: string[],
   country: string,
   /**
-   * Quante ricerche insieme. Otto e non quattro: la fase impiegava cinquanta
-   * secondi e su iOS il sistema chiude la richiesta a sessanta, quindi il
-   * margine serviva. SerpAPI regge questa concorrenza senza limitare.
+   * Quante ricerche insieme.
+   *
+   * Sei e' il compromesso trovato provando: con otto, SerpAPI accodava le
+   * richieste e sei su diciotto scadevano — ricerche pagate e prodotti senza
+   * prezzo. Con quattro la fase superava i cinquanta secondi, e su iOS il
+   * sistema chiude la connessione a sessanta.
    */
-  gruppo = 8,
+  gruppo = 6,
 ): Promise<SerpPricesResult> {
   const prezzi: SerpPriceRow[] = [];
   let ricerche = 0;

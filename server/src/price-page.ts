@@ -145,6 +145,19 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
     return { status: "non-raggiungibile", reason: "nessun link" };
   }
 
+  // I link di Google Shopping non sono pagine di prodotto: sono ricerche su
+  // Google. Aprirli da qui porta alla schermata del consenso cookie — HTTP
+  // 400 da un indirizzo senza cookie — e li faceva scartare tutti. Sul
+  // telefono di una persona invece si aprono senza problemi.
+  //
+  // Non si possono verificare (non c'e' un prezzo da leggere in una pagina di
+  // ricerca), ma il link e' buono: si conserva, dichiarando che il prezzo non
+  // e' confermato. Vale la pena saperlo: questi link portano su Google
+  // Shopping, non nel negozio.
+  if (/^https?:\/\/(www\.)?google\.[a-z.]+\/search/i.test(url)) {
+    return { status: "bloccato", reason: "pagina di Google Shopping, non del negozio" };
+  }
+
   let html: string;
   try {
     const res = await fetch(url, {

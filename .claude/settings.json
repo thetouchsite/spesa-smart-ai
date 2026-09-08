@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed 's/=\\\\\\(.\\\\{6\\\\}\\\\\\).*/=\\\\1…/' server/.env)",
+      "Bash(netstat -ano)"
+    ]
+  }
+}
