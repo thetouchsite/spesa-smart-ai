@@ -34,6 +34,34 @@
 
 const BASE = "https://www.socialcrawl.dev/v1";
 
+/**
+ * Dove cercare, paese per paese.
+ *
+ * Amazon non ha un marketplace ovunque, e chiedere di un paese che non ne ha
+ * uno fa rispondere `HTTP 400` — sprecando una chiamata. E' successo col
+ * Portogallo, che Amazon serve da `amazon.es`: senza questa mappa il credito
+ * se ne andava e l'utente non vedeva niente.
+ *
+ * I paesi con un marketplace proprio puntano a se stessi; gli altri a quello
+ * che li serve davvero, perche' un utente portoghese da amazon.es ci compra
+ * per davvero. Un paese che non compare qui non viene interrogato affatto:
+ * meglio nessuna offerta che un credito buttato.
+ */
+const MERCATO_PER_PAESE: Record<string, string> = {
+  // Marketplace propri
+  IT: "IT", DE: "DE", FR: "FR", ES: "ES", NL: "NL", SE: "SE", PL: "PL",
+  BE: "BE", GB: "GB", UK: "GB", IE: "GB", US: "US", CA: "CA", MX: "MX",
+  BR: "BR", JP: "JP", AU: "AU", IN: "IN", AE: "AE", SA: "SA", EG: "EG",
+  SG: "SG", TR: "TR",
+  // Serviti da un marketplace vicino
+  PT: "ES",
+  AT: "DE", CH: "DE", LI: "DE", CZ: "DE", SK: "DE", HU: "DE", SI: "DE",
+  GR: "DE", HR: "DE", RO: "DE", BG: "DE",
+  LU: "FR", MC: "FR",
+  DK: "DE", NO: "SE", FI: "SE",
+  NZ: "AU",
+};
+
 export function isAmazonSearchConfigured(): boolean {
   return Boolean(process.env.SOCIALCRAWL_KEY);
 }
@@ -118,7 +146,19 @@ export async function cercaProdottoAmazon(
   const key = process.env.SOCIALCRAWL_KEY;
   if (!key) return [];
 
-  const cc = (paese || "IT").toUpperCase().slice(0, 2);
+  const richiesto = (paese || "IT").toUpperCase().slice(0, 2);
+  const cc = MERCATO_PER_PAESE[richiesto];
+
+  // Nessun marketplace per quel paese: non si chiama e non si spende. Il
+  // servizio risponderebbe 400 e il credito sarebbe perso comunque.
+  if (!cc) {
+    console.info(`[amazon] nessun marketplace per ${richiesto}: salto senza spendere`);
+    return [];
+  }
+  if (cc !== richiesto) {
+    console.info(`[amazon] ${richiesto} servito da amazon.${cc.toLowerCase()}`);
+  }
+
   const url = `${BASE}/amazon/product-search?query=${encodeURIComponent(prodotto)}&country=${cc}`;
 
   let body: RispostaRicerca;

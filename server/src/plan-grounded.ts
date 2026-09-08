@@ -393,6 +393,18 @@ export const MenuSchema = z.object({
   lista: z.array(
     z.object({
       nome: z.string(),
+      /**
+       * Il nome con cui quel prodotto si cerca NEL PAESE dove si compra.
+       *
+       * Serve perché le due lingue possono non coincidere: un italiano che
+       * vive in Portogallo legge l'app in italiano ma compra su siti
+       * portoghesi. Cercando «Mele rosse» su un negozio portoghese non si
+       * trova niente — lì si chiamano «maçãs», e la ricerca è letterale.
+       *
+       * Vuoto quando lingua dell'utente e lingua del paese coincidono: in quel
+       * caso vale `nome` e non serve ripeterlo.
+       */
+      nomeLocale: z.string().default(""),
       // Numeri e campi assenti capitano: si normalizzano invece di rifiutare.
       quantita: z.union([z.string(), z.number()]).default("").transform(String),
       reparto: z.string().default(""),
@@ -447,6 +459,14 @@ ingredienti, reparti, consigli. Nessun campo in un'altra lingua.
    come in qualunque spesa di famiglia. Le conserve e i surgelati stanno in una
    dispensa normale, ma non possono sostituire il fresco: un menù fatto di
    scatolette è sbagliato anche se costa poco.
+
+   DUE NOMI PER OGNI VOCE, quando servono:
+   - "nome" è quello che l'utente legge, in lingua "${d.language}"
+   - "nomeLocale" è come lo stesso prodotto si chiama e si cerca in
+     ${d.country}, nella lingua di quel paese
+   Se le due lingue coincidono lascia "nomeLocale" vuoto. Serve perché la
+   ricerca nei negozi è letterale: chi legge in italiano ma compra in
+   Portogallo non troverebbe mai «Mele rosse», lì sono «maçãs».
 ${recipeBlock}
 ${d.withRecipes ? "4" : "3"}. CONSIGLI — 3 o 4 modi concreti per spendere meno con questa lista.
 
@@ -457,7 +477,7 @@ formati coerenti con quella cifra.
 ## FORMATO
 Rispondi SOLO con questo JSON, senza testo né blocchi di codice attorno:
 {"menu":[{"giorno":"","colazione":"","pranzo":"","cena":""}],
-${d.withRecipes ? ' "ricette":[{"giorno":"","piatto":"","porzioni":0,"ingredienti":[{"nome":"","quantita":""}],"passaggi":[""],"prep_minuti":0,"cottura_minuti":0}],\n' : ""} "lista":[{"nome":"","quantita":"","reparto":""}],
+${d.withRecipes ? ' "ricette":[{"giorno":"","piatto":"","porzioni":0,"ingredienti":[{"nome":"","quantita":""}],"passaggi":[""],"prep_minuti":0,"cottura_minuti":0}],\n' : ""} "lista":[{"nome":"","nomeLocale":"","quantita":"","reparto":""}],
  "consigli":[""]}`;
 }
 
@@ -710,6 +730,8 @@ export const ListaSchema = z.object({
   lista: z.array(
     z.object({
       nome: z.string(),
+      /** Il nome con cui cercarlo nel paese dove si compra. Vedi MenuSchema. */
+      nomeLocale: z.string().default(""),
       quantita: z.union([z.string(), z.number()]).default("").transform(String),
       reparto: z.string().default(""),
     }),
@@ -756,9 +778,17 @@ lista di conserve.
 Nomi generici e comprensibili, come li si cercherebbe al supermercato:
 "Passata di pomodoro 700 g", non "passata bio artigianale del contadino".
 
+DUE NOMI PER OGNI VOCE, quando servono:
+- "nome" è quello che l'utente legge, in lingua "${input.language}"
+- "nomeLocale" è come lo stesso prodotto si chiama e si cerca in
+  ${input.country}, nella lingua di quel paese
+Se le due lingue coincidono lascia "nomeLocale" vuoto. Serve perché la ricerca
+nei negozi è letterale: chi legge in italiano ma compra in Portogallo non
+troverebbe mai «Mele rosse», lì sono «maçãs».
+
 ## FORMATO
 Rispondi SOLO con questo JSON:
-{"lista":[{"nome":"","quantita":"","reparto":""}]}`;
+{"lista":[{"nome":"","nomeLocale":"","quantita":"","reparto":""}]}`;
 
   const r = await callGemini(key, MENU_MODEL, prompt, false, 120_000);
   return {
@@ -815,6 +845,9 @@ Ogni parola in lingua "${input.language}": giorni, piatti, ingredienti, reparti.
    prodotti. Piatti che una famiglia farebbe davvero in ${input.country},
    variando le proteine e senza ripetere lo stesso piatto.
 2. LISTA — riporta i prodotti usati, con le quantità totali servite.
+   In "nome" scrivili nella lingua dell'utente ("${input.language}"), in
+   "nomeLocale" come si chiamano in ${input.country}: l'utente li legge nella
+   sua lingua ma li cerca in quella del paese dove compra.
 3. CONSIGLI — 3 o 4 modi concreti per spendere meno.
 
 Se con quei prodotti certi pasti non vengono bene, scegli piatti più semplici:
@@ -823,7 +856,7 @@ Se con quei prodotti certi pasti non vengono bene, scegli piatti più semplici:
 ## FORMATO
 Rispondi SOLO con questo JSON:
 {"menu":[{"giorno":"","colazione":"","pranzo":"","cena":""}],
- "lista":[{"nome":"","quantita":"","reparto":""}],
+ "lista":[{"nome":"","nomeLocale":"","quantita":"","reparto":""}],
  "consigli":[""]}`;
 
   const r = await callGemini(key, MENU_MODEL, prompt, false, 120_000);

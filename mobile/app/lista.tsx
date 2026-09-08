@@ -62,7 +62,7 @@ interface Row {
   /** Nome mostrato all'utente, nella sua lingua. */
   name: string;
   /**
-   * Nome originale dal catalogo, in inglese.
+   * Il termine con cui cercare questo prodotto nei negozi.
    *
    * Serve tenerlo separato: la ricerca del prezzo reale deve poter risalire
    * al prodotto, e da "Hähnchenbrustfilet" non ci riesce. Passando il nome

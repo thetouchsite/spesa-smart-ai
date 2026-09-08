@@ -124,7 +124,7 @@ export interface PlanExtra {
 interface MenuResponse {
   menu: Array<{ giorno: string; colazione: string; pranzo: string; cena: string }>;
   ricette?: Recipe[];
-  lista: Array<{ nome: string; quantita: string; reparto: string }>;
+  lista: Array<{ nome: string; nomeLocale?: string; quantita: string; reparto: string }>;
   consigli: string[];
   meta: { motoreMenu: string; secondiMenu: number; costoStimatoUsd: number; generatoIl: string };
 }
@@ -282,6 +282,23 @@ function toPlan(r: ServerResponse): Plan {
     groceryList,
     savingTips: r.consigli ?? [],
   });
+}
+
+/**
+ * Le voci con cui interrogare i negozi.
+ *
+ * Si usa `nomeLocale` quando c'è: è il nome del prodotto nella lingua del
+ * paese dove si compra, e serve perché la ricerca nei negozi è LETTERALE.
+ * Un italiano che vive in Portogallo legge l'app in italiano ma compra su siti
+ * portoghesi: cercando «Mele rosse» non trova niente, lì sono «maçãs».
+ *
+ * Quando le due lingue coincidono il campo è vuoto e vale `nome`, senza
+ * bisogno di ripeterlo.
+ */
+function vociDaCercare(
+  lista: Array<{ nome: string; nomeLocale?: string; quantita: string }>,
+): string[] {
+  return lista.map((v) => `${v.nomeLocale?.trim() || v.nome} ${v.quantita}`.trim()).slice(0, 18);
 }
 
 export interface PlanFullResult {
@@ -470,9 +487,7 @@ async function menuPrima(
     throw new Error("il motore ha risposto senza menù o senza lista");
   }
 
-  // Le stesse voci che il server userebbe: nome e quantità insieme, perché è
-  // così che si cerca un prodotto («Passata di pomodoro 700 g»).
-  const items = menu.lista.map((v) => `${v.nome} ${v.quantita}`.trim()).slice(0, 18);
+  const items = vociDaCercare(menu.lista);
 
   let prices: PricesResponse | null = null;
   try {
@@ -657,7 +672,7 @@ async function spesaPrima(
 
   if (!lista?.lista?.length) throw new Error("il motore ha risposto senza lista");
 
-  const items = lista.lista.map((v) => `${v.nome} ${v.quantita}`.trim()).slice(0, 18);
+  const items = vociDaCercare(lista.lista);
 
   // 2 — i prezzi, con la verifica delle pagine.
   let prices: PricesResponse | null = null;
