@@ -257,12 +257,32 @@ interface CallResult {
  * il 40%, ed è esattamente l'errore che ha fatto sembrare un piano più
  * economico di quanto sia.
  */
+/**
+ * Errori che passano da soli, e per cui vale la pena riprovare.
+ *
+ * Il modello ogni tanto risponde «this model is currently experiencing high
+ * demand»: e' un intoppo di qualche secondo, non un guasto. Senza un secondo
+ * tentativo buttava via l'intera generazione — e' successo su Tokyo, dove il
+ * menu' e' morto cosi' e l'app e' ripiegata sul motore senza prezzi.
+ */
+function vaRiprovato(messaggio: string): boolean {
+  return /high demand|overloaded|unavailable|try again|rate limit|429|503|500/i.test(messaggio);
+}
+
+const attesa = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function callGemini(
   apiKey: string,
   modelId: string,
   prompt: string,
   withSearch: boolean,
   timeoutMs: number,
+  /**
+   * Quanti tentativi restano. Due bastano: se il modello e' sovraccarico
+   * anche al secondo colpo, e' meglio consegnare all'utente il piano di
+   * ripiego che tenerlo ad aspettare.
+   */
+  tentativiRimasti = 2,
 ): Promise<CallResult> {
   const started = Date.now();
   const res = await fetch(
@@ -291,11 +311,27 @@ async function callGemini(
     };
   };
 
-  if (body.error) throw new Error(`Gemini ${modelId}: ${body.error.message ?? "errore sconosciuto"}`);
+  if (body.error) {
+    const messaggio = body.error.message ?? "errore sconosciuto";
+    if (tentativiRimasti > 0 && vaRiprovato(messaggio)) {
+      // Mezzo secondo basta: sono picchi brevi, non code lunghe.
+      console.warn(`[gemini] ${modelId} sovraccarico, riprovo fra poco`);
+      await attesa(1500);
+      return callGemini(apiKey, modelId, prompt, withSearch, timeoutMs, tentativiRimasti - 1);
+    }
+    throw new Error(`Gemini ${modelId}: ${messaggio}`);
+  }
 
   const candidate = body.candidates?.[0];
   const text = (candidate?.content?.parts ?? []).map((p) => p.text ?? "").join("");
-  if (!text) throw new Error(`Gemini ${modelId} ha risposto senza contenuto`);
+  if (!text) {
+    if (tentativiRimasti > 0) {
+      console.warn(`[gemini] ${modelId} ha risposto vuoto, riprovo`);
+      await attesa(1000);
+      return callGemini(apiKey, modelId, prompt, withSearch, timeoutMs, tentativiRimasti - 1);
+    }
+    throw new Error(`Gemini ${modelId} ha risposto senza contenuto`);
+  }
 
   const usage = body.usageMetadata ?? {};
   const pricing = TOKEN_PRICING[modelId] ?? TOKEN_PRICING["gemini-3-flash-preview"];
@@ -576,7 +612,8 @@ alimentare — Amazon compreso, che ha le pagine aperte a tutti.
 Il prezzo dev'essere quello del formato richiesto. Attenzione alle confezioni
 multiple: se la pagina vende dodici pezzi il prezzo è di dodici pezzi, e va
 scritto nel nome. Non spacciare un cartone per una confezione singola.
-Per ogni prezzo: "prodotto" è la voce qui sopra scritta IDENTICA, "nome" è il
+Per ogni prezzo: "prodotto" è la voce qui sopra scritta IDENTICA — SENZA il
+numero d'elenco davanti, "nome" è il
 nome sul sito del venditore, poi prezzo, venditore e link alla pagina.
 Se non trovi un prodotto presso un venditore, saltalo. Non stimare MAI un prezzo.
 Il link deve essere una pagina che hai davvero aperto: verranno controllati

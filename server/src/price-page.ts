@@ -543,17 +543,39 @@ const TITOLI_FUORI_CONTESTO = [
 ];
 
 /**
- * Il tetto per una riga della spesa, nella valuta dell'utente.
+ * Quanto vale una riga della spesa, e in quale valuta.
  *
- * Cento è largo di proposito: un olio buono da un litro o un taglio di carne
- * possono superare i venticinque euro, e tagliarli sarebbe sbagliato. Serve
- * solo a fermare l'assurdo — sei uova a 250 €, che era un bancale venduto
- * all'ingrosso e che il modello aveva riportato come se fosse una confezione.
+ * Le soglie erano fisse — sotto 0,10 e sopra 100 — e funzionavano finché si
+ * ragionava in euro. In Giappone hanno buttato via diciannove righe su venti:
+ * un petto di pollo costa 356 yen, cioè poco più di due euro, ma il numero
+ * superava cento e finiva scartato. Lo stesso sarebbe successo in Corea, in
+ * Ungheria, in India.
+ *
+ * Quindi le soglie si scalano sulla valuta. I fattori qui sotto dicono
+ * grosso modo quante unità valgono un euro: NON sono un cambio aggiornato e
+ * non devono esserlo — servono solo a distinguere un ordine di grandezza da un
+ * altro. Se lo yen si muove del venti per cento, questo controllo non se ne
+ * accorge nemmeno, ed è giusto così.
  */
-const TETTO_RIGA = 100;
+const UNITA_PER_EURO: Record<string, number> = {
+  EUR: 1, USD: 1.1, GBP: 0.85, CHF: 0.95, CAD: 1.5, AUD: 1.65, NZD: 1.8,
+  SGD: 1.45, ILS: 4, AED: 4, SAR: 4.1, PLN: 4.3, BRL: 6, DKK: 7.5,
+  NOK: 11.5, SEK: 11.5, ZAR: 20, MXN: 20, CZK: 25, TRY: 40, INR: 90,
+  JPY: 160, HUF: 390, KRW: 1450,
+};
 
-/** Sotto questa cifra non è un prodotto: è un errore di lettura del prezzo. */
-const PAVIMENTO_RIGA = 0.1;
+/**
+ * Il tetto e il pavimento per una riga, nella valuta di quella riga.
+ *
+ * Cento euro è largo di proposito: un olio buono da un litro o un taglio di
+ * carne pregiata possono superare i venticinque, e tagliarli sarebbe
+ * sbagliato. Serve solo a fermare l'assurdo — sei uova a 250 €, che era un
+ * bancale all'ingrosso riportato come se fosse una confezione.
+ */
+function soglie(valuta: string): { pavimento: number; tetto: number } {
+  const fattore = UNITA_PER_EURO[(valuta ?? "EUR").toUpperCase()] ?? 1;
+  return { pavimento: 0.1 * fattore, tetto: 100 * fattore };
+}
 
 /**
  * Scarta le righe che non possono essere la spesa di una famiglia.
@@ -563,14 +585,18 @@ const PAVIMENTO_RIGA = 0.1;
  * il prodotto della lista. Applicarlo in un posto solo significa correggerlo
  * una volta sola.
  */
-export function scartaImplausibili<T extends { nome: string; negozio: string; prezzo: number | null }>(
-  rows: T[],
-): { tenute: T[]; scartate: number } {
+export function scartaImplausibili<
+  T extends { nome: string; negozio: string; prezzo: number | null; valuta?: string },
+>(rows: T[]): { tenute: T[]; scartate: number } {
   const tenute = rows.filter((r) => {
     if (r.prezzo == null) return true; // senza prezzo non c'è niente da giudicare
 
-    if (r.prezzo < PAVIMENTO_RIGA || r.prezzo > TETTO_RIGA) {
-      console.info(`[plausibilita] scartato "${r.nome.slice(0, 50)}": ${r.prezzo} fuori scala`);
+    const { pavimento, tetto } = soglie(r.valuta ?? "EUR");
+    if (r.prezzo < pavimento || r.prezzo > tetto) {
+      console.info(
+        `[plausibilita] scartato "${r.nome.slice(0, 50)}": ${r.prezzo} ${r.valuta ?? "EUR"} ` +
+          `fuori dalla scala ${pavimento}–${tetto}`,
+      );
       return false;
     }
 
