@@ -486,21 +486,17 @@ export function groupByProduct(rows: CheckedRow[]): ProductOffers[] {
   }
 
   return [...groups.entries()].map(([key, offerte]) => {
-    // Prima i prezzi verificati, poi gli altri; dentro ciascun gruppo, dal piu'
-    // economico.
+    // Dal piu' economico, e basta.
     //
-    // L'ordine conta piu' di quanto sembri. Il primo della lista e' quello che
-    // l'app propone e su cui fa i conti, quindi deve sempre essere un prezzo
-    // di cui abbiamo aperto la pagina. Un prezzo non verificato piu' basso
-    // resta visibile come alternativa — e' quasi sempre reale, il modello lo
-    // legge davvero dal web — ma non puo' guidare il totale ne' presentarsi
-    // come un fatto: e' successo che ne indicasse dodici con altrettanti
-    // indirizzi inesistenti.
-    offerte.sort((a, b) => {
-      const aOk = a.verifica !== "non-raggiungibile" ? 0 : 1;
-      const bOk = b.verifica !== "non-raggiungibile" ? 0 : 1;
-      return aOk !== bOk ? aOk - bOk : a.prezzo - b.prezzo;
-    });
+    // Prima si mettevano davanti i verificati, e l'app finiva per chiamare
+    // "piu' conveniente" qualcosa che non lo era: una salsiccia verificata a
+    // 14,40 sopra la stessa a 5,99 non verificata. Detto a un utente e' falso,
+    // e nessuna buona intenzione lo giustifica.
+    //
+    // La verifica non sparisce: resta l'etichetta su ogni riga, e soprattutto
+    // decide che cosa entra nel TOTALE — che si calcola a parte, sui soli
+    // prezzi di cui abbiamo aperto la pagina.
+    offerte.sort((a, b) => a.prezzo - b.prezzo);
 
     const first = rows.find((r) => (r.prodotto || r.nome).trim().toLowerCase() === key);
     // La differenza si calcola solo fra prezzi verificati: confrontare un
@@ -634,4 +630,23 @@ export function togliOutlier(gruppi: ProductOffers[]): ProductOffers[] {
           : null,
     };
   });
+}
+
+
+/**
+ * Il prezzo più basso di cui abbiamo aperto la pagina, prodotto per prodotto.
+ *
+ * Serve al TOTALE, ed è una selezione diversa da quella che vede l'utente.
+ * L'elenco mostra le offerte dal prezzo più basso, com'è giusto: chiamare
+ * "più conveniente" una cosa che non lo è sarebbe falso. Ma un totale
+ * costruito su prezzi che nessuno ha potuto controllare sarebbe altrettanto
+ * falso, in modo più subdolo — un numero preciso e sbagliato.
+ *
+ * Quindi le due cose si separano: si mostra il più economico, si somma il più
+ * economico VERIFICATO, e si dichiara quante voci sono rimaste fuori.
+ */
+export function migliorePrezzoVerificato(gruppo: ProductOffers): Offer | null {
+  return (
+    gruppo.offerte.find((o) => o.verifica === "verificato" || o.verifica === "pagina-ok") ?? null
+  );
 }

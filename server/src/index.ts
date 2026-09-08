@@ -583,8 +583,15 @@ async function prezzaLista(
 
   // Nel totale entrano SOLO i prezzi verificati: sommare cio' che non si e'
   // potuto controllare da' un numero sbagliato con l'aria di essere esatto.
-  const contati = migliori.filter((r) => r.verifica !== "non-raggiungibile");
-  const totale = Math.round(contati.reduce((s, r) => s + (r.prezzo ?? 0), 0) * 100) / 100;
+  // Il totale prende, per ogni prodotto, il prezzo piu' basso FRA QUELLI
+  // VERIFICATI — che puo' non essere quello mostrato in cima all'elenco. I
+  // prodotti dove nessun prezzo si e' potuto controllare restano fuori, e
+  // l'app dice quanti sono: un conto parziale dichiarato vale piu' di uno
+  // completo e inventato.
+  const contati = prodotti
+    .map((p) => migliorePrezzoVerificato(p))
+    .filter((o): o is NonNullable<typeof o> => o !== null);
+  const totale = Math.round(contati.reduce((s, o) => s + o.prezzo, 0) * 100) / 100;
 
   console.info(
     `[prezzi] ${prodotti.length} prodotti, ${conAlternative} con alternative, ` +
