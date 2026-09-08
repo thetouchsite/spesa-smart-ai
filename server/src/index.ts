@@ -49,6 +49,8 @@ import {
 } from "./price-page.js";
 import { generatePricesSerpapi } from "./prices-serpapi.js";
 import { cercaListaSuAmazon, isAmazonConfigured } from "./amazon.js";
+import { linkDiRipiego } from "./fallback-link.js";
+import { annota } from "./diario.js";
 import {
   AiRecipeInput,
   ChefInput,
@@ -543,6 +545,24 @@ async function prezzaLista(
   const [checked, amazon] = await Promise.all([verifyPrices(tenute, 10), amazonPromise]);
   console.info(`[prezzi] pagine aperte con esito ${checked.verificati}/${checked.totali}`);
 
+  /* NESSUN PRODOTTO SENZA UN POSTO DOVE ANDARE
+     Le righe il cui link non si e' aperto tenevano il prezzo ma perdevano il
+     modo di comprare: meta' lista senza sbocco. Ora prendono l'indirizzo di
+     RICERCA di quel prodotto — sul sito del negozio se lo conosciamo,
+     altrimenti su Amazon. Un indirizzo di ricerca si costruisce e non puo'
+     dare 404, quindi si apre sempre. */
+  let ripieghi = 0;
+  const conRipiego = checked.rows.map((r) => {
+    if (r.verifica !== "non-raggiungibile") return r;
+    const rip = linkDiRipiego(r.prodotto || r.nome, r.negozio, country);
+    if (!rip) return r;
+    ripieghi++;
+    // Il prezzo torna: la riga non e' piu' un vicolo cieco. Resta dichiarata
+    // non verificata, perche' la pagina del prodotto non l'abbiamo aperta.
+    return { ...r, prezzo: r.prezzo, linkRicerca: rip.url, ricercaSu: rip.negozio };
+  });
+  if (ripieghi > 0) console.info(`[prezzi] ${ripieghi} righe salvate con la ricerca di ripiego`);
+
   if (amazon.cercati > 0) {
     console.info(
       `[amazon] ${amazon.offerte.length} offerte su ${amazon.trovati}/${amazon.cercati} prodotti`,
@@ -552,7 +572,7 @@ async function prezzaLista(
   // Le righe Amazon entrano gia' verificate: vengono dall'API ufficiale, non
   // da un indirizzo dedotto, quindi non c'e' niente da controllare.
   const righeComplete = [
-    ...checked.rows,
+    ...conRipiego,
     ...amazon.offerte.map((o) => ({
       prodotto: o.prodotto,
       nome: o.nome,
@@ -598,6 +618,35 @@ async function prezzaLista(
     `[prezzi] ${prodotti.length} prodotti, ${conAlternative} con alternative, ` +
       `${offerte} in promozione — totale al meglio ${totale} ${currency}`,
   );
+
+  annota("prezzi", {
+    citta: city,
+    paese: country,
+    valuta: currency,
+    fonte,
+    richiesti: items,
+    totale,
+    secondi: Math.round(secondi),
+    costoUsd: Number(costo.toFixed(4)),
+    verificati: checked.verificati,
+    proposti: checked.totali,
+    catene: confronto.catene,
+    // Tutte le offerte per prodotto: e' la parte che serve a capire cosa ha
+    // visto davvero l'utente.
+    prodotti: prodotti.map((p) => ({
+      prodotto: p.prodotto,
+      differenza: p.differenza,
+      offerte: p.offerte.map((o) => ({
+        negozio: o.negozio,
+        nome: o.nome,
+        prezzo: o.prezzo,
+        verifica: o.verifica,
+        link: o.link || null,
+        linkRicerca: o.linkRicerca ?? null,
+        sconto: o.scontoPercento ?? null,
+      })),
+    })),
+  });
 
   return {
     prezzi: migliori,
@@ -678,6 +727,13 @@ app.post("/ai/menu", async (body) => {
     `[menu] ${fase1.model}: ${fase1.seconds.toFixed(0)}s, $${fase1.cost.toFixed(4)}, ` +
       `${fase1.data.menu.length} giorni, ${fase1.data.lista.length} voci`,
   );
+
+  annota("menu", {
+    richiesta: data,
+    giorni: fase1.data.menu.length,
+    lista: fase1.data.lista,
+    secondi: Math.round(fase1.seconds),
+  });
 
   const result = {
     ...fase1.data,

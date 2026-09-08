@@ -1,44 +1,35 @@
 /**
- * Amazon Product Advertising API — prezzi e link ufficiali, non indovinati.
+ * Amazon: link di affiliazione oggi, prezzi ufficiali quando si potrà.
  *
- * PERCHÉ SERVE
- * ------------
- * Il motore con ricerca trova prezzi veri ma i suoi link reggono a
- * intermittenza: in prove consecutive, dieci link validi su trenta e poi cinque
- * su ventinove. Il modello conosce bene gli indirizzi di pochi siti e sugli
- * altri tira a indovinare — dodici 404 in una sola generazione.
+ * QUELLO CHE È SUCCESSO
+ * ---------------------
+ * La Product Advertising API — quella che avremmo voluto usare per avere
+ * prezzi e indirizzi ufficiali — **non esiste più**. Amazon l'ha deprecata il
+ * 30 aprile 2026 e spenta il 15 maggio: oggi chi la chiama riceve
+ * `403 AccessDeniedException`. Lo dice la sua stessa documentazione.
  *
- * E chiedergli di includere Amazon nel prompt non basta: provato, e in quella
- * generazione Amazon non è comparso nemmeno una volta. Il prompt suggerisce,
- * non garantisce.
+ * La sostituta è la **Creators API**, e la barriera d'ingresso si è alzata
+ * parecchio: servono **dieci vendite qualificate negli ultimi trenta giorni**
+ * per ottenere l'accesso, e si perde se scende sotto. Prima erano tre vendite
+ * in centottanta giorni. Per un'app che deve ancora nascere è un cane che si
+ * morde la coda — servono vendite per avere l'API, e l'API per fare vendite.
  *
- * Questa API invece è deterministica: dà titolo, prezzo, immagine e indirizzo
- * ufficiali. Niente da verificare, niente da indovinare.
+ * QUELLO CHE INVECE SI PUÒ FARE SUBITO
+ * ------------------------------------
+ * Le commissioni **non richiedono nessuna API**: bastano il tag di
+ * affiliazione nell'indirizzo e un account Associates approvato. Un link di
+ * ricerca costruito da noi — `amazon.it/s?k=passata&tag=iltuotag-21` — porta
+ * l'utente sul prodotto giusto e attribuisce la vendita.
  *
- * COME SI INCASTRA
- * ----------------
- * NON sostituisce il motore: si aggiunge. Su ogni prodotto l'utente vede il
- * supermercato accanto ad Amazon e sceglie. È importante perché — misurato
- * sulle nostre prove — Amazon vende bene la dispensa (pasta, tonno, biscotti,
- * olio) e quasi mai il fresco: carne, latticini, uova e verdura non compaiono.
- * Da sola coprirebbe metà lista.
+ * Quindi il piano è in due tempi:
+ *   OGGI     link di ricerca con il tag: si apre sempre, genera commissioni,
+ *            costo zero, funziona in venti paesi
+ *   POI      quando le vendite superano le dieci al mese, la Creators API
+ *            aggiunge prezzo e immagine ufficiali
  *
- * CHE COSA SERVE PER ACCENDERLA
- * -----------------------------
- * Un account Amazon Associates (il programma di affiliazione) e tre chiavi:
- * AMAZON_ACCESS_KEY, AMAZON_SECRET_KEY, AMAZON_PARTNER_TAG. Senza, il modulo
- * resta spento e il resto funziona come prima.
- *
- * Due cose da sapere prima di proporla al cliente:
- *   - ogni acquisto dai link dell'app genera una COMMISSIONE al titolare
- *     dell'account, tipicamente fra l'1% e il 4% sull'alimentare;
- *   - Amazon chiede TRE VENDITE qualificate entro 180 giorni dall'iscrizione,
- *     altrimenti sospende l'accesso all'API. Con un'app appena lanciata è un
- *     rischio reale e va detto prima, non dopo.
- *
- * La richiesta va firmata con AWS Signature V4. È implementata qui a mano con
- * `node:crypto` invece di tirare dentro l'SDK di AWS: sono sessanta righe, e
- * l'SDK porterebbe decine di dipendenze per una sola chiamata.
+ * Il codice della vecchia API resta in fondo al file, spento. Non si butta
+ * perché la Creators API riusa le stesse idee — marketplace, reparti, forma
+ * della risposta — e riscriverla da zero sarebbe uno spreco.
  */
 
 import { createHash, createHmac } from "node:crypto";
@@ -87,12 +78,55 @@ const REPARTO_ALIMENTARI: Record<string, string> = {
   JP: "FoodAndBeverage", IN: "GroceryAndGourmetFood", AE: "GroceryAndGourmetFood",
 };
 
+/**
+ * Vero quando si può chiamare l'API dei prezzi.
+ *
+ * Oggi è sempre falso, e non per configurazione: la PA-API è spenta e la
+ * Creators API richiede dieci vendite al mese che un'app nuova non ha. Resta
+ * qui perché il giorno in cui quelle vendite ci saranno, si accende cambiando
+ * una riga.
+ */
 export function isAmazonConfigured(): boolean {
   return Boolean(
     process.env.AMAZON_ACCESS_KEY &&
       process.env.AMAZON_SECRET_KEY &&
-      process.env.AMAZON_PARTNER_TAG,
+      process.env.AMAZON_PARTNER_TAG &&
+      // Interruttore esplicito: senza, il modulo resta spento anche con le
+      // chiavi, perché chiamare un'API spenta fa solo perdere tempo.
+      process.env.AMAZON_API_ATTIVA === "1",
   );
+}
+
+/** Il tag di affiliazione, se configurato: è tutto ciò che serve per le commissioni. */
+export function tagAffiliazione(): string | undefined {
+  return process.env.AMAZON_PARTNER_TAG || undefined;
+}
+
+/**
+ * Link di ricerca Amazon per un prodotto, col tag di affiliazione.
+ *
+ * È la parte che funziona OGGI. Non chiama nessuna API, non può dare 404 — un
+ * indirizzo di ricerca esiste sempre — e attribuisce la vendita all'account
+ * del cliente.
+ *
+ * `i=grocery` restringe al reparto alimentari dove esiste: senza, cercando
+ * «passata di pomodoro» escono anche libri di cucina.
+ */
+export function linkRicercaAmazon(prodotto: string, paese: string): string | null {
+  const codice = (paese || "IT").toUpperCase().slice(0, 2);
+  const mercato = MARKETPLACE[codice];
+  // Nessun marketplace in quel paese: non si manda l'utente su un sito che
+  // non gli spedisce niente.
+  if (!mercato) return null;
+
+  const url = new URL(`https://${mercato.sito}/s`);
+  url.searchParams.set("k", prodotto);
+  if (REPARTO_ALIMENTARI[codice]) url.searchParams.set("i", "grocery");
+
+  const tag = tagAffiliazione();
+  if (tag) url.searchParams.set("tag", tag);
+
+  return url.toString();
 }
 
 /** Un'offerta Amazon, nella stessa forma che produce il motore AI. */

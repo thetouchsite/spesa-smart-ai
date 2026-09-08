@@ -200,6 +200,9 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
 
 /** Una riga di prezzo dopo il controllo, pronta per il client. */
 export interface CheckedRow {
+  /** Ricerca di ripiego, quando la pagina del prodotto non si è aperta. */
+  linkRicerca?: string;
+  ricercaSu?: string;
   /** Voce della lista della spesa: uguale fra le insegne, serve a confrontarle. */
   prodotto?: string;
   nome: string;
@@ -226,9 +229,10 @@ export interface CheckedRow {
  * del più lento, quindi il tempo massimo per pagina conta quanto la
  * concorrenza.
  *
- * Le righe non raggiungibili non vengono buttate — il nome del prodotto resta
- * utile nella lista della spesa — ma perdono link e prezzo: meglio "prezzo non
- * disponibile" che un numero che nessuno può controllare.
+ * Le righe non raggiungibili perdono il link, che non porta da nessuna parte,
+ * ma tengono il prezzo: viene da una ricerca vera, e un indirizzo sbagliato
+ * non dimostra che il numero lo sia. Resta dichiarato non verificato e non
+ * entra nel totale — così è un'indicazione, non un impegno.
  *
  * Quelle solo bloccate invece si tengono per intero. Il sito ha rifiutato NOI,
  * non l'utente: dal suo telefono quel link si apre. Il prezzo resta quello del
@@ -254,8 +258,12 @@ export async function verifyPrices(
         const v = await verifyProductPage(row.link);
 
         if (v.status === "non-raggiungibile") {
-          console.info(`[verifica] scartato "${row.nome}": ${v.reason}`);
-          return { ...row, prezzo: null, link: "", verifica: v.status };
+          // Il LINK non vale niente e sparisce. Il prezzo invece si tiene: il
+          // modello l'ha letto durante una ricerca vera, e un indirizzo
+          // sbagliato non dimostra che anche il numero lo sia. Resta marcato
+          // come non verificato e — questo conta — NON entra mai nel totale.
+          console.info(`[verifica] link scartato per "${row.nome}": ${v.reason}`);
+          return { ...row, link: "", verifica: v.status };
         }
 
         if (v.status === "bloccato") {
@@ -394,6 +402,16 @@ export function pickBestStore(rows: CheckedRow[], minVerified = 5): StoreCompari
 
 export interface Offer {
   negozio: string;
+  /**
+   * Dove mandare l'utente quando `link` non si è aperto.
+   *
+   * È la ricerca di quel prodotto sul sito del negozio, o su Amazon quando il
+   * negozio non lo conosciamo. Si apre sempre — un indirizzo di ricerca non
+   * può dare 404 — quindi nessun prodotto resta senza un posto dove andare.
+   */
+  linkRicerca?: string;
+  /** Il nome per il tasto di ripiego: «cerca su Amazon». */
+  ricercaSu?: string;
   /** Miniatura del prodotto, se la fonte la fornisce (Google Shopping sì). */
   immagine?: string;
   /* `verifica` dice quanto fidarsi: solo "verificato" e "pagina-ok" hanno un
@@ -439,12 +457,17 @@ export function groupByProduct(rows: CheckedRow[]): ProductOffers[] {
   const groups = new Map<string, Offer[]>();
 
   for (const r of rows) {
+    // Una riga senza prezzo non è un'offerta. Una con prezzo ma senza pagina
+    // che si apre lo è ancora, purché abbia un posto dove mandare l'utente.
     if (r.prezzo == null) continue;
+    if (r.verifica === "non-raggiungibile" && !r.linkRicerca) continue;
 
     const key = (r.prodotto || r.nome).trim().toLowerCase();
     const offer: Offer = {
       negozio: r.negozio,
       immagine: r.immagine,
+      linkRicerca: r.linkRicerca,
+      ricercaSu: r.ricercaSu,
       nome: r.nome,
       prezzo: r.prezzo,
       valuta: r.valuta,
