@@ -36,7 +36,7 @@ import {
 import { fetchRecipe, type ContentSource } from "../src/lib/content";
 import type { Recipe } from "../src/lib/recipes/types";
 import type { Recipe as GeneratedRecipe } from "../src/lib/plan-full";
-import { unsplashFoodImage } from "../src/lib/recipes/unsplash";
+import { DishPhoto } from "../src/components/dish-photo";
 import { useSession } from "../src/lib/state/session";
 import { localDay } from "../src/lib/days";
 import { useI18n } from "../src/lib/i18n";
@@ -100,7 +100,8 @@ function toRecipe(g: GeneratedRecipe, dish: string, servings: number): Recipe {
   return {
     id: `gen-${norm32(g.piatto || dish)}`,
     title: g.piatto || dish,
-    image: unsplashFoodImage(g.piatto || dish),
+    // Vuota: la cerca il backend, e se non c'e' si disegna il segnaposto.
+    image: "",
     servings: g.porzioni || servings,
     prepMinutes: g.prep_minuti ?? 0,
     cookMinutes: g.cottura_minuti ?? 0,
@@ -202,12 +203,7 @@ export default function RicettaScreen() {
 
   return (
     <Screen footer={<Button label={ui("Torna al menù")} onPress={() => router.back()} />}>
-      <Image
-        source={{ uri: recipe.image }}
-        style={styles.photo}
-        accessibilityLabel={`Foto di ${recipe.title}`}
-        resizeMode="cover"
-      />
+      <DishPhoto uri={recipe.image} nome={recipe.title} style={styles.photo} />
 
       <View style={styles.head}>
         {params.giorno ? (

@@ -26,7 +26,7 @@ import {
 } from "../src/components/ui";
 import { useSession } from "../src/lib/state/session";
 import { localDay } from "../src/lib/days";
-import { unsplashFoodImage } from "../src/lib/recipes/unsplash";
+import { DishPhoto } from "../src/components/dish-photo";
 import { colors, font, radius, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 import { useI18n } from "../src/lib/i18n";
@@ -103,13 +103,9 @@ export default function MenuScreen() {
                   }
                   style={({ pressed }) => [styles.meal, pressed && styles.mealPressed]}
                 >
-                  <Image
-                    source={{ uri: unsplashFoodImage(dish) }}
-                    style={styles.thumb}
-                    contentFit="cover"
-                    transition={200}
-                    accessibilityLabel={`Foto di ${dish}`}
-                  />
+                  {/* Senza foto vera si disegna un segnaposto: i servizi
+                      gratuiti cadono, e un riquadro rotto e' peggio. */}
+                  <DishPhoto uri={undefined} nome={dish} style={styles.thumb} compatto />
                   <View style={styles.mealText}>
                     <View style={styles.mealTop}>
                       <Ionicons name={m.icon} size={13} color={colors.mutedForeground} />

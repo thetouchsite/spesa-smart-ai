@@ -108,16 +108,22 @@ async function main() {
   // ── 5. Immagini dei piatti ──────────────────────────────────────────
   console.log("\n5. Immagini dei piatti");
   const dish = plan.mealPlan[0].dinner;
+  // Questo controllo è cambiato di senso, ed è il punto: prima verificava che
+  // l'app producesse un indirizzo e che quell'indirizzo rispondesse. Tre
+  // servizi gratuiti sono morti uno dopo l'altro — Unsplash Source dismesso,
+  // LoremFlickr che risponde 500 a sette richieste su otto, Foodish sospeso —
+  // e ogni volta l'utente trovava un riquadro rotto in cima alla ricetta.
+  //
+  // Ora l'app non indovina più indirizzi: la foto vera la cerca il backend, e
+  // dove non c'è si disegna un segnaposto che non può cadere. Quindi si
+  // verifica l'opposto — che nessun indirizzo sperato venga prodotto.
   const url = unsplashFoodImage(dish);
-  check("URL generato", url.startsWith("https://"), url.slice(0, 60) + "…");
-  check("non punta più al servizio dismesso", !url.includes("source.unsplash.com"));
+  check("nessun indirizzo indovinato", url === "", url === "" ? "vuoto, come deve" : url.slice(0, 50));
+  check(
+    "niente servizi dismessi",
+    !url.includes("source.unsplash.com") && !url.includes("loremflickr"),
+  );
   check("stabile fra due chiamate", unsplashFoodImage(dish) === url);
-  try {
-    const res = await fetch(url, { method: "GET" });
-    check("l'immagine risponde", res.ok, `HTTP ${res.status}`);
-  } catch {
-    check("l'immagine risponde", false, "rete non raggiungibile");
-  }
 
   // ── 6. Profilo incompleto: l'app non deve rompersi ──────────────────
   console.log("\n6. Profilo incompleto");

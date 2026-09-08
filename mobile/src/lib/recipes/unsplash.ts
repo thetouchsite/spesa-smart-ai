@@ -38,6 +38,29 @@ function hash(text: string): number {
   return Math.abs(h);
 }
 
+/**
+ * L'immagine di un piatto.
+ *
+ * TRE SERVIZI PROVATI, DUE MORTI
+ * ------------------------------
+ * Il prototipo usava Unsplash Source, dismesso. È stato sostituito con
+ * LoremFlickr, che oggi risponde **500 su sette richieste su otto** — provato
+ * su pizza, pollo, risotto, mozzarella e altri. Foodish, la terza opzione,
+ * risponde «Service Suspended».
+ *
+ * Sono tutti servizi gratuiti senza garanzie, e cadono senza preavviso. Il
+ * risultato per l'utente era peggio di nessuna foto: un riquadro rotto in cima
+ * a ogni ricetta.
+ *
+ * COSA SI FA ADESSO
+ * -----------------
+ * Niente indirizzi indovinati. La foto vera arriva dal backend, che la cerca
+ * su TheMealDB — l'unico servizio provato che regge, gratuito e senza chiave,
+ * e che restituisce la foto DI QUEL PIATTO invece di una foto generica di
+ * cibo. Quando non c'è, questa funzione restituisce stringa vuota e la
+ * schermata disegna un segnaposto: non può rompersi, perché non chiede niente
+ * a nessuno.
+ */
 export function unsplashFoodImage(query: string, seed = 0): string {
   const words = query
     .toLowerCase()
@@ -51,5 +74,10 @@ export function unsplashFoodImage(query: string, seed = 0): string {
   const keywords = [...words, "food"].join(",");
   const lock = (hash(query) + seed) % 10000;
 
-  return `https://loremflickr.com/800/600/${encodeURIComponent(keywords)}?lock=${lock}`;
+  // Nessun servizio esterno da qui: quelli provati cadono, e un riquadro
+  // rotto è peggio di un segnaposto pulito. Le parole chiave restano
+  // calcolate perché servono al backend per cercare la foto vera.
+  void keywords;
+  void lock;
+  return "";
 }
