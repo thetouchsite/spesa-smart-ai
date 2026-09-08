@@ -53,6 +53,8 @@ const UI: Record<string, Entry> = {
   "Nessun piano": {"it": "Nessun piano", "en": "No plan", "fr": "Aucun plan", "es": "Ningún plan", "de": "Kein Plan"},
   "Alcune preferenze non sono state caricate.": {"it": "Alcune preferenze non sono state caricate.", "en": "Some preferences could not be loaded.", "fr": "Certaines préférences n'ont pas pu être chargées.", "es": "Algunas preferencias no se han podido cargar.", "de": "Einige Einstellungen konnten nicht geladen werden."},
   "Prezzi reali di oggi": {"it": "Prezzi reali di oggi", "en": "Real prices, today", "fr": "Prix réels du jour", "es": "Precios reales de hoy", "de": "Echte Preise von heute"},
+  "Cerco altri negozi…": {"it": "Cerco altri negozi…", "en": "Looking for other shops…", "fr": "Recherche d'autres magasins…", "es": "Buscando otras tiendas…", "de": "Suche weitere Shops…"},
+  "Cerco anche su Amazon…": {"it": "Cerco anche su Amazon…", "en": "Also checking Amazon…", "fr": "Je regarde aussi sur Amazon…", "es": "También busco en Amazon…", "de": "Schaue auch bei Amazon…"},
   "Nessuna lista": {"it": "Nessuna lista", "en": "No list", "fr": "Aucune liste", "es": "Ninguna lista", "de": "Keine Liste"},
   "Ogni quanto": {"it": "Ogni quanto", "en": "How often", "fr": "À quelle fréquence", "es": "Cada cuánto", "de": "Wie oft"},
   "Persone": {"it": "Persone", "en": "People", "fr": "Personnes", "es": "Personas", "de": "Personen"},

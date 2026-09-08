@@ -402,6 +402,7 @@ export default function ListaScreen() {
       <PriceCheckSheet
         itemName={checking}
         offers={checking ? findOffers(planExtra?.prodotti ?? [], checking) : null}
+        country={country}
         onClose={() => setChecking(null)}
       />
 

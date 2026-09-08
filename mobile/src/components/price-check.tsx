@@ -19,11 +19,13 @@
  * lista nei negozi della città dell'utente.
  */
 
-import { Linking, Modal, Pressable, StyleSheet, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { Body, Button, Label, Title } from "./ui";
-import type { ProductOffers } from "../lib/plan-full";
+import type { Offer, ProductOffers } from "../lib/plan-full";
+import { offerteAmazon } from "../lib/amazon";
 import { productLabel } from "../lib/price-data/labels";
 import { money } from "../lib/format";
 import { useI18n } from "../lib/i18n";
@@ -33,19 +35,55 @@ import { uiText } from "../lib/ui-strings";
 export function PriceCheckSheet({
   itemName,
   offers,
+  country,
   onClose,
 }: {
   /** Nome del prodotto come compare nella lista. Null = riquadro chiuso. */
   itemName: string | null;
   /** Le offerte trovate dal motore per questo prodotto, già dalla più economica. */
   offers: ProductOffers | null;
+  /** Serve a cercare sul sito Amazon giusto. */
+  country: string;
   onClose: () => void;
 }) {
   const { language } = useI18n();
   /** Testo nella lingua scelta dall'utente. */
   const ui = (t: string) => uiText(t, language);
 
-  const righe = offers?.offerte ?? [];
+  /**
+   * Le offerte Amazon si chiedono solo ora, all'apertura del riquadro.
+   *
+   * Cercarle per tutta la lista costerebbe un credito a prodotto anche per
+   * quelli che nessuno guarda. Così ne paga uno solo chi apre davvero — e il
+   * server tiene una cache condivisa, quindi lo stesso prodotto non si paga
+   * due volte.
+   */
+  const [amazon, setAmazon] = useState<Offer[]>([]);
+  const [cercandoAmazon, setCercandoAmazon] = useState(false);
+
+  useEffect(() => {
+    if (!itemName) {
+      setAmazon([]);
+      return;
+    }
+    let vivo = true;
+    setCercandoAmazon(true);
+    setAmazon([]);
+    void offerteAmazon(itemName, country)
+      .then((o) => {
+        if (vivo) setAmazon(o);
+      })
+      .finally(() => {
+        if (vivo) setCercandoAmazon(false);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [itemName, country]);
+
+  // Amazon si affianca alle altre e concorre allo stesso ordine: se costa meno
+  // vince, se costa di più resta sotto. Nessun trattamento di favore.
+  const righe = [...(offers?.offerte ?? []), ...amazon].sort((a, b) => a.prezzo - b.prezzo);
   const migliore = righe[0] ?? null;
 
   return (
@@ -76,7 +114,12 @@ export function PriceCheckSheet({
           </Pressable>
         </View>
 
-        {righe.length === 0 ? (
+        {righe.length === 0 && cercandoAmazon ? (
+          <View style={styles.empty}>
+            <ActivityIndicator color={colors.primary} />
+            <Body style={styles.emptyText}>{ui("Cerco altri negozi…")}</Body>
+          </View>
+        ) : righe.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="information-circle-outline" size={36} color={colors.mutedForeground} />
             <Body style={styles.emptyText}>
@@ -145,6 +188,13 @@ export function PriceCheckSheet({
                 </View>
               </Pressable>
             ))}
+
+            {cercandoAmazon ? (
+              <View style={styles.attesa}>
+                <ActivityIndicator size="small" color={colors.mutedForeground} />
+                <Body style={styles.attesaText}>{ui("Cerco anche su Amazon…")}</Body>
+              </View>
+            ) : null}
 
             <Body style={styles.note}>
               {ui("Prezzi trovati sul web quando è stato creato il piano e verificati aprendo la pagina del prodotto. Toccando una riga si apre il negozio.")}
@@ -224,6 +274,14 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     textDecorationLine: "line-through",
   },
+
+  attesa: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingTop: 10,
+  },
+  attesaText: { fontSize: font.size.xs, color: colors.mutedForeground },
 
   note: {
     fontSize: font.size.xs,

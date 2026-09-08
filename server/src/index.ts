@@ -23,6 +23,7 @@
  *   POST /ai/recipe-web      ricerca web + estrazione strutturata
  *   POST /ai/chef            rifinitura "da chef" (non tocca gli ingredienti)
  *   POST /ai/plan            piano alimentare completo
+ *   POST /product/amazon     prodotti Amazon veri per UNA voce, al tocco
  *   POST /ai/plan-full       piano + ricette + confronto supermercati + prezzi
  *                            veri, in UNA chiamata con ricerca Google
  */
@@ -48,7 +49,7 @@ import {
   verifyPrices,
 } from "./price-page.js";
 import { generatePricesSerpapi } from "./prices-serpapi.js";
-import { cercaListaSuAmazon, isAmazonConfigured } from "./amazon.js";
+import { cercaProdottoAmazon, isAmazonSearchConfigured } from "./amazon-search.js";
 import { linkDiRipiego } from "./fallback-link.js";
 import { annota } from "./diario.js";
 import {
@@ -514,24 +515,15 @@ async function prezzaLista(
     console.warn("[prezzi] ricerca fallita, restituisco la lista senza prezzi:", err);
   }
 
-  /* AMAZON, IN PIU' E NON AL POSTO
-     Le offerte ufficiali si aggiungono a quelle trovate dal motore, cosi'
-     l'utente vede il supermercato accanto ad Amazon e sceglie. Vengono da
-     un'API, quindi hanno prezzo e indirizzo certi: niente da indovinare.
+  /* AMAZON NON SI CERCA QUI
+     Un credito per prodotto: su una lista da diciotto voci sarebbero diciotto
+     crediti a generazione, e i cento gratuiti finirebbero in cinque piani.
+     Cercarlo per tutta la lista significa pagare anche i prodotti che nessuno
+     guardera' mai.
 
-     Chiederle nel prompt non basta — provato, e in quella generazione Amazon
-     non e' comparso nemmeno una volta.
-
-     La ricerca gira IN PARALLELO con la verifica dei link, che e' fatta di
-     attese di rete: cosi' non allunga il tempo che l'utente aspetta. */
-  const amazonPromise =
-    isAmazonConfigured() && items.length > 0
-      ? cercaListaSuAmazon(items, paeseIso(country).toUpperCase()).catch((err) => {
-          // Amazon che non risponde non deve far cadere il piano.
-          console.warn("[amazon] ricerca fallita, proseguo senza:", err);
-          return { offerte: [], trovati: 0, cercati: items.length };
-        })
-      : Promise.resolve({ offerte: [], trovati: 0, cercati: 0 });
+     Sta invece su /product/amazon, che l'app chiama quando l'utente apre un
+     prodotto: un credito per prodotto guardato davvero, e la cache fa si' che
+     lo stesso prodotto non si paghi due volte. */
 
   // Prima del controllo dei link: via cio' che non puo' essere la spesa di una
   // famiglia. Vale per entrambe le strade, perche' il difetto e' lo stesso —
@@ -542,7 +534,7 @@ async function prezzaLista(
 
   // Il controllo dei link: gratis, e trasforma "il modello dice" in "l'abbiamo
   // aperto". Dieci per volta, con trenta o quaranta pagine da aprire.
-  const [checked, amazon] = await Promise.all([verifyPrices(tenute, 10), amazonPromise]);
+  const checked = await verifyPrices(tenute, 10);
   console.info(`[prezzi] pagine aperte con esito ${checked.verificati}/${checked.totali}`);
 
   /* NESSUN PRODOTTO SENZA UN POSTO DOVE ANDARE
@@ -563,27 +555,7 @@ async function prezzaLista(
   });
   if (ripieghi > 0) console.info(`[prezzi] ${ripieghi} righe salvate con la ricerca di ripiego`);
 
-  if (amazon.cercati > 0) {
-    console.info(
-      `[amazon] ${amazon.offerte.length} offerte su ${amazon.trovati}/${amazon.cercati} prodotti`,
-    );
-  }
-
-  // Le righe Amazon entrano gia' verificate: vengono dall'API ufficiale, non
-  // da un indirizzo dedotto, quindi non c'e' niente da controllare.
-  const righeComplete = [
-    ...conRipiego,
-    ...amazon.offerte.map((o) => ({
-      prodotto: o.prodotto,
-      nome: o.nome,
-      prezzo: o.prezzo,
-      valuta: o.valuta,
-      negozio: o.negozio,
-      link: o.link,
-      immagine: o.immagine,
-      verifica: "verificato" as const,
-    })),
-  ];
+  const righeComplete = conRipiego;
 
   // Le offerte dello stesso prodotto affiancate, la piu' economica in testa.
   // Le alternative fuori scala si tolgono DOPO il raggruppamento, perche' si
@@ -669,10 +641,8 @@ async function prezzaLista(
       // Se e' falso, i prezzi vengono dalla memoria del modello: va detto.
       ricercaEffettuata: hacercato,
       costoStimatoUsd: Number(costo.toFixed(4)),
-      prezziVerificati: checked.verificati + amazon.offerte.length,
-      prezziTotali: checked.totali + amazon.offerte.length,
-      // Quanti prodotti Amazon ha davvero: sul fresco e' quasi sempre zero.
-      prodottiSuAmazon: amazon.trovati,
+      prezziVerificati: checked.verificati,
+      prezziTotali: checked.totali,
       insegneConfrontate: confronto.catene.length,
       prodottiConAlternative: conAlternative,
       prodottiInOfferta: offerte,
@@ -907,6 +877,87 @@ app.post("/ai/plan-full", async (body) => {
     }
   }
   return result;
+});
+
+/* ─────────────────── Amazon, su richiesta dell'utente ─────────────────── */
+
+const AmazonInput = z.object({
+  query: z.string().min(2).max(140),
+  country: z.string().max(40).default("Italia"),
+  limit: z.number().min(1).max(6).default(3),
+});
+
+/**
+ * Prodotti Amazon veri per UN prodotto, quando l'utente lo chiede.
+ *
+ * PERCHE' AL TOCCO E NON SU TUTTA LA LISTA
+ * Si paga un credito per ricerca. Su una lista da diciotto voci sarebbero
+ * diciotto crediti a generazione, e i cento gratuiti finirebbero in cinque
+ * piani — pagando anche i prodotti che nessuno guardera' mai. Al tocco invece
+ * gli stessi cento crediti valgono cento consultazioni, ed e' l'utente a
+ * decidere quali gli interessano.
+ *
+ * La cache e' condivisa fra tutti: due persone che aprono "passata di
+ * pomodoro" in Italia consumano un credito solo. Con un catalogo che cambia
+ * poco di giorno in giorno e' cio' che rende sostenibile l'intera funzione.
+ */
+app.post("/product/amazon", async (body) => {
+  const data = parse(AmazonInput, body);
+  if (!isAmazonSearchConfigured()) {
+    // 503 e non 500: e' uno stato di configurazione previsto, e il client lo
+    // traduce in "non disponibile" invece che in un errore.
+    throw new HttpError(503, "Ricerca Amazon non configurata su questo ambiente");
+  }
+
+  const paese = paeseIso(data.country).toUpperCase();
+  const key = cacheKey("amazon", { q: data.query.toLowerCase().trim(), paese, n: data.limit });
+
+  const local = memoryGet(key);
+  if (local !== undefined) {
+    console.info(`[cache] HIT memoria ${key} — nessun credito consumato`);
+    return local;
+  }
+  if (isDbConfigured()) {
+    try {
+      const hit = await (await cache()).findOne({ _id: key });
+      if (hit) {
+        memorySet(key, hit.value);
+        console.info(`[cache] HIT database ${key} — nessun credito consumato`);
+        return hit.value;
+      }
+    } catch {
+      /* cache irraggiungibile: si prosegue */
+    }
+  }
+
+  const t0 = Date.now();
+  const offerte = await cercaProdottoAmazon(data.query, paese, data.limit);
+  console.info(
+    `[amazon] "${data.query.slice(0, 40)}" — ${offerte.length} offerte in ` +
+      `${((Date.now() - t0) / 1000).toFixed(0)}s, 1 credito`,
+  );
+
+  const risultato = { ok: offerte.length > 0, offerte };
+
+  // Si mette in cache solo un esito positivo: un "niente trovato" oggi puo'
+  // diventare un risultato domani, e il credito e' comunque gia' speso.
+  if (offerte.length > 0) {
+    memorySet(key, risultato);
+    if (isDbConfigured()) {
+      try {
+        await (await cache()).insertOne({
+          _id: key,
+          value: risultato,
+          createdAt: new Date(),
+          // Tre giorni: i prezzi Amazon cambiano spesso, ma non ogni ora.
+          expiresAt: new Date(Date.now() + 3 * 86_400_000),
+        });
+      } catch {
+        /* chiave gia' presente */
+      }
+    }
+  }
+  return risultato;
 });
 
 /* ───────────────────── Prezzo reale del prodotto ───────────────────── */
