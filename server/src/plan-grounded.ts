@@ -451,6 +451,29 @@ export const MenuSchema = z.object({
 
 export type MenuResult = z.infer<typeof MenuSchema>;
 
+/**
+ * La data di oggi, per il prompt.
+ *
+ * Sembra superfluo e non lo è: senza, il modello sa DOVE ma non QUANDO, e
+ * "verdura di stagione" diventa un'ipotesi. Un italiano a settembre deve
+ * trovare zucchine e uva, non asparagi.
+ *
+ * Conta anche l'emisfero, e la data da sola basta a dedurlo: a settembre in
+ * Australia è primavera, e un menù pensato per l'autunno europeo sarebbe
+ * sbagliato di sei mesi. Il modello sa in che emisfero sta un paese; quello
+ * che non può sapere è il giorno.
+ *
+ * Si scrive per esteso e non come numero, perché "8 settembre 2026" non si
+ * presta a essere letto come 9 agosto.
+ */
+function oggiPerEsteso(): string {
+  return new Intl.DateTimeFormat("it-IT", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date());
+}
+
 export function menuPrompt(d: GroundedPlanInput): string {
   const days = d.frequency === "monthly" ? 14 : 7;
 
@@ -466,6 +489,7 @@ export function menuPrompt(d: GroundedPlanInput): string {
   return `Sei il pianificatore alimentare di un'app per la spesa.
 
 ## CONTESTO
+- Oggi è il ${oggiPerEsteso()}
 - Città: ${d.city || "non specificata"}
 - Paese: ${d.country}
 - Persone in casa: ${d.household}
@@ -484,6 +508,11 @@ ingredienti, reparti, consigli. Nessun campo in un'altra lingua.
    Piatti che una famiglia cucinerebbe davvero IN ${d.country.toUpperCase()},
    non traduzioni di piatti stranieri. Varia le proteine lungo la settimana e
    non ripetere lo stesso piatto due volte.
+
+   DI STAGIONE, nell'emisfero giusto. Frutta e verdura devono essere quelle
+   che si trovano in ${d.country} in questo periodo dell'anno: costano meno,
+   sanno di più, e proporre asparagi a settembre in Italia — o una zuppa
+   invernale a settembre in Australia, dove è primavera — si nota subito.
 
 2. LISTA DELLA SPESA — aggregata da tutti i pasti, raggruppata per reparto.
    Quantità arrotondate ai formati d'acquisto reali: "1 confezione da 500 g",
@@ -792,6 +821,7 @@ export async function generateListaSpesa(
   const prompt = `Sei il pianificatore della spesa di un'app alimentare.
 
 ## CONTESTO
+- Oggi è il ${oggiPerEsteso()}
 - Città: ${input.city || "non specificata"}
 - Paese: ${input.country}
 - Persone in casa: ${input.household}
@@ -811,6 +841,10 @@ non "370 g").
 Deve essere una spesa di famiglia vera e completa: carne, pesce, verdura,
 frutta, latticini freschi, uova, e la dispensa che serve a cucinarli. Non una
 lista di conserve.
+
+Frutta e verdura DI STAGIONE in ${input.country} in questo periodo: costano
+meno e sanno di più. Attenzione all'emisfero — a settembre in Australia è
+primavera, non autunno.
 
 Nomi generici e comprensibili, come li si cercherebbe al supermercato:
 "Passata di pomodoro 700 g", non "passata bio artigianale del contadino".
@@ -868,6 +902,7 @@ ${disponibili.map((p) => `- ${p}`).join("\n")}
 Puoi dare per scontati solo sale, pepe, olio, acqua, aceto e spezie comuni.
 
 ## CONTESTO
+- Oggi è il ${oggiPerEsteso()}
 - Paese: ${input.country}${input.city ? ` — ${input.city}` : ""}
 - Persone in casa: ${input.household}
 - Stile alimentare: ${input.style}
