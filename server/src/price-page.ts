@@ -494,3 +494,121 @@ export function groupByProduct(rows: CheckedRow[]): ProductOffers[] {
     };
   });
 }
+
+/* ─────────────── Prezzi che non possono essere veri ─────────────── */
+
+/**
+ * Venditori che non fanno la spesa di tutti i giorni.
+ *
+ * Non è snobismo: i negozi di specialità italiane per l'estero vendono la
+ * stessa passata a cinque volte il prezzo del supermercato. È un prezzo vero
+ * di un prodotto vero, ma in un confronto sulla spesa settimanale non ci sta —
+ * e se vince il confronto lo falsa del tutto.
+ *
+ * L'elenco è cresciuto sulle prove: `Italy Food Shop`, `Cicalia`, `Sicalb` e
+ * simili sono comparsi con l'olio a 11,29 € contro i 6,75 di Carrefour.
+ */
+const VENDITORI_FUORI_CONTESTO = [
+  "gourmet", "delicatessen", "specialit", "export", "italy food", "italian food",
+  "made in italy", "eccellenz", "bottega", "enoteca", "vinicola", "cantina",
+  "farmacia", "parafarmacia", "erboristeria", "integrat",
+  "ingrosso", "wholesale", "grossist", "cash and carry",
+  "wish", "aliexpress", "alibaba", "temu",
+];
+
+/** Parole nel titolo che tradiscono un formato diverso da quello cercato. */
+const TITOLI_FUORI_CONTESTO = [
+  "cartone da", "all'ingrosso", "bancale", "pallet",
+  "integratore", "capsule", "compresse",
+  "per animali", "per cani", "per gatti",
+];
+
+/**
+ * Il tetto per una riga della spesa, nella valuta dell'utente.
+ *
+ * Cento è largo di proposito: un olio buono da un litro o un taglio di carne
+ * possono superare i venticinque euro, e tagliarli sarebbe sbagliato. Serve
+ * solo a fermare l'assurdo — sei uova a 250 €, che era un bancale venduto
+ * all'ingrosso e che il modello aveva riportato come se fosse una confezione.
+ */
+const TETTO_RIGA = 100;
+
+/** Sotto questa cifra non è un prodotto: è un errore di lettura del prezzo. */
+const PAVIMENTO_RIGA = 0.1;
+
+/**
+ * Scarta le righe che non possono essere la spesa di una famiglia.
+ *
+ * Vale per ENTRAMBE le strade — il motore AI e Google Shopping — perché il
+ * difetto è lo stesso: la ricerca trova un prezzo vero di qualcosa che non è
+ * il prodotto della lista. Applicarlo in un posto solo significa correggerlo
+ * una volta sola.
+ */
+export function scartaImplausibili<T extends { nome: string; negozio: string; prezzo: number | null }>(
+  rows: T[],
+): { tenute: T[]; scartate: number } {
+  const tenute = rows.filter((r) => {
+    if (r.prezzo == null) return true; // senza prezzo non c'è niente da giudicare
+
+    if (r.prezzo < PAVIMENTO_RIGA || r.prezzo > TETTO_RIGA) {
+      console.info(`[plausibilita] scartato "${r.nome.slice(0, 50)}": ${r.prezzo} fuori scala`);
+      return false;
+    }
+
+    const venditore = (r.negozio ?? "").toLowerCase();
+    if (VENDITORI_FUORI_CONTESTO.some((v) => venditore.includes(v))) {
+      console.info(`[plausibilita] scartato "${r.nome.slice(0, 40)}": venditore ${r.negozio}`);
+      return false;
+    }
+
+    const titolo = (r.nome ?? "").toLowerCase();
+    if (TITOLI_FUORI_CONTESTO.some((v) => titolo.includes(v))) {
+      console.info(`[plausibilita] scartato "${r.nome.slice(0, 50)}": formato non da spesa`);
+      return false;
+    }
+
+    return true;
+  });
+
+  return { tenute, scartate: rows.length - tenute.length };
+}
+
+/**
+ * Toglie le offerte troppo care rispetto alla più economica dello stesso prodotto.
+ *
+ * Il confronto fra venditori serve a mostrare quanto si risparmia, ma se
+ * un'offerta costa sei volte l'altra non è un'alternativa: è un prodotto
+ * diverso, o un formato diverso, e mostrarla fa sembrare enorme un risparmio
+ * che non esiste. Nella prova, sei uova a 4,80 accanto a sei uova a 250
+ * producevano «risparmi 245,20 €».
+ *
+ * Sei volte è una soglia larga: fra il primo prezzo e il prodotto di marca
+ * ci sta un fattore due o tre, e quello deve passare.
+ */
+export function togliOutlier(gruppi: ProductOffers[]): ProductOffers[] {
+  return gruppi.map((g) => {
+    if (g.offerte.length < 2) return g;
+
+    const minimo = Math.min(...g.offerte.map((o) => o.prezzo));
+    const offerte = g.offerte.filter((o) => {
+      const troppo = o.prezzo > minimo * 6;
+      if (troppo) {
+        console.info(
+          `[plausibilita] tolta alternativa "${o.nome.slice(0, 40)}" da ${o.negozio}: ` +
+            `${o.prezzo} contro ${minimo} del più economico`,
+        );
+      }
+      return !troppo;
+    });
+
+    const sicuri = offerte.filter((o) => o.verifica !== "non-raggiungibile");
+    return {
+      ...g,
+      offerte,
+      differenza:
+        sicuri.length > 1
+          ? Math.round((sicuri[sicuri.length - 1].prezzo - sicuri[0].prezzo) * 100) / 100
+          : null,
+    };
+  });
+}

@@ -504,28 +504,36 @@ export function pricesPrompt(
   stores = 3,
 ): string {
   const where = city ? `${city}, ${country}` : country;
-  return `Trova il PREZZO ATTUALE REALE di questi prodotti nei supermercati online di ${where}.
+  return `Trova il PREZZO ATTUALE REALE di questi prodotti su siti di e-commerce
+che consegnano in ${where}.
 
 PRODOTTI
 ${items.map((n, i) => `${i + 1}. ${n}`).join("\n")}
 
-Cerca ogni prodotto su ${stores} catene diverse — non di più: oltre quel
-numero la risposta diventa lunga da scrivere e l'utente aspetta. Bastano due
-o tre insegne perché il confronto abbia senso.
+Cerca ogni prodotto presso ${stores} venditori diversi — non di più: oltre
+quel numero la risposta diventa lunga da scrivere e l'utente aspetta.
 
-Conta soprattutto una cosa: che il LINK SI APRA e mostri QUEL prodotto.
-Scegli quindi negozi alimentari online le cui pagine si aprono senza login,
-senza registrazione e senza scegliere prima un punto vendita — molte grandi
-catene mostrano i prezzi solo dopo l'accesso, e da quelle non ricavi niente.
-Fra i negozi consultabili preferisci i supermercati generalisti, dove una
-famiglia fa la spesa di tutti i giorni, perché i prezzi siano confrontabili.
-Ma per completare la lista va bene qualunque negozio che venda davvero quel
-prodotto alimentare, compresi i grandi marketplace come Amazon o eBay: hanno
-le pagine aperte a tutti ed è lì che spesso si trova ciò che le catene non
-mostrano. Meglio un prezzo vero su un marketplace che nessun prezzo.
+DEVE ESSERE UN PRODOTTO CHE SI COMPRA ONLINE.
+Servono pagine di e-commerce con il pulsante d'acquisto: Amazon, i supermercati
+con la spesa online, i negozi alimentari che spediscono. NON volantini, NON
+listini di punti vendita fisici, NON pagine informative senza carrello: se da
+quella pagina non si può ordinare, non va bene.
+
+Il LINK deve aprirsi e mostrare QUEL prodotto: è la cosa che conta di più.
+Scegli quindi venditori le cui pagine si aprono senza login, senza
+registrazione e senza scegliere prima un punto vendita — molte catene mostrano
+i prezzi solo dopo l'accesso, e da quelle non ricavi niente.
+Fra i venditori validi preferisci quelli generalisti, dove una famiglia fa la
+spesa di tutti i giorni, perché i prezzi siano confrontabili; ma per completare
+la lista va benissimo qualunque e-commerce che venda davvero quel prodotto
+alimentare — Amazon compreso, che ha le pagine aperte a tutti.
+
+Il prezzo dev'essere quello del formato richiesto. Attenzione alle confezioni
+multiple: se la pagina vende dodici pezzi il prezzo è di dodici pezzi, e va
+scritto nel nome. Non spacciare un cartone per una confezione singola.
 Per ogni prezzo: "prodotto" è la voce qui sopra scritta IDENTICA, "nome" è il
-nome sul sito del negozio, poi prezzo, negozio e link alla pagina.
-Se non trovi un prodotto in una catena, saltalo. Non stimare MAI un prezzo.
+nome sul sito del venditore, poi prezzo, venditore e link alla pagina.
+Se non trovi un prodotto presso un venditore, saltalo. Non stimare MAI un prezzo.
 Il link deve essere una pagina che hai davvero aperto: verranno controllati
 uno per uno.
 

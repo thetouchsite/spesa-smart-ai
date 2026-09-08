@@ -40,7 +40,13 @@ import { hashPassword, issueToken, requireUser, verifyPassword } from "./auth.js
 import { isShoppingConfigured, searchShopping } from "./shopping.js";
 import { budgetExhausted, quotaStatus, recordCost, recordUse, spendStatus } from "./quota.js";
 import { generateMenu, generatePricesParallel, GROUNDED_MODEL, MENU_MODEL } from "./plan-grounded.js";
-import { groupByProduct, pickBestStore, verifyPrices } from "./price-page.js";
+import {
+  groupByProduct,
+  pickBestStore,
+  scartaImplausibili,
+  togliOutlier,
+  verifyPrices,
+} from "./price-page.js";
 import { generatePricesSerpapi } from "./prices-serpapi.js";
 import {
   AiRecipeInput,
@@ -505,13 +511,22 @@ async function prezzaLista(
     console.warn("[prezzi] ricerca fallita, restituisco la lista senza prezzi:", err);
   }
 
+  // Prima del controllo dei link: via cio' che non puo' essere la spesa di una
+  // famiglia. Vale per entrambe le strade, perche' il difetto e' lo stesso —
+  // un prezzo vero di qualcosa che non e' il prodotto della lista. Farlo qui
+  // risparmia anche le richieste HTTP di verifica su righe da buttare.
+  const { tenute, scartate } = scartaImplausibili(prezziGrezzi);
+  if (scartate > 0) console.info(`[prezzi] ${scartate} righe scartate perche' implausibili`);
+
   // Il controllo dei link: gratis, e trasforma "il modello dice" in "l'abbiamo
   // aperto". Dieci per volta, con trenta o quaranta pagine da aprire.
-  const checked = await verifyPrices(prezziGrezzi, 10);
+  const checked = await verifyPrices(tenute, 10);
   console.info(`[prezzi] pagine aperte con esito ${checked.verificati}/${checked.totali}`);
 
   // Le offerte dello stesso prodotto affiancate, la piu' economica in testa.
-  const prodotti = groupByProduct(checked.rows);
+  // Le alternative fuori scala si tolgono DOPO il raggruppamento, perche' si
+  // giudicano rispetto al prezzo piu' basso dello stesso prodotto.
+  const prodotti = togliOutlier(groupByProduct(checked.rows));
   const conAlternative = prodotti.filter((p) => p.offerte.length > 1).length;
 
   const migliori = prodotti.map((p) => ({
