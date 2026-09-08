@@ -675,3 +675,162 @@ export async function generatePricesParallel(
     model: GROUNDED_MODEL,
   };
 }
+
+/* ════════ FLUSSO ALTERNATIVO — prima la spesa, poi il menù ════════ */
+
+/**
+ * Due modi di costruire un piano, e servono a rispondere a una domanda vera.
+ *
+ * Il cliente l'ha posta in riunione: «e se il menù lo facessimo con quello che
+ * è vendibile online?». È una domanda legittima, e la risposta non si dà a
+ * parole — si mostrano le due strade una accanto all'altra.
+ *
+ *   "menu-prima"    (predefinito)
+ *   onboarding → menù → lista della spesa → prezzi → ricette
+ *   Il modello pensa a cosa si cucina, senza sapere niente di cosa si venda
+ *   online. Il menù è quello di una famiglia vera; alcuni prodotti poi non
+ *   avranno un prezzo.
+ *
+ *   "spesa-prima"
+ *   onboarding → lista → prezzi → menù COSTRUITO SUI PRODOTTI TROVATI → ricette
+ *   Ogni ingrediente del menù è comprabile, con prezzo e link. In cambio il
+ *   menù è vincolato a ciò che i negozi pubblicano online — e i prodotti con
+ *   il catalogo migliore sono quelli a lunga conservazione.
+ *
+ * Il secondo costa una chiamata in più e circa dieci secondi, perché il menù
+ * si genera dopo aver visto i prezzi.
+ */
+export type Flusso = "menu-prima" | "spesa-prima";
+
+export function flussoPredefinito(): Flusso {
+  return process.env.FLUSSO === "spesa-prima" ? "spesa-prima" : "menu-prima";
+}
+
+export const ListaSchema = z.object({
+  lista: z.array(
+    z.object({
+      nome: z.string(),
+      quantita: z.union([z.string(), z.number()]).default("").transform(String),
+      reparto: z.string().default(""),
+    }),
+  ),
+});
+
+/**
+ * Solo la lista della spesa, senza menù.
+ *
+ * È il primo passo del flusso "spesa-prima": si parte da cosa una famiglia
+ * comprerebbe, si va a vedere quanto costa e cosa esiste davvero, e solo dopo
+ * si decide cosa cucinare.
+ */
+export async function generateListaSpesa(
+  input: GroundedPlanInput,
+): Promise<PhaseResult<z.infer<typeof ListaSchema>>> {
+  const key = menuKey();
+  if (!key) throw new Error("nessuna chiave Gemini configurata");
+
+  const giorni = input.frequency === "monthly" ? 14 : 7;
+  const prompt = `Sei il pianificatore della spesa di un'app alimentare.
+
+## CONTESTO
+- Città: ${input.city || "non specificata"}
+- Paese: ${input.country}
+- Persone in casa: ${input.household}
+- Budget: ${input.budget} ${input.currency} ${input.frequency === "monthly" ? "al mese" : "a settimana"}
+- Stile alimentare: ${input.style}
+- Allergie e diete: ${input.allergies.length ? input.allergies.join(", ") : "nessuna"}
+- Non gradito: ${input.dislikes || "niente in particolare"}
+
+## LINGUA
+Scrivi ogni parola in lingua "${input.language}".
+
+## COSA DEVI PRODURRE
+La LISTA DELLA SPESA per ${giorni} giorni: fra 14 e 18 voci, raggruppate per
+reparto, con le quantità nei formati d'acquisto reali ("1 confezione da 500 g",
+non "370 g").
+
+Deve essere una spesa di famiglia vera e completa: carne, pesce, verdura,
+frutta, latticini freschi, uova, e la dispensa che serve a cucinarli. Non una
+lista di conserve.
+
+Nomi generici e comprensibili, come li si cercherebbe al supermercato:
+"Passata di pomodoro 700 g", non "passata bio artigianale del contadino".
+
+## FORMATO
+Rispondi SOLO con questo JSON:
+{"lista":[{"nome":"","quantita":"","reparto":""}]}`;
+
+  const r = await callGemini(key, MENU_MODEL, prompt, false, 120_000);
+  return {
+    data: ListaSchema.parse(parseJson(r.text)),
+    seconds: r.seconds,
+    cost: r.cost,
+    model: MENU_MODEL,
+  };
+}
+
+/**
+ * Il menù costruito sui prodotti che si possono davvero comprare.
+ *
+ * È il secondo passo del flusso "spesa-prima". Riceve solo i prodotti che
+ * hanno superato la verifica — quelli con un prezzo e una pagina che si apre —
+ * e ci costruisce sopra i pasti.
+ *
+ * Il vincolo è severo di proposito: è tutto il senso di questo flusso. Se il
+ * modello potesse aggiungere ingredienti, il piano tornerebbe a contenere cose
+ * che l'utente non può comprare, e le due strade diventerebbero la stessa.
+ */
+export async function generateMenuDaProdotti(
+  input: GroundedPlanInput,
+  disponibili: string[],
+): Promise<PhaseResult<MenuResult>> {
+  const key = menuKey();
+  if (!key) throw new Error("nessuna chiave Gemini configurata");
+
+  const giorni = input.frequency === "monthly" ? 14 : 7;
+  const prompt = `Sei il pianificatore alimentare di un'app per la spesa.
+
+## LA REGOLA PRINCIPALE
+Costruisci il menù USANDO SOLO i prodotti qui sotto: sono quelli che l'utente
+può davvero comprare online, con prezzo e link verificati. Non aggiungerne
+altri.
+
+PRODOTTI DISPONIBILI:
+${disponibili.map((p) => `- ${p}`).join("\n")}
+
+Puoi dare per scontati solo sale, pepe, olio, acqua, aceto e spezie comuni.
+
+## CONTESTO
+- Paese: ${input.country}${input.city ? ` — ${input.city}` : ""}
+- Persone in casa: ${input.household}
+- Stile alimentare: ${input.style}
+- Allergie e diete: ${input.allergies.length ? input.allergies.join(", ") : "nessuna"}
+- Non gradito: ${input.dislikes || "niente in particolare"}
+
+## LINGUA — REGOLA ASSOLUTA
+Ogni parola in lingua "${input.language}": giorni, piatti, ingredienti, reparti.
+
+## COSA DEVI PRODURRE
+1. MENÙ — ${giorni} giorni con colazione, pranzo e cena, cucinabili con QUEI
+   prodotti. Piatti che una famiglia farebbe davvero in ${input.country},
+   variando le proteine e senza ripetere lo stesso piatto.
+2. LISTA — riporta i prodotti usati, con le quantità totali servite.
+3. CONSIGLI — 3 o 4 modi concreti per spendere meno.
+
+Se con quei prodotti certi pasti non vengono bene, scegli piatti più semplici:
+è meglio un menù modesto ma comprabile che uno bello e impossibile.
+
+## FORMATO
+Rispondi SOLO con questo JSON:
+{"menu":[{"giorno":"","colazione":"","pranzo":"","cena":""}],
+ "lista":[{"nome":"","quantita":"","reparto":""}],
+ "consigli":[""]}`;
+
+  const r = await callGemini(key, MENU_MODEL, prompt, false, 120_000);
+  const data = MenuSchema.parse(parseJson(r.text));
+  for (const ricetta of data.ricette) {
+    ricetta.passaggi = ricetta.passaggi.filter((p) => p.trim().length > 0);
+    ricetta.ingredienti = ricetta.ingredienti.filter((i) => i.nome.trim().length > 0);
+  }
+  return { data, seconds: r.seconds, cost: r.cost, model: MENU_MODEL };
+}

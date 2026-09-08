@@ -86,6 +86,8 @@ export interface PlanMeta {
   motorePrezzi: string;
   /** Quale strada ha prodotto questi prezzi: cambia quanto valgono. */
   fontePrezzi?: "ai" | "serpapi";
+  /** Quale dei due flussi ha costruito il piano. */
+  flusso?: Flusso;
   secondi: number;
   /** Quanto è durata la sola ricerca prezzi. */
   secondiPrezzi?: number;
@@ -335,6 +337,31 @@ const PRICES_TIMEOUT_MS = 55_000;
  */
 const PRICE_SOURCE = process.env.EXPO_PUBLIC_PRICE_SOURCE;
 
+/**
+ * Quale delle due strade seguire per costruire il piano.
+ *
+ * Si imposta in `mobile/.env` con EXPO_PUBLIC_FLUSSO, e serve a mostrare
+ * entrambe al cliente — la domanda è venuta da lui in riunione: «e se il menù
+ * lo facessimo con quello che è vendibile online?».
+ *
+ *   "menu-prima"   (predefinito)  menù → lista → prezzi → ricette
+ *   Il modello pensa a cosa si cucina, senza sapere niente di cosa si venda
+ *   online. Il menù è quello di una famiglia vera; alcuni prodotti poi non
+ *   avranno un prezzo.
+ *
+ *   "spesa-prima"                 lista → prezzi → menù → ricette
+ *   Ogni ingrediente del menù è comprabile, con prezzo e link. In cambio il
+ *   menù è vincolato a ciò che i negozi pubblicano online — e i cataloghi
+ *   migliori sono quelli dei prodotti a lunga conservazione.
+ *
+ * La seconda costa una chiamata in più e una decina di secondi, perché il
+ * menù si genera solo dopo aver visto i prezzi.
+ */
+const FLUSSO = process.env.EXPO_PUBLIC_FLUSSO === "spesa-prima" ? "spesa-prima" : "menu-prima";
+
+/** Quale strada ha prodotto il piano che si sta guardando. */
+export type Flusso = "menu-prima" | "spesa-prima";
+
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     p,
@@ -374,30 +401,64 @@ export async function fetchPlanFull(
   const currency = profile.currency || defaults.currency;
   const city = profile.city || "";
 
+  /** Il profilo, nella forma che il backend si aspetta. */
+  const richiesta = {
+    city,
+    country,
+    household: profile.household || "2",
+    budget: Number(profile.budget) || 100,
+    currency,
+    frequency: (profile.frequency === "monthly" ? "monthly" : "weekly") as "weekly" | "monthly",
+    style: profile.style || "equilibrato",
+    allergies: profile.allergies ?? [],
+    dislikes: profile.dislikes ?? "",
+    language,
+  };
+
+  return FLUSSO === "spesa-prima"
+    ? spesaPrima(richiesta, currency, city, country, profile)
+    : menuPrima(richiesta, currency, city, country, profile);
+}
+
+/** I campi comuni alle due strade: il profilo mandato al backend. */
+type Richiesta = {
+  city: string;
+  country: string;
+  household: string;
+  budget: number;
+  currency: string;
+  frequency: "weekly" | "monthly";
+  style: string;
+  allergies: string[];
+  dislikes: string;
+  language: string;
+};
+
+/**
+ * STRADA 1 — menù, poi prezzi.
+ *
+ * Il modello pensa a cosa si cucina senza sapere cosa si venda online. È la
+ * strada predefinita perché produce il menù di una famiglia vera: nell'ultima
+ * generazione, diciotto voci con carne, pesce, ortofrutta e latticini, zero
+ * conserve. Il prezzo poi si trova per il 60-85% dei prodotti.
+ */
+async function menuPrima(
+  richiesta: Richiesta,
+  currency: string,
+  city: string,
+  country: string,
+  profile: UserProfile,
+): Promise<PlanFullResult> {
   const menu = await withTimeout(
     post<MenuResponse>(
       "/ai/menu",
       {
-        city,
-        country,
-        household: profile.household || "2",
-        budget: Number(profile.budget) || 100,
-        currency,
-        frequency: profile.frequency === "monthly" ? "monthly" : "weekly",
-        style: profile.style || "equilibrato",
-        allergies: profile.allergies ?? [],
-        dislikes: profile.dislikes ?? "",
-        language,
-        // Le ricette NON si generano qui.
-        //
-        // Scriverle tutte e sette raddoppia il tempo del menù — misurato:
-        // 15-28 secondi senza, 36-42 con — e su iOS, che chiude le connessioni
-        // a sessanta, quel raddoppio è la differenza fra un piano che arriva e
-        // uno che fallisce.
-        //
-        // Non si perde niente: la schermata della ricetta la genera quando
-        // l'utente apre il piatto, come faceva il prototipo. E quasi nessuno
-        // apre tutte e sette le cene, quindi si genera anche meno.
+        ...richiesta,
+        // Le ricette NON si generano qui: scriverle tutte e sette raddoppia il
+        // tempo del menù — 15-28 secondi senza, 36-42 con — e su iOS, che
+        // chiude le connessioni a sessanta, quel raddoppio e' la differenza
+        // fra un piano che arriva e uno che fallisce. Le genera la schermata
+        // della ricetta quando l'utente apre il piatto.
         withRecipes: false,
       },
       MENU_TIMEOUT_MS,
@@ -454,6 +515,7 @@ export async function fetchPlanFull(
       motoreMenu: menu.meta.motoreMenu,
       motorePrezzi: prices?.meta.motorePrezzi ?? "nessuno",
       fontePrezzi: prices?.meta.fontePrezzi,
+      flusso: "menu-prima",
       secondi: menu.meta.secondiMenu + (prices?.meta.secondiPrezzi ?? 0),
       secondiPrezzi: prices?.meta.secondiPrezzi ?? 0,
       ricerche: prices?.meta.ricerche ?? 0,
@@ -551,6 +613,147 @@ export function pricingFromOffers(
       region: 0,
       global: 0,
       missing: items.length - conPrezzo.length,
+    },
+  };
+}
+
+
+/**
+ * STRADA 2 — prezzi, poi menù.
+ *
+ * È la strada che il cliente ha chiesto in riunione: «e se il menù lo
+ * facessimo con quello che è vendibile online?». Tre passi invece di due.
+ *
+ *   1. si genera la sola LISTA della spesa per quel profilo
+ *   2. si cercano i PREZZI, e si verifica quali pagine esistono davvero
+ *   3. si costruisce il MENÙ usando SOLO i prodotti che hanno superato la
+ *      verifica
+ *
+ * Il risultato è un piano dove ogni ingrediente è comprabile con prezzo e
+ * link — nessuna riga senza sbocco. Il prezzo da pagare è il menù: vincolato a
+ * ciò che i negozi pubblicano online, e i cataloghi migliori sono quelli dei
+ * prodotti a lunga conservazione.
+ *
+ * Costa una chiamata in più e una decina di secondi. Serve a mostrare le due
+ * strade una accanto all'altra e far decidere il cliente con i risultati
+ * davanti invece che a parole.
+ */
+async function spesaPrima(
+  richiesta: Richiesta,
+  currency: string,
+  city: string,
+  country: string,
+  profile: UserProfile,
+): Promise<PlanFullResult> {
+  // 1 — la sola lista, senza menù.
+  const lista = await withTimeout(
+    post<{ lista: MenuResponse["lista"]; meta: MenuResponse["meta"] }>(
+      "/ai/lista",
+      richiesta,
+      MENU_TIMEOUT_MS,
+    ),
+    MENU_TIMEOUT_MS,
+  );
+
+  if (!lista?.lista?.length) throw new Error("il motore ha risposto senza lista");
+
+  const items = lista.lista.map((v) => `${v.nome} ${v.quantita}`.trim()).slice(0, 18);
+
+  // 2 — i prezzi, con la verifica delle pagine.
+  let prices: PricesResponse | null = null;
+  try {
+    prices = await withTimeout(
+      post<PricesResponse>(
+        "/ai/prices",
+        { items, city, country, currency, ...(PRICE_SOURCE ? { priceSource: PRICE_SOURCE } : {}) },
+        PRICES_TIMEOUT_MS,
+      ),
+      PRICES_TIMEOUT_MS,
+    );
+  } catch (err) {
+    console.info("[prezzi] non disponibili:", (err as Error).message);
+  }
+
+  /**
+   * I prodotti su cui costruire il menù: solo quelli con una pagina che si
+   * apre. È il punto di tutta questa strada — se passassero anche i non
+   * verificati, il menù tornerebbe a contenere cose non comprabili e le due
+   * strade diventerebbero la stessa.
+   */
+  const comprabili = (prices?.prodotti ?? [])
+    .filter((p) => p.offerte.some((o) => o.verifica === "verificato" || o.verifica === "pagina-ok"))
+    .map((p) => p.prodotto);
+
+  // Senza prodotti verificati non c'è niente su cui costruire: si ricade sulla
+  // strada normale, che almeno un menù lo produce.
+  if (comprabili.length < 4) {
+    console.info(
+      `[flusso] solo ${comprabili.length} prodotti comprabili: torno a "menù prima"`,
+    );
+    return menuPrima(richiesta, currency, city, country, profile);
+  }
+
+  // 3 — il menù, costruito su quei prodotti.
+  const menu = await withTimeout(
+    post<MenuResponse>(
+      "/ai/menu-da-prodotti",
+      { ...richiesta, disponibili: comprabili },
+      MENU_TIMEOUT_MS,
+    ),
+    MENU_TIMEOUT_MS,
+  );
+
+  if (!menu?.menu?.length) throw new Error("il motore ha risposto senza menù");
+
+  const budget = Number(profile.budget) || 0;
+
+  const response: ServerResponse = {
+    ...menu,
+    prezzi: prices?.prezzi ?? [],
+    prodotti: prices?.prodotti ?? [],
+    catene: prices?.catene ?? [],
+    vincitore: prices?.vincitore ?? null,
+    risparmioVsPiuCara: prices?.risparmioVsPiuCara ?? null,
+    totali: {
+      spesaAlMiglioPrezzo: prices?.totali.spesaAlMiglioPrezzo ?? 0,
+      budget,
+      valuta: currency,
+      prodottiSenzaPrezzo: prices?.totali.prodottiSenzaPrezzo ?? 0,
+      vociInLista: menu.lista.length,
+    },
+    meta: {
+      motoreMenu: menu.meta.motoreMenu,
+      motorePrezzi: prices?.meta.motorePrezzi ?? "nessuno",
+      fontePrezzi: prices?.meta.fontePrezzi,
+      flusso: "spesa-prima",
+      secondi:
+        lista.meta.secondiMenu + (prices?.meta.secondiPrezzi ?? 0) + menu.meta.secondiMenu,
+      secondiPrezzi: prices?.meta.secondiPrezzi ?? 0,
+      ricerche: prices?.meta.ricerche ?? 0,
+      ricercaEffettuata: prices?.meta.ricercaEffettuata ?? false,
+      costoStimatoUsd:
+        lista.meta.costoStimatoUsd +
+        (prices?.meta.costoStimatoUsd ?? 0) +
+        menu.meta.costoStimatoUsd,
+      prezziVerificati: prices?.meta.prezziVerificati ?? 0,
+      prezziTotali: prices?.meta.prezziTotali ?? 0,
+      insegneConfrontate: prices?.meta.insegneConfrontate ?? 0,
+      prodottiConAlternative: prices?.meta.prodottiConAlternative ?? 0,
+      prodottiInOfferta: prices?.meta.prodottiInOfferta ?? 0,
+      generatoIl: menu.meta.generatoIl,
+    },
+  };
+
+  return {
+    plan: toPlan(response),
+    extra: {
+      ricette: response.ricette ?? [],
+      prodotti: response.prodotti,
+      catene: response.catene,
+      vincitore: response.vincitore,
+      risparmioVsPiuCara: response.risparmioVsPiuCara,
+      totali: response.totali,
+      meta: response.meta,
     },
   };
 }

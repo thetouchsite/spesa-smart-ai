@@ -23,6 +23,8 @@
  *   POST /ai/recipe-web      ricerca web + estrazione strutturata
  *   POST /ai/chef            rifinitura "da chef" (non tocca gli ingredienti)
  *   POST /ai/plan            piano alimentare completo
+ *   POST /ai/lista           solo la lista della spesa (flusso "spesa-prima")
+ *   POST /ai/menu-da-prodotti menu' costruito sui soli prodotti comprabili
  *   POST /product/amazon     prodotti Amazon veri per UNA voce, al tocco
  *   POST /ai/plan-full       piano + ricette + confronto supermercati + prezzi
  *                            veri, in UNA chiamata con ricerca Google
@@ -40,7 +42,15 @@ import { cache, isDbConfigured, plans, users } from "./db.js";
 import { hashPassword, issueToken, requireUser, verifyPassword } from "./auth.js";
 import { isShoppingConfigured, searchShopping } from "./shopping.js";
 import { budgetExhausted, quotaStatus, recordCost, recordUse, spendStatus } from "./quota.js";
-import { generateMenu, generatePricesParallel, GROUNDED_MODEL, MENU_MODEL } from "./plan-grounded.js";
+import {
+  flussoPredefinito,
+  generateListaSpesa,
+  generateMenu,
+  generateMenuDaProdotti,
+  generatePricesParallel,
+  GROUNDED_MODEL,
+  MENU_MODEL,
+} from "./plan-grounded.js";
 import {
   groupByProduct,
   migliorePrezzoVerificato,
@@ -199,6 +209,8 @@ app.get("/health", async () => ({
   // Il motore vero dell'app: il modello con ricerca Google.
   menuModel: MENU_MODEL,
   groundedModel: GROUNDED_MODEL,
+  // Quale delle due strade e' attiva: si cambia con FLUSSO nell'ambiente.
+  flusso: flussoPredefinito(),
   // Dichiara la verità: se manca una chiave lo deve sapere il monitoraggio,
   // non l'utente che riceve un errore.
   aiConfigured: isConfigured(),
@@ -736,6 +748,100 @@ app.post("/ai/menu", async (body) => {
       /* gia' presente */
     }
   }
+  return result;
+});
+
+/**
+ * FLUSSO ALTERNATIVO, primo passo: la sola lista della spesa.
+ *
+ * Serve alla strada "spesa-prima", quella che il cliente ha chiesto in
+ * riunione: prima si guarda cosa si puo' comprare, poi si decide cosa
+ * cucinare. Qui si produce solo la lista, senza menu'.
+ */
+app.post("/ai/lista", async (body) => {
+  const data = parse(GroundedInput, body);
+  if (!isConfigured()) throw new HttpError(503, "Servizio AI non configurato su questo ambiente");
+
+  const key = cacheKey("lista", data);
+  const local = memoryGet(key);
+  if (local !== undefined) {
+    console.info(`[cache] HIT memoria ${key}`);
+    return local;
+  }
+
+  recordUse("gemini");
+  const fase = await generateListaSpesa(data);
+  recordCost(fase.cost);
+  console.info(
+    `[lista] ${fase.model}: ${fase.seconds.toFixed(0)}s, $${fase.cost.toFixed(4)}, ` +
+      `${fase.data.lista.length} voci`,
+  );
+
+  annota("lista", { richiesta: data, lista: fase.data.lista, secondi: Math.round(fase.seconds) });
+
+  const result = {
+    ...fase.data,
+    meta: {
+      motoreMenu: fase.model,
+      secondiMenu: Math.round(fase.seconds),
+      costoStimatoUsd: Number(fase.cost.toFixed(4)),
+      generatoIl: new Date().toISOString(),
+    },
+  };
+  memorySet(key, result);
+  return result;
+});
+
+const MenuDaProdottiInput = GroundedInput.extend({
+  /** I prodotti che hanno superato la verifica: il menù nasce solo da questi. */
+  disponibili: z.array(z.string().max(160)).min(1).max(40),
+});
+
+/**
+ * FLUSSO ALTERNATIVO, terzo passo: il menu' costruito sui prodotti comprabili.
+ *
+ * Riceve solo cio' che ha superato la verifica — prezzo trovato e pagina che
+ * si apre — e ci costruisce sopra i pasti. Il vincolo e' severo di proposito:
+ * e' tutto il senso di questa strada. Se il modello potesse aggiungere
+ * ingredienti, il piano tornerebbe a contenere cose non comprabili e le due
+ * strade diventerebbero la stessa.
+ */
+app.post("/ai/menu-da-prodotti", async (body) => {
+  const data = parse(MenuDaProdottiInput, body);
+  if (!isConfigured()) throw new HttpError(503, "Servizio AI non configurato su questo ambiente");
+
+  const key = cacheKey("menu-da-prodotti", data);
+  const local = memoryGet(key);
+  if (local !== undefined) {
+    console.info(`[cache] HIT memoria ${key}`);
+    return local;
+  }
+
+  recordUse("gemini");
+  const fase = await generateMenuDaProdotti(data, data.disponibili);
+  recordCost(fase.cost);
+  console.info(
+    `[menu-da-prodotti] ${fase.model}: ${fase.seconds.toFixed(0)}s, $${fase.cost.toFixed(4)}, ` +
+      `${fase.data.menu.length} giorni da ${data.disponibili.length} prodotti comprabili`,
+  );
+
+  annota("menu-da-prodotti", {
+    richiesta: { ...data, disponibili: undefined },
+    disponibili: data.disponibili,
+    giorni: fase.data.menu.length,
+    secondi: Math.round(fase.seconds),
+  });
+
+  const result = {
+    ...fase.data,
+    meta: {
+      motoreMenu: fase.model,
+      secondiMenu: Math.round(fase.seconds),
+      costoStimatoUsd: Number(fase.cost.toFixed(4)),
+      generatoIl: new Date().toISOString(),
+    },
+  };
+  memorySet(key, result);
   return result;
 });
 
