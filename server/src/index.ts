@@ -43,6 +43,7 @@ import { budgetExhausted, quotaStatus, recordCost, recordUse, spendStatus } from
 import { generateMenu, generatePricesParallel, GROUNDED_MODEL, MENU_MODEL } from "./plan-grounded.js";
 import {
   groupByProduct,
+  migliorePrezzoVerificato,
   pickBestStore,
   scartaImplausibili,
   togliOutlier,
