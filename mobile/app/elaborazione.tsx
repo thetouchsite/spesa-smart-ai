@@ -18,6 +18,7 @@ import { useRouter } from "expo-router";
 import { Body, Button, Loading, Screen, Subtitle, Title } from "../src/components/ui";
 import { useSession } from "../src/lib/state/session";
 import { fetchPlan, type ContentSource } from "../src/lib/content";
+import { ProdottiInsufficientiError } from "../src/lib/plan-full";
 import { deviceDefaults } from "../src/lib/format";
 import { useI18n } from "../src/lib/i18n";
 import { colors, font, spacing } from "../src/theme";
@@ -40,6 +41,8 @@ export default function ElaborazioneScreen() {
   const { language } = useI18n();
   const [beat, setBeat] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  /** Il caso in cui la generazione e' riuscita ma i prodotti non bastano. */
+  const [pochi, setPochi] = useState<ProdottiInsufficientiError | null>(null);
 
   // In sviluppo React monta due volte: senza questa guardia il piano verrebbe
   // generato due volte e il secondo risultato sovrascriverebbe il primo.
@@ -56,8 +59,9 @@ export default function ElaborazioneScreen() {
     void build();
   }, []);
 
-  async function build() {
+  async function build(forzaFlusso?: "menu-prima") {
     setError(null);
+    setPochi(null);
     setStatus("generating");
     try {
       // Il motore pretende questi due campi: se l'onboarding è stato saltato
@@ -75,6 +79,7 @@ export default function ElaborazioneScreen() {
         { ...profile, household, country },
         variantSeed,
         language,
+        forzaFlusso,
       );
       if (__DEV__) {
         console.info(`[elaborazione] piano generato da: ${source}`);
@@ -94,10 +99,58 @@ export default function ElaborazioneScreen() {
       setStatus("ready");
       router.replace("/risultati");
     } catch (err) {
+      // Pochi prodotti comprabili NON e' un guasto: la generazione e' andata
+      // bene, in quella citta' i negozi online pubblicano poco. Merita un
+      // messaggio che dica cosa e' successo, non "riprova" — riprovare non
+      // cambierebbe niente.
+      if (err instanceof ProdottiInsufficientiError) {
+        console.info("[elaborazione]", err.message);
+        setStatus("error", err.message);
+        setPochi(err);
+        return;
+      }
       console.warn("[elaborazione] generazione fallita:", err);
       setStatus("error", String(err));
       setError("Non siamo riusciti a creare il piano. Riprova.");
     }
+  }
+
+  if (pochi) {
+    return (
+      <Screen>
+        <View style={styles.center}>
+          <Title>{ui("Qui non riusciamo a farti la spesa")}</Title>
+          {/* Frasi intere, non pezzi cuciti: `uiText` cerca la stringa completa
+              in un dizionario, e un frammento come "A" non si traduce in
+              nessuna lingua. I numeri restano fuori, che sono uguali ovunque. */}
+          <Subtitle>
+            {ui("Qui i negozi online pubblicano troppo poco per costruire una settimana di pasti. Preferiamo dirtelo, invece di proporti un piano che non potresti comprare.")}
+          </Subtitle>
+          <Body style={styles.conto}>
+            {pochi.citta} · {pochi.trovati}/{pochi.cercati}{" "}
+            {ui("prodotti con una pagina che si apre")}
+          </Body>
+          {pochi.comprabili.length > 0 && (
+            <Body style={styles.trovati}>{pochi.comprabili.join(" · ")}</Body>
+          )}
+          <Button
+            label={ui("Fai il piano lo stesso")}
+            onPress={() => {
+              started.current = false;
+              // Di proposito la strada normale: il menù nasce prima dei prezzi,
+              // quindi conterrà anche cose che online non si trovano. È una
+              // scelta dell'utente, e ora è dichiarata.
+              void build("menu-prima");
+            }}
+          />
+          <Button
+            label={ui("Cambia città")}
+            variant="ghost"
+            onPress={() => router.replace("/onboarding/citta")}
+          />
+        </View>
+      </Screen>
+    );
   }
 
   if (error) {
@@ -143,5 +196,18 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxxl,
   },
   title: { textAlign: "center" },
+  /** I numeri del caso: si leggono a colpo d'occhio, quindi stanno soli. */
+  conto: {
+    color: colors.foreground,
+    fontSize: font.size.md,
+    textAlign: "center",
+  },
+  /** L'elenco dei pochi trovati: e' la prova di cio' che diciamo, quindi si
+   *  legge, ma non deve competere con il messaggio principale. */
+  trovati: {
+    color: colors.mutedForeground,
+    fontSize: font.size.sm,
+    textAlign: "center",
+  },
   beat: { color: colors.mutedForeground, fontSize: font.size.md, textAlign: "center" },
 });

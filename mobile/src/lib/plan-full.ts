@@ -383,6 +383,65 @@ const PRICE_SOURCE = process.env.EXPO_PUBLIC_PRICE_SOURCE;
  */
 const FLUSSO = process.env.EXPO_PUBLIC_FLUSSO === "spesa-prima" ? "spesa-prima" : "menu-prima";
 
+/**
+ * Quanti prodotti servono per costruire una settimana di pasti.
+ *
+ * DIECI, e non e' un numero tondo scelto a caso: e' quello sotto il quale
+ * sette giorni di colazione, pranzo e cena diventano la stessa cosa ripetuta.
+ *
+ * Serve perche' la regola di questa strada e' severa — passano solo i prodotti
+ * la cui pagina esiste davvero — e ogni tanto una generazione va male. Misurato
+ * su diciassette generazioni vere:
+ *
+ *     Napoli, Londra, Lisbona    94-100% dei prodotti sopravvive
+ *     Atene                      62-94%
+ *     Tokyo                      75-86%
+ *
+ * quindi quasi sempre si passa. Ma tre generazioni su diciassette sono finite
+ * sotto — 8%, 29%, 50% — perche' il modello era andato a pescare negozi che
+ * non esistono. In quei casi un menu' si potrebbe comunque scrivere, ma sarebbe
+ * una presa in giro: meglio dirlo, e' l'unica risposta che non fa perdere tempo
+ * a chi legge.
+ */
+const MINIMO_PRODOTTI = Number(process.env.EXPO_PUBLIC_MIN_PRODOTTI) || 10;
+
+/**
+ * Non ci sono abbastanza prodotti comprabili per costruire un piano.
+ *
+ * NON e' un guasto, ed e' importante che non venga trattato come tale: la
+ * generazione e' andata benissimo, semplicemente in quella citta' i negozi
+ * online non pubblicano abbastanza di quella lista. Porta con se' i numeri
+ * perche' la schermata possa dirlo con precisione invece di un generico
+ * "qualcosa e' andato storto" — che sarebbe falso.
+ */
+export class ProdottiInsufficientiError extends Error {
+  readonly trovati: number;
+  readonly cercati: number;
+  readonly minimo: number;
+  readonly citta: string;
+  /** I pochi che ce l'hanno fatta: la schermata li mostra, sono la prova. */
+  readonly comprabili: string[];
+
+  constructor(opts: {
+    trovati: number;
+    cercati: number;
+    minimo: number;
+    citta: string;
+    comprabili: string[];
+  }) {
+    super(
+      `solo ${opts.trovati} prodotti su ${opts.cercati} hanno una pagina che si apre ` +
+        `(ne servono ${opts.minimo})`,
+    );
+    this.name = "ProdottiInsufficientiError";
+    this.trovati = opts.trovati;
+    this.cercati = opts.cercati;
+    this.minimo = opts.minimo;
+    this.citta = opts.citta;
+    this.comprabili = opts.comprabili;
+  }
+}
+
 /** Quale strada ha prodotto il piano che si sta guardando. */
 export type Flusso = "menu-prima" | "spesa-prima";
 
@@ -419,6 +478,15 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 export async function fetchPlanFull(
   profile: UserProfile,
   language: string,
+  /**
+   * Forza una strada, ignorando l'impostazione.
+   *
+   * Serve a una cosa sola, ma importante: quando "spesa prima" si ferma perche'
+   * i prodotti comprabili sono troppo pochi, l'utente puo' chiedere il piano
+   * lo stesso — sapendo che sara' costruito senza quella garanzia. La scelta
+   * resta sua e dichiarata, che e' l'opposto del ripiego silenzioso di prima.
+   */
+  forzaFlusso?: "menu-prima" | "spesa-prima",
 ): Promise<PlanFullResult> {
   const defaults = deviceDefaults();
   const country = profile.country || defaults.country;
@@ -439,7 +507,8 @@ export async function fetchPlanFull(
     language,
   };
 
-  return FLUSSO === "spesa-prima"
+  const strada = forzaFlusso ?? FLUSSO;
+  return strada === "spesa-prima"
     ? spesaPrima(richiesta, currency, city, country, profile)
     : menuPrima(richiesta, currency, city, country, profile);
 }
@@ -698,22 +767,61 @@ async function spesaPrima(
   }
 
   /**
-   * I prodotti su cui costruire il menù: solo quelli con una pagina che si
-   * apre. È il punto di tutta questa strada — se passassero anche i non
-   * verificati, il menù tornerebbe a contenere cose non comprabili e le due
+   * I prodotti su cui costruire il menù: quelli la cui pagina ESISTE.
+   *
+   * È il punto di tutta questa strada — se passassero anche i prodotti con un
+   * link rotto, il menù tornerebbe a contenere cose non comprabili e le due
    * strade diventerebbero la stessa.
+   *
+   * `bloccato` VA INCLUSO, e per un pezzo non lo era. Significa che il sito ha
+   * risposto 403 al nostro server: ha capito che siamo un programma. La pagina
+   * c'è, e dal telefono di una persona si apre — è la differenza fra «non
+   * esiste» e «non parlo con i robot», e solo la prima è un errore del modello.
+   *
+   * Escluderlo non era un dettaglio: ad Atene i siti greci rispondono 403 quasi
+   * sempre, e su due generazioni vere i link erano 19 su 19 e 20 su 20 tutti
+   * VERI, zero inventati. Con il filtro sbagliato ne sopravvivevano 3 e 6, e
+   * l'app concludeva che ad Atene non si può fare la spesa. Misurato su
+   * diciassette generazioni, la differenza è questa:
+   *
+   *     Atene    12-33%  →  62-94%
+   *     Tokyo    56-64%  →  75-86%
+   *
+   * L'unica cosa che si perde è la conferma del prezzo, e infatti resta quello
+   * che il modello ha letto cercando: la riga lo dichiara non confermato.
    */
   const comprabili = (prices?.prodotti ?? [])
-    .filter((p) => p.offerte.some((o) => o.verifica === "verificato" || o.verifica === "pagina-ok"))
+    .filter((p) =>
+      p.offerte.some(
+        (o) =>
+          o.verifica === "verificato" ||
+          o.verifica === "pagina-ok" ||
+          o.verifica === "bloccato",
+      ),
+    )
     .map((p) => p.prodotto);
 
-  // Senza prodotti verificati non c'è niente su cui costruire: si ricade sulla
-  // strada normale, che almeno un menù lo produce.
-  if (comprabili.length < 4) {
+  /* QUANDO NON BASTANO, LO SI DICE.
+     Qui prima si ripiegava in silenzio sulla strada "menu' prima", che un menu'
+     lo produce sempre — ma costruito su prodotti di cui NON sappiamo se si
+     comprano. L'utente vedeva un piano normale e non aveva modo di sapere che
+     meta' della sua spesa era senza sbocco.
+
+     E' esattamente cio' che questa strada esiste per evitare, quindi il
+     silenzio era il difetto peggiore di tutti: rendeva le due strade
+     indistinguibili proprio nei casi in cui differiscono. */
+  if (comprabili.length < MINIMO_PRODOTTI) {
     console.info(
-      `[flusso] solo ${comprabili.length} prodotti comprabili: torno a "menù prima"`,
+      `[flusso] ${comprabili.length}/${items.length} prodotti con pagina aperta: ` +
+        `sotto il minimo di ${MINIMO_PRODOTTI}, lo dichiaro invece di inventare`,
     );
-    return menuPrima(richiesta, currency, city, country, profile);
+    throw new ProdottiInsufficientiError({
+      trovati: comprabili.length,
+      cercati: items.length,
+      minimo: MINIMO_PRODOTTI,
+      citta: city || country,
+      comprabili,
+    });
   }
 
   // 3 — il menù, costruito su quei prodotti.

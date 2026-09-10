@@ -31,7 +31,7 @@ import { buildDeterministicRecipe } from "./recipes/deterministic-recipe";
 import type { Recipe } from "./recipes/types";
 import type { Plan } from "./models/plan-schema";
 import type { UserProfile } from "./models";
-import { fetchPlanFull, type PlanExtra } from "./plan-full";
+import { fetchPlanFull, ProdottiInsufficientiError, type PlanExtra } from "./plan-full";
 import { deviceDefaults } from "./format";
 
 /** Oltre questo tempo si smette di aspettare e si usa il locale. */
@@ -139,6 +139,8 @@ export async function fetchPlan(
   profile: UserProfile,
   seed = 1,
   language = "en",
+  /** Vedi `fetchPlanFull`: serve a chiedere il piano lo stesso, di proposito. */
+  forzaFlusso?: "menu-prima" | "spesa-prima",
 ): Promise<PlanResult> {
   const local = () => ({ plan: generateMealPlan({ profile, seed }).plan, source: "locale" as const });
 
@@ -151,9 +153,17 @@ export async function fetchPlan(
   // piu' degli altri, e li vale: e' la cosa che distingue l'app da un
   // generatore di menu'.
   try {
-    const { plan, extra } = await fetchPlanFull(profile, language);
+    const { plan, extra } = await fetchPlanFull(profile, language, forzaFlusso);
     return { plan, source: "ai", extra };
   } catch (err) {
+    /* QUESTO ERRORE NON SI RIPIEGA.
+       Tutti gli altri sì: se il backend non risponde, un piano stimato dal
+       listino interno è meglio di una schermata vuota. Ma "in questa città non
+       ci sono abbastanza prodotti comprabili" è una RISPOSTA, non un guasto —
+       e ripiegando la si trasformerebbe nel suo contrario: un piano dall'aria
+       normale, costruito su prodotti che l'utente non può comprare. Sarebbe la
+       bugia peggiore che l'app possa dire, perché non si vede. */
+    if (err instanceof ProdottiInsufficientiError) throw err;
     console.info("[contenuti] motore con ricerca non disponibile:", (err as Error).message);
   }
 

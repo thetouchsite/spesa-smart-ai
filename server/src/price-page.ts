@@ -292,10 +292,12 @@ export async function verifyPrices(
 
   return {
     rows: out,
-    // "Verificati" conta solo le pagine che si sono davvero aperte: quelle
-    // bloccate hanno un link buono ma un prezzo che nessuno ha controllato, e
-    // farle passare per confermate sarebbe una bugia comoda.
-    verificati: out.filter((r) => r.verifica === "verificato" || r.verifica === "pagina-ok").length,
+    // Quante righe hanno una pagina che ESISTE — vedi `paginaEsiste`, che
+    // spiega perche' un 403 conta. Il nome e' rimasto "verificati" perche' lo
+    // legge l'app, ma la cosa che misura e' "l'utente ha dove comprare": la
+    // conferma del prezzo la porta solo lo stato `verificato`, ed e' contata a
+    // parte.
+    verificati: out.filter((r) => paginaEsiste(r.verifica)).length,
     totali: out.length,
   };
 }
@@ -339,6 +341,31 @@ export interface StoreComparison {
  * regge la verifica: un totale calcolato su tre prezzi su dodici sembrerebbe
  * bassissimo e vincerebbe per il motivo sbagliato.
  */
+/**
+ * La pagina di questa riga esiste?
+ *
+ * TRE STATI SU QUATTRO DICONO DI SI', e per un pezzo ne contavamo due.
+ *
+ *   verificato   la pagina si apre e ci dichiara il prezzo
+ *   pagina-ok    la pagina si apre, il prezzo non e' leggibile dal codice
+ *   bloccato     403: la pagina C'E', il sito non parla con i programmi
+ *
+ * Escludere `bloccato` sembrava prudenza ed era un errore di misura. Sull'asse
+ * del PREZZO non c'e' nessuna differenza fra `bloccato` e `pagina-ok`: in
+ * entrambi i casi il numero e' quello che il modello ha letto cercando, non
+ * uno che abbiamo riletto noi. L'unica differenza e' se il nostro server e'
+ * riuscito ad aprire la pagina — che riguarda noi, non chi compra.
+ *
+ * QUANTO COSTAVA. Ad Atene i siti greci rispondono 403 quasi sempre, e la
+ * spesa settimanale per tre persone veniva mostrata a 12,30 EUR invece di
+ * 63,81. A Zurigo, dove Coop aveva risposto 403 a nove prodotti su nove, il
+ * totale era 0,00 CHF. Numeri sbagliati di cinque volte, o vuoti, con l'aria
+ * di essere esatti — che e' peggio di un numero dichiarato incerto.
+ */
+function paginaEsiste(stato: VerifyStatus): boolean {
+  return stato === "verificato" || stato === "pagina-ok" || stato === "bloccato";
+}
+
 export function pickBestStore(rows: CheckedRow[], minVerified = 5): StoreComparison {
   const byStore = new Map<string, CheckedRow[]>();
   for (const r of rows) {
@@ -353,7 +380,7 @@ export function pickBestStore(rows: CheckedRow[], minVerified = 5): StoreCompari
       // Solo i prezzi letti davvero: un totale costruito su numeri non
       // confermati non puo' vincere un confronto di convenienza.
       const good = list.filter(
-        (r) => (r.verifica === "verificato" || r.verifica === "pagina-ok") && r.prezzo != null,
+        (r) => paginaEsiste(r.verifica) && r.prezzo != null,
       );
       return {
         negozio,
@@ -662,17 +689,23 @@ export function togliOutlier(gruppi: ProductOffers[]): ProductOffers[] {
 /**
  * Il prezzo più basso di cui abbiamo aperto la pagina, prodotto per prodotto.
  *
- * Serve al TOTALE, ed è una selezione diversa da quella che vede l'utente.
- * L'elenco mostra le offerte dal prezzo più basso, com'è giusto: chiamare
- * "più conveniente" una cosa che non lo è sarebbe falso. Ma un totale
- * costruito su prezzi che nessuno ha potuto controllare sarebbe altrettanto
- * falso, in modo più subdolo — un numero preciso e sbagliato.
+ * Serve al TOTALE, ed è una selezione diversa da quella che vede l'utente:
+ * l'elenco mostra tutte le offerte dal prezzo più basso, il totale somma solo
+ * quelle il cui negozio ha davvero quella pagina.
  *
- * Quindi le due cose si separano: si mostra il più economico, si somma il più
- * economico VERIFICATO, e si dichiara quante voci sono rimaste fuori.
+ * IL CONFINE È SULLA PAGINA, NON SUL PREZZO, e per un pezzo è stato messo nel
+ * posto sbagliato. Escludere le pagine bloccate sembrava prudenza — «non
+ * sommare numeri che nessuno ha controllato» — ma le pagine `pagina-ok`
+ * passavano già, e il loro prezzo è altrettanto non controllato. Il risultato
+ * era il numero preciso e sbagliato che si voleva evitare: 12,30 € invece di
+ * 63,81 per la spesa settimanale di tre persone ad Atene, e 0,00 CHF a Zurigo.
+ *
+ * Fuori dal totale restano solo le righe il cui link non si apre: quelle sì,
+ * sommarle significherebbe contare un negozio che non ha quel prodotto. E
+ * quante sono lo si dichiara sempre.
  */
 export function migliorePrezzoVerificato(gruppo: ProductOffers): Offer | null {
   return (
-    gruppo.offerte.find((o) => o.verifica === "verificato" || o.verifica === "pagina-ok") ?? null
+    gruppo.offerte.find((o) => paginaEsiste(o.verifica)) ?? null
   );
 }
