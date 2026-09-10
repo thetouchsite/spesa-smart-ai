@@ -55,6 +55,7 @@
  */
 
 import { z } from "zod";
+import { elencoChiuso, isoDaPaese, linkCostruitiAttivo, rigaInsegne } from "./insegne-online.js";
 
 /** Fase 2: il modello che cerca. È quello che si paga. */
 export const GROUNDED_MODEL = process.env.GEMINI_GROUNDED_MODEL ?? "gemini-3-flash-preview";
@@ -103,7 +104,70 @@ const GROUNDING_PER_CALL = 0.014;
  * piano.
  */
 function menuKey(): string | undefined {
+  if (freeEsaurita()) return process.env.GOOGLE_GENERATIVE_AI_API_KEY ?? process.env.GEMINI_FREE_KEY;
   return process.env.GEMINI_FREE_KEY ?? process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+}
+
+/**
+ * Quando la chiave gratuita ha finito la quota, e fino a quando riprovarci.
+ *
+ * IL FATTO MISURATO: il piano gratuito concede VENTI richieste al giorno per
+ * `gemini-3-flash`, non le cinquemila al mese che si leggono in giro. Dopo la
+ * ventesima risponde «You exceeded your current quota» e la generazione muore
+ * — è così che sono cadute le prove su Tokyo e Londra, in mezzo secondo, dopo
+ * che Napoli e Atene erano andate benissimo.
+ *
+ * L'errore dice anche fra quanto riprovare («Please retry in 8.5s»), ma è il
+ * tempo del limite al minuto, non di quello al giorno: chiedere di nuovo dopo
+ * nove secondi ridà lo stesso errore. Quindi si passa alla chiave a pagamento
+ * e la si tiene per un quarto d'ora, poi si ritenta la gratuita — abbastanza
+ * per non sprecare un viaggio a ogni richiesta, poco abbastanza da tornare
+ * gratis appena la quota si rinnova.
+ *
+ * Il costo del ripiego è qualche millesimo di dollaro: la fase del menù non
+ * usa la ricerca, e nessuno rinuncia al piano per risparmiare mezzo centesimo.
+ */
+let freeEsauritaFino = 0;
+const PAUSA_FREE_MS = 15 * 60_000;
+
+function freeEsaurita(): boolean {
+  return Date.now() < freeEsauritaFino;
+}
+
+/** Riconosce l'esaurimento della quota, che non è un sovraccarico passeggero. */
+function quotaFinita(messaggio: string): boolean {
+  return /exceeded your current quota|RESOURCE_EXHAUSTED|free_tier/i.test(messaggio);
+}
+
+/**
+ * La fase del menù, con il passaggio alla chiave a pagamento se la gratuita
+ * ha finito. Le tre generazioni senza ricerca — menù, lista, menù dai
+ * prodotti — passano tutte di qui, così la regola sta in un posto solo.
+ */
+async function chiamaMenu(
+  modelId: string,
+  prompt: string,
+  timeoutMs: number,
+): Promise<CallResult> {
+  const key = menuKey();
+  if (!key) throw new Error("nessuna chiave Gemini configurata");
+
+  try {
+    return await callGemini(key, modelId, prompt, false, timeoutMs);
+  } catch (err) {
+    const messaggio = String((err as Error)?.message ?? err);
+    const pagamento = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    // Solo se c'è davvero un'altra chiave da provare: ritentare la stessa
+    // sarebbe un secondo errore identico.
+    if (!quotaFinita(messaggio) || !pagamento || pagamento === key) throw err;
+
+    freeEsauritaFino = Date.now() + PAUSA_FREE_MS;
+    console.warn(
+      "[gemini] quota gratuita finita per oggi: passo alla chiave a consumo " +
+        "(qualche millesimo di dollaro) e riprovo la gratuita fra un quarto d'ora",
+    );
+    return callGemini(pagamento, modelId, prompt, false, timeoutMs);
+  }
 }
 
 /** La chiave della fase 2: deve avere la fatturazione attiva per poter cercare. */
@@ -548,10 +612,7 @@ ${d.withRecipes ? ' "ricette":[{"giorno":"","piatto":"","porzioni":0,"ingredient
 
 /** Menù, ricette e lista della spesa. Nessuna ricerca, nessun costo di grounding. */
 export async function generateMenu(input: GroundedPlanInput): Promise<PhaseResult<MenuResult>> {
-  const key = menuKey();
-  if (!key) throw new Error("nessuna chiave Gemini configurata");
-
-  const r = await callGemini(key, MENU_MODEL, menuPrompt(input), false, 120_000);
+  const r = await chiamaMenu(MENU_MODEL, menuPrompt(input), 120_000);
   const data = MenuSchema.parse(parseJson(r.text));
 
   // La normalizzazione puo' lasciare stringhe vuote dove un oggetto non aveva
@@ -582,7 +643,11 @@ export const PricesSchema = z.object({
       prezzo: z.number().nullable(),
       valuta: z.string().default("EUR"),
       negozio: z.string(),
-      link: z.string(),
+      /**
+       * Facoltativo: nella strada `LINK_COSTRUITI` non lo chiediamo, perche'
+       * il modello lo inventa e l'indirizzo lo mettiamo insieme noi.
+       */
+      link: z.string().default(""),
     }),
   ),
 });
@@ -609,6 +674,47 @@ export function pricesPrompt(
   stores = 3,
 ): string {
   const where = city ? `${city}, ${country}` : country;
+  const iso = isoDaPaese(country);
+  /** A capo, come costante: dentro un template annidato l'escape si perde. */
+  const NL = String.fromCharCode(10);
+
+  // La strada in cui i link li costruiamo noi: al modello si chiede meno, e
+  // quel meno lo sa fare. Vedi `linkCostruitiAttivo` per il perche'.
+  if (linkCostruitiAttivo(iso)) {
+    const negozi = elencoChiuso(iso);
+    return `Trova il PREZZO ATTUALE REALE di questi prodotti nei supermercati
+online che consegnano in ${where}.
+
+PRODOTTI
+${items.map((n, i) => `${i + 1}. ${n}`).join(NL)}
+
+NEGOZI — usa SOLO questi, scritti esattamente così:
+${negozi.map((n) => `- ${n}`).join(NL)}
+
+Cerca ogni prodotto presso ${stores} di questi negozi. Se un negozio quel
+prodotto non ce l'ha, salta e passa al successivo: meglio due prezzi veri che
+tre di cui uno inventato.
+
+NON SCRIVERE LINK. Non servono: gli indirizzi li costruiamo noi dal nome del
+negozio. Concentrati sul prezzo, che è la cosa che sai fare e che conta.
+
+Il prezzo dev'essere quello del formato richiesto, letto sul sito del negozio
+oggi. Attenzione alle confezioni multiple: se la pagina vende dodici pezzi il
+prezzo è di dodici pezzi, e va detto nel nome. Non stimare MAI un prezzo: se
+non lo trovi, ometti la riga.
+
+"prodotto" è la voce qui sopra scritta IDENTICA, senza il numero d'elenco.
+"nome" è il nome del prodotto come appare sul sito del negozio.
+
+Rispondi SOLO con JSON:
+{"prezzi":[{"prodotto":"","nome":"","prezzo":0,"valuta":"${currency}","negozio":""}]}`;
+  }
+
+  // Una riga sola con le catene che in quel paese pubblicano il listino.
+  // Vuota se il suggerimento non e' acceso o se il paese non e' censito:
+  // vedi la nota in cima a `insegne-online.ts` per il perche' non e' sempre
+  // attivo.
+  const insegne = rigaInsegne(isoDaPaese(country));
   return `Trova il PREZZO ATTUALE REALE di questi prodotti su siti di e-commerce
 che consegnano in ${where}.
 
@@ -617,6 +723,9 @@ ${items.map((n, i) => `${i + 1}. ${n}`).join("\n")}
 
 Cerca ogni prodotto presso ${stores} venditori diversi — non di più: oltre
 quel numero la risposta diventa lunga da scrivere e l'utente aspetta.
+${insegne ? `${insegne}
+Parti da queste, ma non fermarti lì se altrove il prezzo è migliore.
+` : ""}
 
 AMAZON VA SEMPRE INCLUSO fra i venditori, per ogni prodotto in cui Amazon lo
 vende davvero. Non al posto dei supermercati: IN PIÙ, come confronto. Usa il
@@ -814,9 +923,6 @@ export const ListaSchema = z.object({
 export async function generateListaSpesa(
   input: GroundedPlanInput,
 ): Promise<PhaseResult<z.infer<typeof ListaSchema>>> {
-  const key = menuKey();
-  if (!key) throw new Error("nessuna chiave Gemini configurata");
-
   const giorni = input.frequency === "monthly" ? 14 : 7;
   const prompt = `Sei il pianificatore della spesa di un'app alimentare.
 
@@ -861,7 +967,7 @@ troverebbe mai «Mele rosse», lì sono «maçãs».
 Rispondi SOLO con questo JSON:
 {"lista":[{"nome":"","nomeLocale":"","quantita":"","reparto":""}]}`;
 
-  const r = await callGemini(key, MENU_MODEL, prompt, false, 120_000);
+  const r = await chiamaMenu(MENU_MODEL, prompt, 120_000);
   return {
     data: ListaSchema.parse(parseJson(r.text)),
     seconds: r.seconds,
@@ -885,9 +991,6 @@ export async function generateMenuDaProdotti(
   input: GroundedPlanInput,
   disponibili: string[],
 ): Promise<PhaseResult<MenuResult>> {
-  const key = menuKey();
-  if (!key) throw new Error("nessuna chiave Gemini configurata");
-
   const giorni = input.frequency === "monthly" ? 14 : 7;
   const prompt = `Sei il pianificatore alimentare di un'app per la spesa.
 
@@ -931,7 +1034,7 @@ Rispondi SOLO con questo JSON:
  "lista":[{"nome":"","nomeLocale":"","quantita":"","reparto":""}],
  "consigli":[""]}`;
 
-  const r = await callGemini(key, MENU_MODEL, prompt, false, 120_000);
+  const r = await chiamaMenu(MENU_MODEL, prompt, 120_000);
   const data = MenuSchema.parse(parseJson(r.text));
   for (const ricetta of data.ricette) {
     ricetta.passaggi = ricetta.passaggi.filter((p) => p.trim().length > 0);

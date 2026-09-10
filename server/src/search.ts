@@ -124,9 +124,73 @@ const braveProvider: SearchProvider = {
   },
 };
 
+
+/**
+ * Google, attraverso SerpAPI.
+ *
+ * PERCHE' SERVE UN TERZO MOTORE
+ * -----------------------------
+ * Perche' gli altri due non bastano per la domanda che conta: «questo
+ * prodotto, DENTRO questo negozio». DuckDuckGo risponde `202` — il suo modo
+ * di dire no — dopo appena otto ricerche `site:`, misurato; Brave vuole una
+ * chiave che non abbiamo. Google le ricerche ristrette a un dominio le fa
+ * bene, ed e' l'unico modo di scoprire l'indirizzo vero di un prodotto senza
+ * chiederlo al modello, che quando non lo sa se lo inventa.
+ *
+ * IL PREZZO
+ * ---------
+ * Duecentocinquanta ricerche al mese sul piano gratuito, una per prodotto per
+ * negozio. Non e' una quota da produzione: e' abbastanza per misurare quanto
+ * valga la strada prima di pagarla.
+ */
+const serpapiProvider: SearchProvider = {
+  id: "serpapi",
+  async search(query) {
+    const key = process.env.SERPAPI_KEY;
+    if (!key) {
+      console.warn("[search:serpapi] SERPAPI_KEY assente");
+      return [];
+    }
+    try {
+      const url = new URL("https://serpapi.com/search.json");
+      url.searchParams.set("engine", "google");
+      url.searchParams.set("q", query);
+      url.searchParams.set("num", "10");
+      url.searchParams.set("api_key", key);
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!res.ok) {
+        console.warn(`[search:serpapi] HTTP ${res.status}`);
+        return [];
+      }
+      const json = (await res.json()) as {
+        error?: string;
+        organic_results?: Array<{ title?: string; link?: string; snippet?: string }>;
+      };
+      if (json.error) {
+        console.warn(`[search:serpapi] ${json.error.slice(0, 120)}`);
+        return [];
+      }
+      return (json.organic_results ?? [])
+        .filter((r) => r.link)
+        .map((r) => ({
+          url: r.link!,
+          title: stripTags(r.title ?? ""),
+          snippet: stripTags(r.snippet ?? ""),
+        }));
+    } catch (err) {
+      console.warn("[search:serpapi] fallita:", err);
+      return [];
+    }
+  },
+};
+
 const PROVIDERS: Record<string, SearchProvider> = {
   ddg: ddgProvider,
   brave: braveProvider,
+  serpapi: serpapiProvider,
 };
 
 export function searchProvider(): SearchProvider {

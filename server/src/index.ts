@@ -51,6 +51,7 @@ import {
   GROUNDED_MODEL,
   MENU_MODEL,
 } from "./plan-grounded.js";
+import type { CheckedRow } from "./price-page.js";
 import {
   groupByProduct,
   migliorePrezzoVerificato,
@@ -62,6 +63,7 @@ import {
 import { generatePricesSerpapi } from "./prices-serpapi.js";
 import { cercaProdottoAmazon, isAmazonSearchConfigured } from "./amazon-search.js";
 import { linkDiRipiego } from "./fallback-link.js";
+import { isoDaPaese } from "./insegne-online.js";
 import { annota } from "./diario.js";
 import {
   AiRecipeInput,
@@ -422,22 +424,17 @@ const PRICE_SOURCE_DEFAULT = process.env.PRICE_SOURCE === "serpapi" ? "serpapi" 
  * L'elenco copre i paesi provati; per gli altri si passa il testo cosi' com'e'
  * quando sono gia' due lettere, altrimenti si ripiega sull'Italia.
  */
-const ISO_PER_PAESE: Record<string, string> = {
-  italia: "it", italy: "it",
-  svizzera: "ch", schweiz: "ch", suisse: "ch", switzerland: "ch",
-  francia: "fr", france: "fr",
-  spagna: "es", "españa": "es", espana: "es", spain: "es",
-  germania: "de", deutschland: "de", germany: "de",
-  "paesi bassi": "nl", nederland: "nl", olanda: "nl", netherlands: "nl",
-  "regno unito": "gb", "united kingdom": "gb", uk: "gb", inghilterra: "gb",
-  austria: "at", belgio: "be", belgium: "be", portogallo: "pt", portugal: "pt",
-};
-
+/**
+ * Il codice del paese, con l'elenco completo che sta in `insegne-online`.
+ *
+ * Qui c'era una mappa di una dozzina di paesi che fuori da quella dozzina
+ * rispondeva `"it"`: la Grecia diventava Italia, e ad Atene si cercava su
+ * Amazon.it senza che nulla segnalasse l'errore. Ora i paesi sconosciuti
+ * restano sconosciuti, e l'Italia e' una scelta dichiarata per chi non ha
+ * detto dove sta.
+ */
 function paeseIso(paese: string): string {
-  const chiave = (paese ?? "").trim().toLowerCase();
-  if (ISO_PER_PAESE[chiave]) return ISO_PER_PAESE[chiave];
-  if (/^[a-z]{2}$/.test(chiave)) return chiave;
-  return "it";
+  return (isoDaPaese(paese) || "IT").toLowerCase();
 }
 
 /**
@@ -545,10 +542,39 @@ async function prezzaLista(
   const { tenute, scartate } = scartaImplausibili(prezziGrezzi);
   if (scartate > 0) console.info(`[prezzi] ${scartate} righe scartate perche' implausibili`);
 
+  /* LE RIGHE SENZA LINK, QUANDO I LINK LI COSTRUIAMO NOI
+     Con LINK_COSTRUITI al modello non chiediamo affatto gli indirizzi: da'
+     prodotto, prezzo e negozio, e l'indirizzo lo mette insieme questo server
+     dal dominio censito. Quelle righe non hanno niente da aprire, e mandarle
+     al verificatore sarebbe assurdo: finirebbero "non raggiungibili" e il
+     totale crollerebbe a zero.
+
+     Diventano `pagina-ok`, che e' esattamente cio' che sono: la destinazione
+     e' buona — l'abbiamo costruita noi da un dominio verificato — e il prezzo
+     e' quello che il modello ha letto cercando, non confermato aprendo la
+     scheda. La stessa etichetta che portano da sempre le pagine che si aprono
+     ma non dichiarano il prezzo in modo leggibile. */
+  const daCostruire = tenute.filter((r) => !r.link);
+  const daAprire = tenute.filter((r) => r.link);
+
+  const costruite: CheckedRow[] = daCostruire.flatMap((r) => {
+    const rip = linkDiRipiego(r.prodotto || r.nome, r.negozio, country);
+    if (!rip) return [];
+    return [{ ...r, link: "", linkRicerca: rip.url, ricercaSu: rip.negozio, verifica: "pagina-ok" as const }];
+  });
+  if (costruite.length > 0) {
+    console.info(`[prezzi] ${costruite.length} righe con link costruito da noi, senza chiederlo al modello`);
+  }
+
   // Il controllo dei link: gratis, e trasforma "il modello dice" in "l'abbiamo
   // aperto". Dieci per volta, con trenta o quaranta pagine da aprire.
-  const checked = await verifyPrices(tenute, 10);
-  console.info(`[prezzi] pagine aperte con esito ${checked.verificati}/${checked.totali}`);
+  const aperte = await verifyPrices(daAprire, 10);
+  const checked = {
+    rows: [...aperte.rows, ...costruite],
+    verificati: aperte.verificati + costruite.length,
+    totali: aperte.totali + costruite.length,
+  };
+  console.info(`[prezzi] pagine aperte con esito ${aperte.verificati}/${aperte.totali}`);
 
   /* NESSUN PRODOTTO SENZA UN POSTO DOVE ANDARE
      Le righe il cui link non si e' aperto tenevano il prezzo ma perdevano il
@@ -846,7 +872,10 @@ app.post("/ai/menu-da-prodotti", async (body) => {
 });
 
 const PricesInput = z.object({
-  items: z.array(z.string().min(2).max(160)).min(1).max(24),
+  // UN CARATTERE BASTA. In giapponese `塩` e' il sale e `卵` sono le uova:
+  // pretendere due caratteri faceva rifiutare l'intera lista di Tokyo con un
+  // 400, dopo che il modello l'aveva gia' scritta bene.
+  items: z.array(z.string().min(1).max(160)).min(1).max(24),
   city: z.string().max(80).default(""),
   country: z.string().max(40).default("Italia"),
   currency: z.string().min(3).max(3).default("EUR"),
