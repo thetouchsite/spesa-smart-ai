@@ -29,6 +29,7 @@
  */
 
 import { linkRicercaAmazon } from "./amazon.js";
+import { insegnePerPaese, isoDaPaese } from "./insegne-online.js";
 
 /**
  * Nomi di paese verso codice ISO.
@@ -37,30 +38,19 @@ import { linkRicercaAmazon } from "./amazon.js";
  * nell'onboarding; qui serve la sigla. Senza conversione un utente italiano
  * finirebbe sul marketplace sbagliato.
  */
-const ISO_PER_NOME: Record<string, string> = {
-  italia: "IT", italy: "IT",
-  germania: "DE", deutschland: "DE", germany: "DE",
-  francia: "FR", france: "FR",
-  spagna: "ES", espana: "ES", "españa": "ES", spain: "ES",
-  "regno unito": "GB", "united kingdom": "GB", inghilterra: "GB", england: "GB",
-  irlanda: "IE", ireland: "IE",
-  "paesi bassi": "NL", olanda: "NL", nederland: "NL", netherlands: "NL",
-  belgio: "BE", belgium: "BE",
-  svizzera: "CH", schweiz: "CH", suisse: "CH", switzerland: "CH",
-  austria: "AT", portogallo: "PT", portugal: "PT",
-  grecia: "GR", greece: "GR", polonia: "PL", poland: "PL",
-  svezia: "SE", sweden: "SE", danimarca: "DK", denmark: "DK",
-  "stati uniti": "US", usa: "US", "united states": "US",
-  canada: "CA", messico: "MX", mexico: "MX", brasile: "BR", brazil: "BR",
-  giappone: "JP", japan: "JP", australia: "AU", india: "IN",
-  turchia: "TR", turkey: "TR",
-};
-
+/**
+ * Il codice del paese, dall'elenco completo in `insegne-online`.
+ *
+ * Qui viveva una seconda mappa, piu' corta, che di `日本` non sapeva nulla e
+ * rispondeva `IT`: chi cercava a Tokyo un prodotto senza link finiva su
+ * amazon.it, in italiano, con prezzi in euro. Due elenchi di paesi in due file
+ * diversi divergono sempre, e a divergere in silenzio ci mettono poco.
+ *
+ * L'Italia resta la risposta per chi non ha detto dove sta — ma ora e' una
+ * scelta dichiarata, non il buco di una mappa incompleta.
+ */
 export function codicePaese(paese: string): string {
-  const chiave = (paese ?? "").trim().toLowerCase();
-  if (ISO_PER_NOME[chiave]) return ISO_PER_NOME[chiave];
-  if (/^[a-z]{2}$/.test(chiave)) return chiave.toUpperCase();
-  return "IT";
+  return isoDaPaese(paese) || "IT";
 }
 
 /**
@@ -71,20 +61,31 @@ export function codicePaese(paese: string): string {
  * modello — «Carrefour (Bologna)» contiene «carrefour» — perché il nome esatto
  * cambia da una risposta all'altra.
  *
- * Non è un elenco da completare a mano per duecento paesi: è una scorciatoia
- * per i casi frequenti. Tutto il resto passa da Amazon.
+ * OGNI RIGA È STATA APERTA, non dedotta. È il punto: il 2026-09-09 tre di
+ * questi indirizzi rispondevano 404 — Carrefour, Conad ed EasyCoop — e l'app
+ * ci mandava sopra gli utenti a cui la pagina del prodotto non si era aperta.
+ * Un vicolo cieco che ne sostituiva un altro. I pattern giusti li hanno detti
+ * i siti stessi, leggendo il modulo di ricerca dalla loro home.
+ *
+ * CRAI è uscito: `craiweb.it` non risponde più affatto.
+ *
+ * Un 403 invece va benissimo e resta — Tesco, Kaufland, Sainsbury's respingono
+ * i programmi, non le persone: dal telefono di chi usa l'app quelle pagine si
+ * aprono.
+ *
+ * Non è un elenco da completare a mano per duecento paesi: sotto c'è la rete
+ * di sicurezza che copre tutti gli altri.
  */
 const RICERCA_PER_NEGOZIO: Array<{ chiave: string; url: (q: string) => string }> = [
-  { chiave: "carrefour", url: (q) => `https://www.carrefour.it/ricerca?q=${encodeURIComponent(q)}` },
-  { chiave: "conad", url: (q) => `https://spesaonline.conad.it/ricerca?q=${encodeURIComponent(q)}` },
-  { chiave: "coop", url: (q) => `https://www.easycoop.com/search?q=${encodeURIComponent(q)}` },
+  { chiave: "carrefour", url: (q) => `https://www.carrefour.it/search?q=${encodeURIComponent(q)}` },
+  { chiave: "conad", url: (q) => `https://spesaonline.conad.it/search?query=${encodeURIComponent(q)}` },
+  { chiave: "coop", url: (q) => `https://www.easycoop.com/catalogsearch/result/?q=${encodeURIComponent(q)}` },
   { chiave: "esselunga", url: (q) => `https://www.esselunga.it/it/spesa-online/ricerca?q=${encodeURIComponent(q)}` },
-  { chiave: "crai", url: (q) => `https://www.craiweb.it/ricerca?q=${encodeURIComponent(q)}` },
   { chiave: "tesco", url: (q) => `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(q)}` },
   { chiave: "sainsbury", url: (q) => `https://www.sainsburys.co.uk/gol-ui/SearchResults/${encodeURIComponent(q)}` },
   { chiave: "rewe", url: (q) => `https://shop.rewe.de/productList?search=${encodeURIComponent(q)}` },
   { chiave: "kaufland", url: (q) => `https://www.kaufland.de/s/?search_value=${encodeURIComponent(q)}` },
-  { chiave: "jumbo", url: (q) => `https://www.jumbo.com/zoeken?searchTerms=${encodeURIComponent(q)}` },
+  { chiave: "jumbo", url: (q) => `https://www.jumbo.com/producten/?searchTerms=${encodeURIComponent(q)}` },
   { chiave: "albert heijn", url: (q) => `https://www.ah.nl/zoeken?query=${encodeURIComponent(q)}` },
   { chiave: "migros", url: (q) => `https://www.migros.ch/it/search?query=${encodeURIComponent(q)}` },
   { chiave: "consum", url: (q) => `https://tienda.consum.es/es/busqueda?q=${encodeURIComponent(q)}` },
@@ -113,6 +114,45 @@ export function linkDiRipiego(prodotto: string, negozio: string, paese: string):
   const noto = RICERCA_PER_NEGOZIO.find((r) => nome.includes(r.chiave));
   if (noto) return { url: noto.url(prodotto), negozio };
 
+  // Il negozio non è fra quelli con un indirizzo di ricerca scritto a mano,
+  // ma potrebbe essere una delle 114 catene del censimento: allora la ricerca
+  // gliela facciamo fare a Google, ristretta al suo dominio. Non è elegante,
+  // ma è l'unica cosa che funziona per centoquattordici siti senza scrivere
+  // centoquattordici indirizzi a mano — e soprattutto NON PUÒ SBAGLIARE: una
+  // ricerca Google si apre sempre, e mostra le pagine di quel negozio.
+  const censita = insegnePerPaese(isoDaPaese(paese)).find((i) => {
+    const suo = i.nome.toLowerCase();
+    // «Conad Spesa Online» dal censimento contro «Conad» dal modello: basta
+    // che una delle due contenga la prima parola dell'altra.
+    const prima = suo.split(/\s+/)[0];
+    return nome.includes(prima) || suo.includes(nome.split(/\s+/)[0]);
+  });
+  if (censita) {
+    return {
+      url:
+        "https://www.google.com/search?q=" +
+        encodeURIComponent(`site:${censita.dominio} ${prodotto}`),
+      negozio: censita.nome,
+    };
+  }
+
   const amazon = linkRicercaAmazon(prodotto, codicePaese(paese));
-  return amazon ? { url: amazon, negozio: "Amazon" } : null;
+  if (amazon) return { url: amazon, negozio: "Amazon" };
+
+  // Ultimo appiglio: il negozio non l'abbiamo riconosciuto e Amazon in quel
+  // paese non c'è — è il caso del Portogallo — ma il paese sì. Allora si manda
+  // alla catena principale di lì. Non è il negozio che aveva quel prezzo, e
+  // l'etichetta lo dice apertamente mostrando il nome vero; è però un posto
+  // dove quel prodotto si compra davvero, che è quello che serviva.
+  const prima = insegnePerPaese(isoDaPaese(paese))[0];
+  if (prima) {
+    return {
+      url:
+        "https://www.google.com/search?q=" +
+        encodeURIComponent(`site:${prima.dominio} ${prodotto}`),
+      negozio: prima.nome,
+    };
+  }
+
+  return null;
 }
