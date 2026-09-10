@@ -12,7 +12,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, View } from "react-native";
-import { useRouter } from "expo-router";
 import {
   Body,
   Button,
@@ -34,6 +33,7 @@ import { loadResolvedLocation } from "../src/lib/location/store";
 import { colors, font, radius, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 import { useI18n } from "../src/lib/i18n";
+import { tornaIndietro } from "../src/lib/navigazione";
 
 const RADII = [1, 3, 5, 10];
 
@@ -41,7 +41,6 @@ export default function NegoziScreen() {
   const { language } = useI18n();
   /** Testo nella lingua scelta dall'utente. */
   const ui = (t: string) => uiText(t, language);
-  const router = useRouter();
   const [radius_, setRadius] = useState(3);
   const [stores, setStores] = useState<NearbyStore[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,7 +94,7 @@ export default function NegoziScreen() {
 
   return (
     <Screen>
-      <TopBar title="Supermercati vicini" onBack={() => router.back()} />
+      <TopBar title="Supermercati vicini" onBack={() => tornaIndietro()} />
 
       <View style={styles.head}>
         <Title>{ui("Dove fare la spesa")}</Title>
@@ -163,7 +162,7 @@ export default function NegoziScreen() {
         </Card>
       ) : null}
 
-      <Button label={ui("Torna indietro")} variant="ghost" onPress={() => router.back()} />
+      <Button label={ui("Torna indietro")} variant="ghost" onPress={() => tornaIndietro()} />
     </Screen>
   );
 }

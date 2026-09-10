@@ -20,7 +20,7 @@
 
 import { useEffect, useState } from "react";
 import { Image, StyleSheet, View } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import {
   Body,
   Button,
@@ -43,6 +43,7 @@ import { useI18n } from "../src/lib/i18n";
 import { productLabel } from "../src/lib/price-data/labels";
 import { colors, font, radius, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
+import { tornaIndietro } from "../src/lib/navigazione";
 
 const DIFFICULTY: Record<string, string> = {
   easy: "facile",
@@ -125,7 +126,6 @@ function norm32(t: string): string {
 export default function RicettaScreen() {
   /** Testo nella lingua scelta dall'utente. */
   const ui = (t: string) => uiText(t, language);
-  const router = useRouter();
   const { profile, planExtra, currentPlan } = useSession();
   const { language } = useI18n();
   const params = useLocalSearchParams<{ piatto?: string; pasto?: string; giorno?: string }>();
@@ -183,7 +183,7 @@ export default function RicettaScreen() {
   if (loading) {
     return (
       <Screen>
-        <TopBar onBack={() => router.back()} />
+        <TopBar onBack={() => tornaIndietro("/menu")} />
         <Loading text={ui("Preparo la ricetta…")} />
       </Screen>
     );
@@ -195,14 +195,14 @@ export default function RicettaScreen() {
         <View style={styles.empty}>
           <Title>{ui("Ricetta non trovata")}</Title>
           <Subtitle>{ui("Torna al menù e scegli un piatto.")}</Subtitle>
-          <Button label={ui("Torna al menù")} onPress={() => router.back()} />
+          <Button label={ui("Torna al menù")} onPress={() => tornaIndietro("/menu")} />
         </View>
       </Screen>
     );
   }
 
   return (
-    <Screen footer={<Button label={ui("Torna al menù")} onPress={() => router.back()} />}>
+    <Screen footer={<Button label={ui("Torna al menù")} onPress={() => tornaIndietro("/menu")} />}>
       <DishPhoto uri={recipe.image} nome={recipe.title} style={styles.photo} />
 
       <View style={styles.head}>

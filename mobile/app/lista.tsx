@@ -57,6 +57,7 @@ import { useI18n } from "../src/lib/i18n";
 import { PriceCheckSheet } from "../src/components/price-check";
 import { colors, font, radius, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
+import { tornaIndietro } from "../src/lib/navigazione";
 
 interface Row {
   /** Nome mostrato all'utente, nella sua lingua. */
@@ -279,11 +280,11 @@ export default function ListaScreen() {
       footer={
         <View style={styles.actions}>
           <Button label={ui("Condividi la lista")} icon="share-social-outline" onPress={() => void shareList()} />
-          <Button label={ui("Torna ai risultati")} variant="ghost" onPress={() => router.back()} />
+          <Button label={ui("Torna ai risultati")} variant="ghost" onPress={() => tornaIndietro("/risultati")} />
         </View>
       }
     >
-      <TopBar title={ui("Lista della spesa")} onBack={() => router.back()} />
+      <TopBar title={ui("Lista della spesa")} onBack={() => tornaIndietro("/risultati")} />
 
       <View style={styles.head}>
         <Title>{ui("Lista della spesa")}</Title>

@@ -40,6 +40,7 @@ import { moneyRounded, number } from "../src/lib/format";
 import { useI18n } from "../src/lib/i18n";
 import { colors, font, radius, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
+import { tornaIndietro } from "../src/lib/navigazione";
 
 const KIND_LABEL: Record<string, string> = {
   discount: "discount",
@@ -81,7 +82,7 @@ export default function DoveConvieneScreen() {
         />
       }
     >
-      <TopBar title={ui("Dove conviene")} onBack={() => router.back()} />
+      <TopBar title={ui("Dove conviene")} onBack={() => tornaIndietro("/risultati")} />
 
       <View style={styles.head}>
         <Pill tone="success" icon="stats-chart-outline">

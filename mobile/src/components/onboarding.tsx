@@ -12,6 +12,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Body, Button, Screen, Subtitle, Title, TopBar } from "./ui";
 import { colors, font, radius, spacing } from "../theme";
+import { tornaIndietro } from "../lib/navigazione";
 
 /** I sei passi, nell'ordine. Serve a numerare e a tornare indietro. */
 export const STEPS = ["citta", "persone", "budget", "stile", "allergie", "extra"] as const;
@@ -48,7 +49,7 @@ export function Step({
     >
       {/* La lingua si puo' cambiare anche a meta' onboarding: chi si
           accorge di non capire le domande non deve ricominciare. */}
-      <TopBar onBack={index > 0 ? () => router.back() : undefined} />
+      <TopBar onBack={index > 0 ? () => tornaIndietro() : undefined} />
 
       <View style={styles.head}>
         <Progress current={index} />
@@ -172,8 +173,10 @@ export function useBack(step: StepName) {
   const router = useRouter();
   const index = STEPS.indexOf(step);
   return () => {
+    // Dal primo passo si esce alla home; dagli altri si risale, e se
+    // qualcuno e' arrivato qui da un link diretto la rete lo riporta a casa.
     if (index <= 0) router.replace("/");
-    else router.back();
+    else tornaIndietro();
   };
 }
 

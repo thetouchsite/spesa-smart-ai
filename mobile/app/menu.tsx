@@ -30,6 +30,7 @@ import { DishPhoto } from "../src/components/dish-photo";
 import { colors, font, radius, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 import { useI18n } from "../src/lib/i18n";
+import { tornaIndietro } from "../src/lib/navigazione";
 
 const MEALS = [
   { key: "breakfast" as const, label: "Colazione", icon: "sunny-outline" as const },
@@ -47,7 +48,7 @@ export default function MenuScreen() {
   if (!currentPlan) {
     return (
       <Screen>
-        <TopBar onBack={() => router.back()} />
+        <TopBar onBack={() => tornaIndietro()} />
         <View style={styles.empty}>
           <Title>{ui("Nessun menù")}</Title>
           <Subtitle>{ui("Crea prima un piano.")}</Subtitle>
@@ -67,7 +68,7 @@ export default function MenuScreen() {
         />
       }
     >
-      <TopBar title={ui("Il menù")} onBack={() => router.back()} />
+      <TopBar title={ui("Il menù")} onBack={() => tornaIndietro("/risultati")} />
 
       <View style={styles.head}>
         <Title>{ui("La tua settimana")}</Title>

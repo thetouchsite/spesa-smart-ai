@@ -34,6 +34,7 @@ import { kv } from "../src/lib/kv";
 import { QuotaDetail } from "../src/components/quota-banner";
 import { colors, font, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
+import { tornaIndietro } from "../src/lib/navigazione";
 
 export default function ImpostazioniScreen() {
   /** Testo nella lingua scelta dall'utente. */
@@ -80,7 +81,7 @@ export default function ImpostazioniScreen() {
 
   return (
     <Screen>
-      <TopBar title="Impostazioni" onBack={() => router.back()} />
+      <TopBar title="Impostazioni" onBack={() => tornaIndietro()} />
 
       <View style={styles.head}>
         <Title>Impostazioni</Title>
