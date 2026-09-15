@@ -94,8 +94,28 @@ function firstNumber(html: string, patterns: RegExp[]): number | null {
   return null;
 }
 
+/**
+ * La parte di pagina in cui vale la pena cercare un prezzo.
+ *
+ * Tagliare i primi N caratteri e' la cosa ovvia e su molti siti funziona,
+ * perche' i dati strutturati stanno in alto. Su Coop no: le sue pagine pesano
+ * 1,8 MB e il blocco `ld+json` comincia intorno al byte 838.000. Con qualunque
+ * taglio ragionevole in testa, il prezzo c'era e non lo leggevamo — e la riga
+ * finiva scartata come «prodotto senza prezzo», che e' una bugia comoda.
+ *
+ * Quindi non si taglia alla cieca: si tiene la testa, dove stanno microdata e
+ * meta og, PIU' la finestra intorno al primo blocco di dati strutturati,
+ * ovunque si trovi.
+ */
+export function porzioneConPrezzi(html: string): string {
+  const testa = html.slice(0, 120_000);
+  const i = html.search(/application\/ld\+json/i);
+  if (i < 0 || i < 120_000) return testa;
+  return `${testa}\n${html.slice(i, i + 160_000)}`;
+}
+
 /** Legge prezzo, listino e scadenza dell'offerta dai dati strutturati. */
-function readPrices(html: string): PagePrice | null {
+export function readPrices(html: string): PagePrice | null {
   const current = firstNumber(html, [
     // Dati strutturati: la forma che i motori di ricerca chiedono.
     /"price"\s*:\s*"?([\d.,]+)"?/i,
@@ -200,7 +220,28 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
        apriva, quindi il link passava come buono, ma senza prezzo la riga non
        entrava nel totale e l'insegna intera veniva dichiarata «troppi link
        rotti». Tre catene su undici sparivano per un taglio di stringa. */
-    html = porzioneConPrezzi(await res.text());
+    const corpo = await res.text();
+
+    /* UN CORPO VUOTO NON E' UNA PAGINA BUONA.
+       Ocado risponde `HTTP 202` con ZERO byte: e' una difesa anti-bot che dice
+       «ricevuto» e non manda niente. Il nostro verificatore vedeva uno stato
+       2xx, non trovava il prezzo in un corpo inesistente e concludeva
+       `pagina-ok` — cioe' «la pagina c'e'». Non lo sapeva affatto, e il link
+       finiva nell'elenco dell'utente sotto la scritta «verificato aprendo la
+       pagina». Aprendolo davvero: «Page not found».
+ 
+       Sotto i duemila caratteri non c'e' nessuna scheda prodotto: c'e' un
+       guscio, un reindirizzo o un rifiuto. Si dichiara `bloccato`, che vuol
+       dire «il sito non parla con noi»: e' la verita', e lascia decidere a chi
+       legge invece di spacciare un'ipotesi per un controllo. */
+    if (corpo.trim().length < 2000) {
+      return {
+        status: "bloccato",
+        reason: `risposta vuota (HTTP ${res.status}, ${corpo.length} byte)`,
+      };
+    }
+
+    html = porzioneConPrezzi(corpo);
   } catch {
     return { status: "non-raggiungibile", reason: "irraggiungibile" };
   }

@@ -69,6 +69,21 @@ export function PriceCheckSheet({
   const [amazon, setAmazon] = useState<Offer[]>([]);
   const [cercandoAmazon, setCercandoAmazon] = useState(false);
 
+  /* AMAZON E' SPENTO, E CON LUI OGNI RICERCA ESTERNA.
+     La lista mostra soltanto quello che trova il NOSTRO catalogo: prodotti
+     con l'indirizzo scritto dal negozio, che non puo' essere sbagliato.
+
+     Le ricerche esterne — Amazon via SocialCrawl, Google Shopping via
+     SerpAPI — davano copertura in cambio di tre cose che non vogliamo:
+     prodotti spesso sbagliati (i venditori del marketplace), un credito che
+     si consuma a ogni tocco, e una dipendenza da servizi che possono chiudere
+     — l'API di Amazon e' stata spenta a maggio, Google Custom Search chiude
+     il 1° gennaio 2027.
+
+     Il codice resta: si riaccende togliendo il commento qui sotto e rimettendo
+     `amazon` nell'elenco delle righe. Non e' stato cancellato perche' il
+     confronto puo' servire di nuovo.
+
   useEffect(() => {
     if (!itemName) {
       setAmazon([]);
@@ -88,10 +103,17 @@ export function PriceCheckSheet({
       vivo = false;
     };
   }, [itemName, searchName, country]);
+  */
 
-  // Amazon si affianca alle altre e concorre allo stesso ordine: se costa meno
-  // vince, se costa di più resta sotto. Nessun trattamento di favore.
-  const righe = [...(offers?.offerte ?? []), ...amazon].sort((a, b) => a.prezzo - b.prezzo);
+  /* SOLO IL NOSTRO CATALOGO, e l'ordine mette i prezzi prima.
+     Chi ha un prezzo sale, dal piu' economico; chi ha solo il prodotto e il
+     link resta sotto — trattare un prezzo mancante come zero lo farebbe
+     sembrare l'offerta migliore, che e' la bugia piu' facile da raccontare. */
+  const righe = [...(offers?.offerte ?? [])].sort((a, b) => {
+    const pa = a.prezzo ?? Number.POSITIVE_INFINITY;
+    const pb = b.prezzo ?? Number.POSITIVE_INFINITY;
+    return pa - pb;
+  });
   const migliore = righe[0] ?? null;
 
   return (
@@ -205,7 +227,14 @@ export function PriceCheckSheet({
             ) : null}
 
             <Body style={styles.note}>
-              {ui("Prezzi trovati sul web quando è stato creato il piano e verificati aprendo la pagina del prodotto. Toccando una riga si apre il negozio.")}
+              {/* NON SI DICE PIU' «VERIFICATI»: non e' sempre vero.
+                  Ocado risponde HTTP 202 con un corpo vuoto, Sainsbury's
+                  scrive «Page not found» con JavaScript: da server quelle
+                  pagine sembrano buone e non lo sono. Promettere un controllo
+                  che non abbiamo fatto e' peggio che ammettere il limite —
+                  l'utente apre il link, trova un 404, e da quel momento non
+                  crede piu' nemmeno ai prezzi giusti. */}
+              {ui("I prezzi sono quelli trovati quando hai creato il piano: possono essere cambiati. Alcuni negozi non ci lasciano controllare la pagina, quindi tocca una riga e verifica sul sito.")}
             </Body>
           </View>
         )}
