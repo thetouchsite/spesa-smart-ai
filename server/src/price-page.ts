@@ -94,8 +94,29 @@ function firstNumber(html: string, patterns: RegExp[]): number | null {
   return null;
 }
 
+/**
+ * La parte di pagina in cui vale la pena cercare un prezzo.
+ *
+ * Tagliare i primi N caratteri e' la cosa ovvia e su molti siti funziona,
+ * perche' i dati strutturati stanno in alto. Su Coop no: le sue pagine pesano
+ * 1,8 MB e il blocco `ld+json` comincia intorno al byte 838.000. Con qualunque
+ * taglio ragionevole in testa il prezzo c'era e non lo leggevamo — e la riga
+ * finiva scartata come «prodotto senza prezzo», che e' una bugia comoda.
+ *
+ * Quindi non si taglia alla cieca: si tiene la testa, dove stanno microdata e
+ * meta og, PIU' la finestra intorno al primo blocco di dati strutturati,
+ * ovunque si trovi.
+ */
+export function porzioneConPrezzi(html: string): string {
+  const testa = html.slice(0, 120_000);
+  const i = html.search(/application\/ld\+json/i);
+  if (i < 0 || i < 120_000) return testa;
+  return `${testa}
+${html.slice(i, i + 160_000)}`;
+}
+
 /** Legge prezzo, listino e scadenza dell'offerta dai dati strutturati. */
-function readPrices(html: string): PagePrice | null {
+export function readPrices(html: string): PagePrice | null {
   const current = firstNumber(html, [
     // Dati strutturati: la forma che i motori di ricerca chiedono.
     /"price"\s*:\s*"?([\d.,]+)"?/i,
