@@ -65,9 +65,11 @@ import { catalogoDisponibilePer, generatePricesCatalogo } from "./prices-catalog
 import { cercaProdottoAmazon, isAmazonSearchConfigured } from "./amazon-search.js";
 import { linkDiRipiego } from "./fallback-link.js";
 import { isoDaPaese } from "./insegne-online.js";
+import { prezziDaiCataloghiIT } from "./catalogo-it.js";
 import { annota } from "./diario.js";
 import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./catalogo.js";
 import { paesiConCatalogo } from "./catalogo-fonti.js";
+import { negoziInCitta, statoNegozi, tuttiINegozi } from "./negozi.js";
 import { aggiornaCatalogo, avviaCatalogoNotturno } from "./catalogo-notturno.js";
 import {
   AiRecipeInput,
@@ -609,6 +611,29 @@ async function prezzaLista(
     console.warn("[prezzi] ricerca fallita, restituisco la lista senza prezzi:", err);
   }
 
+  /* IL CATALOGO, ACCANTO AL MOTORE E NON AL SUO POSTO.
+     -------------------------------------------------
+     Il motore cerca su tutto il web e trova insegne che noi non conosciamo; il
+     catalogo conosce poche insegne ma i suoi indirizzi vengono dalle sitemap
+     che i negozi pubblicano, quindi ESISTONO — non c'e' modo che diano 404.
+     Sono due forze diverse e si sommano: nessuna delle due esclude l'altra, e
+     il confronto fra insegne che viene dopo le mette in fila per prezzo senza
+     sapere da dove arrivano.
+
+     Misurato il 15 settembre sulla lista vera di diciotto voci, solo Carrefour:
+     quattordici prodotti con link e prezzo veri, zero indirizzi morti.
+
+     Non lancia mai: se la sitemap non si scarica, si prosegue con quello che
+     il motore ha trovato, che e' esattamente il comportamento di prima. */
+  try {
+    const dalCatalogo = await prezziDaiCataloghiIT(items, paeseIso(country).toUpperCase(), currency, city);
+    if (dalCatalogo.length) {
+      prezziGrezzi = [...dalCatalogo, ...prezziGrezzi];
+    }
+  } catch (err) {
+    console.warn("[catalogo] non disponibile, proseguo col solo motore:", err);
+  }
+
   /* AMAZON NON SI CERCA QUI
      Un credito per prodotto: su una lista da diciotto voci sarebbero diciotto
      crediti a generazione, e i cento gratuiti finirebbero in cinque piani.
@@ -729,7 +754,9 @@ async function prezzaLista(
   const contati = prodotti
     .map((p) => migliorePrezzoVerificato(p))
     .filter((o): o is NonNullable<typeof o> => o !== null);
-  const totale = Math.round(contati.reduce((s, o) => s + o.prezzo, 0) * 100) / 100;
+  // `migliorePrezzoVerificato` restituisce solo righe con un prezzo: il
+  // fallback a zero e' per il verificatore di tipi, non per i conti.
+  const totale = Math.round(contati.reduce((s, o) => s + (o.prezzo ?? 0), 0) * 100) / 100;
 
   console.info(
     `[prezzi] ${prodotti.length} prodotti, ${conAlternative} con alternative, ` +
@@ -1309,6 +1336,54 @@ app.get("/catalogo/stato", async () => ({
   ...statoCatalogo(),
   quantiPaesi: paesiConCatalogo().length,
 }));
+
+/* ─────────────────────────── I punti vendita ─────────────────────────── */
+
+/**
+ * Dove si compra: i negozi, non i prezzi.
+ *
+ * Tenuti separati dai prezzi di proposito. Il listino e' dell'INSEGNA — sei
+ * Eurospin da Milano a Palermo danno tutti 1,19 € sullo stesso prodotto — e il
+ * negozio e' il TUO. Mescolarli porterebbe ad attaccare lo sconto di un punto
+ * vendita all'indirizzo di un altro, che e' un prezzo vero nel posto sbagliato.
+ *
+ * Con `citta` risponde anche a una domanda piu' utile: QUALI INSEGNE ti servono
+ * davvero li'. E' cio' che permette di non mostrare a chi sta a Milano il
+ * listino di una cooperativa toscana, che sullo stesso limone biologico
+ * differisce del 55%.
+ */
+const NegoziInput = z.object({
+  paese: z.string().max(40).default("Italia"),
+  citta: z.string().max(80).default(""),
+});
+
+app.post("/negozi", async (body) => {
+  const data = parse(NegoziInput, body);
+  const iso = paeseIso(data.paese).toUpperCase();
+
+  if (!data.citta) {
+    const negozi = await tuttiINegozi(iso);
+    return {
+      paese: iso,
+      citta: null,
+      insegne: [...new Set(negozi.map((n) => n.insegna))],
+      quanti: negozi.length,
+      negozi,
+    };
+  }
+
+  const esito = await negoziInCitta(iso, data.citta);
+  return {
+    paese: iso,
+    citta: esito.citta,
+    insegne: esito.insegne,
+    quanti: esito.negozi.length,
+    negozi: esito.negozi,
+  };
+});
+
+/** Quanti punti vendita conosciamo, insegna per insegna. */
+app.get("/negozi/stato", async () => statoNegozi("IT"));
 
 const CercaCatalogo = z.object({
   q: z.string().min(1).max(160),
