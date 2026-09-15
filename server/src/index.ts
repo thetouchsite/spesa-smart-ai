@@ -536,57 +536,47 @@ async function prezzaLista(
 
       const t0 = Date.now();
 
-      /* IL MOTORE SI AGGIUNGE SOLO SE GLIELO SI CHIEDE.
-         `catalogo` significa: la nostra API e basta. Nessuna ricerca sul web,
-         nessun grounding, nessun indirizzo che qualcuno possa immaginare —
-         costo zero e link che il negozio ha scritto di suo pugno.
+      /* SOLO LA NOSTRA API. IL MODELLO NON TOCCA I PREZZI.
+         Il giro e' questo, e non ha eccezioni:
 
-         Chi vuole anche il motore per coprire cio' che il catalogo non ha usa
-         `CATALOGO_CON_MOTORE=1`: allora partono insieme, e dove entrambi
-         rispondono vince il catalogo. Costa quanto la strada "ai", perche' il
-         grounding si paga a chiamata. */
-      const conMotore = process.env.CATALOGO_CON_MOTORE === "1";
+           1. l'AI scrive la LISTA della spesa, dall'onboarding
+           2. il NOSTRO catalogo le attacca prezzi e negozi, dove riesce
+           3. l'AI costruisce il MENU' su quello che si compra davvero
 
-      const [cat, motore] = await Promise.all([
-        conCatalogo
-          ? generatePricesCatalogo(items, iso, currency).catch((err) => {
-              console.warn("[prezzi] catalogo fallito:", err);
-              return null;
-            })
-          : Promise.resolve(null),
-        conMotore || !conCatalogo
-          ? generatePricesParallel(items, city, country, currency).catch((err) => {
-              // Il catalogo da solo consegna comunque qualcosa: e' successo
-              // davvero, con il progetto Gemini oltre il tetto di spesa.
-              console.warn("[prezzi] motore fallito, tengo il catalogo:", err);
-              return null;
-            })
-          : Promise.resolve(null),
-      ]);
+         Il modello non cerca prezzi e non produce indirizzi. E' la ragione per
+         cui quel giro esiste: quando glieli chiedevamo, li inventava — Ocado
+         con la scheda che non c'e', «Amazon (Morrisons)» che non e' un
+         negozio, Cortilia 0 pagine aperte su 12.
 
-      /* IL CATALOGO PRIMA, SEMPRE.
-         Dove entrambi hanno una risposta vince il catalogo: il suo link lo ha
-         scritto il negozio e non puo' essere sbagliato, mentre quello del
-         motore va aperto per sapere se esiste. */
-      const daCatalogo = cat?.prezzi ?? [];
-      const coperte = new Set(daCatalogo.map((p) => p.prodotto));
-      const daMotore = (motore?.data.prezzi ?? []).filter((p) => !coperte.has(p.prodotto ?? ""));
+         Il motore resta raggiungibile con PRICE_SOURCE=ai per confrontare le
+         due strade, ma da qui dentro non parte mai: dove il catalogo non
+         arriva, la voce resta senza prezzo e l'app lo dice. Meglio una riga
+         vuota e onesta di un link che non porta da nessuna parte.
 
-      prezziGrezzi = [...daCatalogo, ...daMotore];
-      secondi = (Date.now() - t0) / 1000;
-      costo = motore?.cost ?? 0;
-      ricerche = (motore?.data.searches ?? 0) + (cat?.pagineAperte ?? 0);
-      hacercato = motore?.data.grounded ?? daCatalogo.length > 0;
-      if (motore) {
-        recordUse("gemini");
-        recordUse("grounding");
-        recordCost(motore.cost);
-      }
+         Se il paese non e' censito, il risultato e' una lista senza prezzi:
+         e' il limite della copertura, ed e' dichiarato invece che nascosto
+         dietro a numeri inventati. */
+      const inizio = Date.now();
+
+      const cat = conCatalogo
+        ? await generatePricesCatalogo(items, iso, currency).catch((err) => {
+            console.warn("[prezzi] catalogo fallito:", err);
+            return null;
+          })
+        : null;
+
+      prezziGrezzi = cat?.prezzi ?? [];
+      secondi = (Date.now() - inizio) / 1000;
+      costo = 0;
+      ricerche = cat?.pagineAperte ?? 0;
+      // Le pagine le abbiamo aperte noi, una per una: e' la forma piu' forte
+      // di «ha cercato davvero».
+      hacercato = prezziGrezzi.length > 0;
 
       console.info(
-        `[prezzi] insieme in ${secondi.toFixed(0)}s: ` +
-          `${coperte.size} voci dal catalogo (link garantiti), ` +
-          `${daMotore.length} prezzi dal motore ($${(motore?.cost ?? 0).toFixed(4)})`,
+        `[prezzi] solo catalogo: ${secondi.toFixed(0)}s, ` +
+          `${new Set(prezziGrezzi.map((p) => p.prodotto)).size}/${items.length} voci, ` +
+          `${ricerche} pagine aperte, $0`,
       );
     } else if (fonte === "serpapi") {
       // La strada del prototipo: una ricerca per prodotto su Google Shopping.
