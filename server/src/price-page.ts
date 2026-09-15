@@ -95,7 +95,27 @@ function firstNumber(html: string, patterns: RegExp[]): number | null {
 }
 
 /** Legge prezzo, listino e scadenza dell'offerta dai dati strutturati. */
-function readPrices(html: string): PagePrice | null {
+/**
+ * La parte di pagina in cui vale la pena cercare un prezzo.
+ *
+ * Tagliare i primi N caratteri e' la cosa ovvia e su molti siti funziona,
+ * perche' i dati strutturati stanno in alto. Su Coop no: le sue pagine pesano
+ * 1,8 MB e il blocco `ld+json` comincia intorno al byte 838.000. Con qualunque
+ * taglio ragionevole in testa, il prezzo c'era e non lo leggevamo — e la riga
+ * finiva scartata come «prodotto senza prezzo», che e' una bugia comoda.
+ *
+ * Quindi non si taglia alla cieca: si tiene la testa, dove stanno microdata e
+ * meta og, PIU' la finestra intorno al primo blocco di dati strutturati,
+ * ovunque si trovi.
+ */
+export function porzioneConPrezzi(html: string): string {
+  const testa = html.slice(0, 120_000);
+  const i = html.search(/application\/ld\+json/i);
+  if (i < 0 || i < 120_000) return testa;
+  return `${testa}\n${html.slice(i, i + 160_000)}`;
+}
+
+export function readPrices(html: string): PagePrice | null {
   const current = firstNumber(html, [
     /"price"\s*:\s*"?([\d.,]+)"?/i,
     /"lowPrice"\s*:\s*"?([\d.,]+)"?/i,
@@ -179,7 +199,14 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
     }
     // Le pagine prodotto sono grandi: i dati strutturati stanno in alto,
     // quindi non serve tenerne più di così in memoria.
-    html = (await res.text()).slice(0, 200_000);
+    /* La finestra giusta, non i primi duecentomila caratteri.
+       Il taglio in testa funziona finche' i dati strutturati stanno in alto, e
+       su Coop non ci stanno: il blocco `ld+json` comincia oltre l'ottocentesimo
+       migliaio. Qui l'effetto era piu' subdolo che altrove — la pagina si
+       apriva, quindi il link passava come buono, ma senza prezzo la riga non
+       entrava nel totale e l'insegna intera veniva dichiarata «troppi link
+       rotti». Tre catene su undici sparivano per un taglio di stringa. */
+    html = porzioneConPrezzi(await res.text());
   } catch {
     return { status: "non-raggiungibile", reason: "irraggiungibile" };
   }
@@ -214,6 +241,8 @@ export interface CheckedRow {
   /** Vuoto quando la pagina non si apre: non si mostra un link rotto. */
   link: string;
   verifica: VerifyStatus;
+  /** Il negozio fisico a cui il prezzo si riferisce, quando lo sappiamo. */
+  puntoVendita?: string;
   /** Prezzo pieno, presente solo se il prodotto è in offerta. */
   prezzoListino?: number;
   risparmio?: number;
@@ -247,6 +276,14 @@ export async function verifyPrices(
     negozio: string;
     link: string;
     immagine?: string;
+    /* Promozione gia' nota. Le insegne interrogate via API la dichiarano
+       loro, e va conservata quando la pagina non ne sa nulla. */
+    prezzoListino?: number;
+    risparmio?: number;
+    scontoPercento?: number;
+    offertaFinoAl?: string;
+    /** Il negozio fisico a cui il prezzo si riferisce, quando lo sappiamo. */
+    puntoVendita?: string;
   }>,
   batchSize = 10,
 ): Promise<{ rows: CheckedRow[]; verificati: number; totali: number }> {
@@ -273,17 +310,22 @@ export async function verifyPrices(
           return { ...row, verifica: v.status };
         }
 
-        // Il prezzo della pagina vince su quello dell'AI: è quello che
-        // l'utente paga oggi, promozione compresa.
+        /* Il prezzo della pagina vince su quello di partenza: è quello che
+           l'utente paga oggi, promozione compresa.
+           MA SOLO SE LA PAGINA LO DA'. Prima questi campi si riscrivevano
+           comunque, anche con `undefined`: una riga che arrivava gia' con la
+           sua promozione — succede per le insegne interrogate via API, dove il
+           listino barrato e lo sconto li dichiara l'API stessa — passava di qui
+           e usciva senza. La promozione veniva raccolta e poi buttata. */
         const p = v.page;
         return {
           ...row,
           prezzo: p?.current ?? row.prezzo,
           verifica: v.status,
-          prezzoListino: p?.list,
-          risparmio: p?.saving,
-          scontoPercento: p?.discountPercent,
-          offertaFinoAl: p?.validUntil,
+          prezzoListino: p?.list ?? row.prezzoListino,
+          risparmio: p?.saving ?? row.risparmio,
+          scontoPercento: p?.discountPercent ?? row.scontoPercento,
+          offertaFinoAl: p?.validUntil ?? row.offertaFinoAl,
         };
       }),
     );
@@ -445,10 +487,13 @@ export interface Offer {
      link, perche' solo per quelli la pagina si e' aperta davvero. */
   /** Il nome sullo scaffale di quel negozio. */
   nome: string;
-  prezzo: number;
+  /** `null` quando l'insegna da' il prodotto ma non il prezzo: vale il link. */
+  prezzo: number | null;
   valuta: string;
   link: string;
   verifica: VerifyStatus;
+  /** Il punto vendita a cui il prezzo si riferisce, quando lo sappiamo. */
+  puntoVendita?: string;
   /** Presenti solo se il prodotto è in promozione in quel negozio. */
   prezzoListino?: number;
   risparmio?: number;
@@ -484,10 +529,19 @@ export function groupByProduct(rows: CheckedRow[]): ProductOffers[] {
   const groups = new Map<string, Offer[]>();
 
   for (const r of rows) {
-    // Una riga senza prezzo non è un'offerta. Una con prezzo ma senza pagina
-    // che si apre lo è ancora, purché abbia un posto dove mandare l'utente.
-    if (r.prezzo == null) continue;
-    if (r.verifica === "non-raggiungibile" && !r.linkRicerca) continue;
+    /* UNA RIGA SENZA PREZZO NON E' UN'OFFERTA — ma un posto dove andare si'.
+       Per alcune insegne il prezzo e' irraggiungibile da fuori (vive nella
+       sessione del loro sito) mentre il prodotto e il suo indirizzo si
+       leggono benissimo. Prima queste righe si buttavano, e su un prodotto
+       che nessun'altra insegna prezza l'utente restava con NIENTE: ne' un
+       numero ne' un negozio.
+       Ora passano, ma solo se il link e' stato aperto davvero. Non portano
+       prezzo e non entrano in nessun totale — sono l'ultima spiaggia, e
+       l'ordinamento piu' sotto le tiene in fondo perche' un'offerta senza
+       prezzo non puo' mai essere «la piu' conveniente». */
+    const soloLink = r.prezzo == null;
+    if (soloLink && (r.verifica === "non-raggiungibile" || !r.link)) continue;
+    if (!soloLink && r.verifica === "non-raggiungibile" && !r.linkRicerca) continue;
 
     const key = (r.prodotto || r.nome).trim().toLowerCase();
     const offer: Offer = {
@@ -496,6 +550,7 @@ export function groupByProduct(rows: CheckedRow[]): ProductOffers[] {
       linkRicerca: r.linkRicerca,
       ricercaSu: r.ricercaSu,
       nome: r.nome,
+      puntoVendita: r.puntoVendita,
       prezzo: r.prezzo,
       valuta: r.valuta,
       // Un link che non si apre non si consegna mai: e' l'unica cosa che
@@ -523,19 +578,25 @@ export function groupByProduct(rows: CheckedRow[]): ProductOffers[] {
     // La verifica non sparisce: resta l'etichetta su ogni riga, e soprattutto
     // decide che cosa entra nel TOTALE — che si calcola a parte, sui soli
     // prezzi di cui abbiamo aperto la pagina.
-    offerte.sort((a, b) => a.prezzo - b.prezzo);
+    // Le righe senza prezzo restano in fondo: sono un posto dove andare, non
+    // un prezzo, e non devono mai finire in cima come «piu' conveniente».
+    offerte.sort((a, b) => {
+      if (a.prezzo == null) return b.prezzo == null ? 0 : 1;
+      if (b.prezzo == null) return -1;
+      return a.prezzo - b.prezzo;
+    });
 
     const first = rows.find((r) => (r.prodotto || r.nome).trim().toLowerCase() === key);
     // La differenza si calcola solo fra prezzi verificati: confrontare un
     // prezzo controllato con uno che non lo e' darebbe un risparmio inventato.
-    const sicuri = offerte.filter((o) => o.verifica !== "non-raggiungibile");
+    const sicuri = offerte.filter((o) => o.prezzo != null && o.verifica !== "non-raggiungibile");
 
     return {
       prodotto: first?.prodotto || first?.nome || key,
       offerte,
       differenza:
         sicuri.length > 1
-          ? Math.round((sicuri[sicuri.length - 1].prezzo - sicuri[0].prezzo) * 100) / 100
+          ? Math.round(((sicuri[sicuri.length - 1].prezzo ?? 0) - (sicuri[0].prezzo ?? 0)) * 100) / 100
           : null,
     };
   });
@@ -661,9 +722,12 @@ export function togliOutlier(gruppi: ProductOffers[]): ProductOffers[] {
   return gruppi.map((g) => {
     if (g.offerte.length < 2) return g;
 
-    const minimo = Math.min(...g.offerte.map((o) => o.prezzo));
+    const prezzi = g.offerte.map((o) => o.prezzo).filter((x): x is number => x != null);
+    if (!prezzi.length) return g;
+    const minimo = Math.min(...prezzi);
     const offerte = g.offerte.filter((o) => {
-      const troppo = o.prezzo > minimo * 6;
+      // Le righe senza prezzo non sono mai un caso limite: non hanno numero.
+      const troppo = o.prezzo != null && o.prezzo > minimo * 6;
       if (troppo) {
         console.info(
           `[plausibilita] tolta alternativa "${o.nome.slice(0, 40)}" da ${o.negozio}: ` +
@@ -673,13 +737,13 @@ export function togliOutlier(gruppi: ProductOffers[]): ProductOffers[] {
       return !troppo;
     });
 
-    const sicuri = offerte.filter((o) => o.verifica !== "non-raggiungibile");
+    const sicuri = offerte.filter((o) => o.prezzo != null && o.verifica !== "non-raggiungibile");
     return {
       ...g,
       offerte,
       differenza:
         sicuri.length > 1
-          ? Math.round((sicuri[sicuri.length - 1].prezzo - sicuri[0].prezzo) * 100) / 100
+          ? Math.round(((sicuri[sicuri.length - 1].prezzo ?? 0) - (sicuri[0].prezzo ?? 0)) * 100) / 100
           : null,
     };
   });
@@ -706,6 +770,8 @@ export function togliOutlier(gruppi: ProductOffers[]): ProductOffers[] {
  */
 export function migliorePrezzoVerificato(gruppo: ProductOffers): Offer | null {
   return (
-    gruppo.offerte.find((o) => paginaEsiste(o.verifica)) ?? null
+    // Il prezzo deve esserci: una riga «solo link» non puo' diventare il
+    // prezzo migliore, o il totale sommerebbe un buco.
+    gruppo.offerte.find((o) => o.prezzo != null && paginaEsiste(o.verifica)) ?? null
   );
 }
