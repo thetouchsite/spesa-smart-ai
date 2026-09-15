@@ -54,8 +54,24 @@ export interface Negozio {
 interface InsegnaConNegozi {
   insegna: string;
   paese: string;
-  /** La base del sito EBSN che espone il cercanegozi. */
+  /** La base del sito che espone il cercanegozi. */
   base: string;
+  /**
+   * Come si leggono i punti vendita di questa insegna.
+   *
+   *   "ebsn"     /ebsn/api/warehouse-locator/search: JSON completo, con
+   *              indirizzo e coordinate. E' il caso migliore.
+   *   "json"     un indirizzo JSON suo, con i campi scritti a modo suo.
+   *   "sitemap"  niente JSON: le schede negozio stanno nella sitemap e del
+   *              punto vendita si ricava la CITTA' dall'indirizzo, non la via.
+   *              Meno dato, ma e' quello che serve alla domanda vera — quali
+   *              insegne ti servono dove stai — e si ottiene senza aprire
+   *              mille pagine.
+   */
+  via: "ebsn" | "json" | "sitemap";
+  /** Per "json": l'indirizzo da chiamare. Per "sitemap": come riconoscere una scheda. */
+  percorso?: string;
+  schema?: RegExp;
 }
 
 /**
@@ -66,14 +82,36 @@ interface InsegnaConNegozi {
  * il cercanegozi ha la stessa forma su tutte.
  */
 export const INSEGNE_CON_NEGOZI: InsegnaConNegozi[] = [
-  { insegna: "Eurospin", paese: "IT", base: "https://online.eurospin.com" },
-  { insegna: "Tigros", paese: "IT", base: "https://www.tigros.it" },
-  { insegna: "Coop (Nova Coop, Lombardia, Liguria)", paese: "IT", base: "https://www.coopshop.it" },
-  { insegna: "Basko", paese: "IT", base: "https://www.basko.it" },
-  { insegna: "Iperal", paese: "IT", base: "https://www.iperalspesaonline.it" },
-  { insegna: "Effepiù", paese: "IT", base: "https://www.myeffepiu.it" },
-  { insegna: "Alì Supermercati", paese: "IT", base: "https://www.alisupermercati.it" },
-  { insegna: "Iper La Grande i", paese: "IT", base: "https://iperdrive.iper.it" },
+  { via: "ebsn", insegna: "Eurospin", paese: "IT", base: "https://online.eurospin.com" },
+  { via: "ebsn", insegna: "Tigros", paese: "IT", base: "https://www.tigros.it" },
+  { via: "ebsn", insegna: "Coop (Nova Coop, Lombardia, Liguria)", paese: "IT", base: "https://www.coopshop.it" },
+  { via: "ebsn", insegna: "Basko", paese: "IT", base: "https://www.basko.it" },
+  { via: "ebsn", insegna: "Iperal", paese: "IT", base: "https://www.iperalspesaonline.it" },
+  { via: "ebsn", insegna: "Effepiù", paese: "IT", base: "https://www.myeffepiu.it" },
+  { via: "ebsn", insegna: "Alì Supermercati", paese: "IT", base: "https://www.alisupermercati.it" },
+  { insegna: "Iper La Grande i", paese: "IT", base: "https://iperdrive.iper.it", via: "ebsn" },
+
+  /* NON-EBSN, trovate con scripts/caccia-negozi.mjs.
+     Penny pubblica un indirizzo JSON completo — citta', provincia, CAP e
+     coordinate — ed e' il caso piu' pulito dopo EBSN. Carrefour ed Esselunga
+     no: hanno una scheda per punto vendita nella sitemap, e da li' si ricava
+     la citta' dall'indirizzo. Dell'indirizzo civico non sappiamo niente, e non
+     lo si finge: il campo resta vuoto. */
+  { insegna: "Penny Market", paese: "IT", base: "https://www.penny.it", via: "json", percorso: "/api/stores" },
+  {
+    insegna: "Carrefour",
+    paese: "IT",
+    base: "https://www.carrefour.it",
+    via: "sitemap",
+    schema: /\/punti-vendita\/([^/.]+)\.html$/i,
+  },
+  {
+    insegna: "Esselunga",
+    paese: "IT",
+    base: "https://www.esselunga.it",
+    via: "sitemap",
+    schema: /\/negozi\/negozio\.esselunga-di-([^/?#]+)$/i,
+  },
 ];
 
 const cache = new Map<string, { negozi: Negozio[]; creatoIl: number }>();
@@ -101,8 +139,120 @@ function nomePulito(grezzo: string): string {
   return grezzo.replace(/^\d+\s*-\s*/, "").trim();
 }
 
+/** Dal nome nell'indirizzo al nome di una citta': "san-martino" -> "San Martino". */
+function cittaDaSlug(slug: string): string {
+  return decodeURIComponent(slug)
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Penny e le altre che pubblicano un JSON loro.
+ *
+ * Ogni insegna scrive i campi a modo suo, quindi si cercano per nome invece di
+ * pretendere una forma: `city`/`citta`, `zip`/`cap`, `street`/`indirizzo`.
+ * Costa poco ed evita una riga di codice per insegna.
+ */
+async function daJson(ins: InsegnaConNegozi): Promise<Negozio[]> {
+  const r = await fetch(ins.base + (ins.percorso ?? "/api/stores"), {
+    signal: AbortSignal.timeout(20_000),
+    headers: { "User-Agent": UA, Accept: "application/json" },
+  });
+  if (!r.ok) return [];
+  const j = JSON.parse(await r.text()) as unknown;
+  const arr = Array.isArray(j)
+    ? j
+    : ((j as { stores?: unknown[]; data?: unknown[] })?.stores ??
+       (j as { data?: unknown[] })?.data ??
+       []);
+
+  const fuori: Negozio[] = [];
+  for (const g of arr as Array<Record<string, unknown>>) {
+    const pos = (g.position ?? g.coordinates ?? {}) as { lat?: number; lng?: number; lon?: number };
+    const citta = String(g.city ?? g.citta ?? g.comune ?? "");
+    if (!citta) continue;
+    fuori.push({
+      insegna: ins.insegna,
+      id: fuori.length,
+      nome: `${ins.insegna} ${citta}`,
+      indirizzo: String(g.street ?? g.indirizzo ?? g.address ?? ""),
+      citta,
+      provincia: String(g.province ?? g.provincia ?? g.prov ?? ""),
+      cap: String(g.zip ?? g.cap ?? g.postalCode ?? ""),
+      latitudine: typeof pos.lat === "number" ? pos.lat : undefined,
+      longitudine: typeof pos.lng === "number" ? pos.lng : (typeof pos.lon === "number" ? pos.lon : undefined),
+    });
+  }
+  return fuori;
+}
+
+/**
+ * Chi il cercanegozi non lo espone, ma ha una scheda per punto vendita.
+ *
+ * Della scheda si legge solo l'INDIRIZZO, non il contenuto: da
+ * `/punti-vendita/como.html` si ricava «Como», e basta a sapere che Carrefour
+ * serve Como. La via non la sappiamo e non la si inventa — il campo resta
+ * vuoto, e chi legge vede che manca.
+ *
+ * Aprire mille pagine per avere il civico costerebbe mille richieste al giorno
+ * per un dato che alla domanda vera — quali insegne mi servono qui — non
+ * aggiunge niente.
+ */
+async function daSitemap(ins: InsegnaConNegozi): Promise<Negozio[]> {
+  if (!ins.schema) return [];
+  const rb = await fetch(ins.base + "/robots.txt", {
+    signal: AbortSignal.timeout(15_000),
+    headers: { "User-Agent": UA },
+  });
+  const testo = rb.ok ? await rb.text() : "";
+  const dichiarate = [...testo.matchAll(/^\s*Sitemap:\s*(\S+)/gim)].map((m) => m[1].trim());
+  const candidate = dichiarate.length ? dichiarate : [ins.base + "/sitemap.xml"];
+
+  const visti = new Map<string, Negozio>();
+  for (const sm of candidate.slice(0, 3)) {
+    const x = await fetch(sm, { signal: AbortSignal.timeout(30_000), headers: { "User-Agent": UA } });
+    if (!x.ok) continue;
+    const xml = await x.text();
+    const loc = [...xml.matchAll(/<loc>([^<]+)<\/loc>/gi)].map((m) => m[1].trim());
+
+    const dentro: string[] = [];
+    if (/<sitemapindex/i.test(xml)) {
+      for (const f of loc.filter((l) => /negoz|punti|store/i.test(l)).slice(0, 4)) {
+        const y = await fetch(f, { signal: AbortSignal.timeout(30_000), headers: { "User-Agent": UA } });
+        if (!y.ok) continue;
+        const yx = await y.text();
+        dentro.push(...[...yx.matchAll(/<loc>([^<]+)<\/loc>/gi)].map((m) => m[1].trim()));
+      }
+    } else {
+      dentro.push(...loc);
+    }
+
+    for (const u of dentro) {
+      const m = u.match(ins.schema);
+      if (!m) continue;
+      const citta = cittaDaSlug(m[1]);
+      if (!citta || visti.has(u)) continue;
+      visti.set(u, {
+        insegna: ins.insegna,
+        id: visti.size,
+        nome: `${ins.insegna} ${citta}`,
+        indirizzo: "",
+        citta,
+        provincia: "",
+        cap: "",
+      });
+    }
+    if (visti.size > 100) break;
+  }
+  return [...visti.values()];
+}
+
 async function scarica(ins: InsegnaConNegozi): Promise<Negozio[]> {
   try {
+    if (ins.via === "json") return await daJson(ins);
+    if (ins.via === "sitemap") return await daSitemap(ins);
     const r = await fetch(`${ins.base}/ebsn/api/warehouse-locator/search`, {
       // Venti secondi: l'elenco e' grosso ma si scarica una volta al giorno,
       // non a ogni richiesta.
