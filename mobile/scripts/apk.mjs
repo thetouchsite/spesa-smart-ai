@@ -72,7 +72,10 @@ function comando(nome) {
 
 function esegui(comando, argomenti, cartella) {
   return new Promise((risolvi, rifiuta) => {
-    const p = spawn(comando, argomenti, {
+    // Con la shell accesa va citato anche IL COMANDO, non solo i suoi
+    // argomenti. Il percorso di questo progetto contiene uno spazio, e cmd
+    // leggeva "C:\Users\anton\works\Spesa" come il programma da eseguire.
+    const p = spawn(citaSeServe(comando), argomenti.map(citaSeServe), {
       cwd: cartella,
       stdio: "inherit",
       // Su Windows i comandi installati sono file .cmd, che non sono
@@ -118,8 +121,24 @@ async function main() {
   await esegui(comando("npx"), ["expo", "prebuild", "--platform", "android"], RADICE);
 
   const android = join(RADICE, "android");
-  const wrapper = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
-  if (!existsSync(join(android, process.platform === "win32" ? "gradlew.bat" : "gradlew"))) {
+
+  /**
+   * Il percorso COMPLETO del wrapper, non il suo nome.
+   *
+   * Il nome da solo non basta: `cmd` cerca gli eseguibili nel PATH e, su
+   * parecchie installazioni Windows, NON nella cartella corrente — c'e' una
+   * politica di sistema che lo disattiva. Il risultato era
+   *
+   *     "gradlew.bat" non e' riconosciuto come comando interno o esterno
+   *
+   * subito dopo un prebuild andato benissimo, con il file li' dove doveva
+   * essere. Con il percorso assoluto la questione non si pone.
+   */
+  const wrapper = join(
+    android,
+    process.platform === "win32" ? "gradlew.bat" : "gradlew",
+  );
+  if (!existsSync(wrapper)) {
     throw new Error("prebuild non ha prodotto il wrapper di Gradle: la cartella android è incompleta");
   }
 

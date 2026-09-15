@@ -69,6 +69,21 @@ export function PriceCheckSheet({
   const [amazon, setAmazon] = useState<Offer[]>([]);
   const [cercandoAmazon, setCercandoAmazon] = useState(false);
 
+  /* AMAZON E' SPENTO, E CON LUI OGNI RICERCA ESTERNA.
+     La lista mostra soltanto quello che trova il NOSTRO catalogo: prodotti
+     con l'indirizzo scritto dal negozio, che non puo' essere sbagliato.
+
+     Le ricerche esterne — Amazon via SocialCrawl, Google Shopping via
+     SerpAPI — davano copertura in cambio di tre cose che non vogliamo:
+     prodotti spesso sbagliati (i venditori del marketplace), un credito che
+     si consuma a ogni tocco, e una dipendenza da servizi che possono chiudere
+     — l'API di Amazon e' stata spenta a maggio, Google Custom Search chiude
+     il 1° gennaio 2027.
+
+     Il codice resta: si riaccende togliendo il commento qui sotto e rimettendo
+     `amazon` nell'elenco delle righe. Non e' stato cancellato perche' il
+     confronto puo' servire di nuovo.
+
   useEffect(() => {
     if (!itemName) {
       setAmazon([]);
@@ -88,11 +103,40 @@ export function PriceCheckSheet({
       vivo = false;
     };
   }, [itemName, searchName, country]);
+  */
 
-  // Amazon si affianca alle altre e concorre allo stesso ordine: se costa meno
-  // vince, se costa di più resta sotto. Nessun trattamento di favore.
-  const righe = [...(offers?.offerte ?? []), ...amazon].sort((a, b) => a.prezzo - b.prezzo);
-  const migliore = righe[0] ?? null;
+  /* SOLO IL NOSTRO CATALOGO, e l'ordine mette i prezzi prima.
+     Chi ha un prezzo sale, dal piu' economico; chi ha solo il prodotto e il
+     link resta sotto — trattare un prezzo mancante come zero lo farebbe
+     sembrare l'offerta migliore, che e' la bugia piu' facile da raccontare. */
+  /* «PIU' CONVENIENTE» SOLO FRA LE OFFERTE CHE ESISTONO.
+     Visto nella risposta del server, e non e' un caso limite:
+
+       Amazon (Morrisons)  link ""   non-raggiungibile   3,49 £   ← era il "migliore"
+       Waitrose            link ""   non-raggiungibile   3,75 £
+       Ocado               link ok   pagina-ok           4,50 £
+
+     Le due piu' economiche avevano il link VUOTO e il server le aveva gia'
+     marcate irraggiungibili. Il pannello le ordinava solo per prezzo, quindi
+     eleggeva a offerta migliore una riga che non porta da nessuna parte — e
+     l'unica con una pagina vera finiva ultima.
+
+     Ordinare per prezzo era giusto quando ogni riga aveva un link. Adesso la
+     domanda viene prima: questa scheda esiste? Chi non ce l'ha resta in
+     elenco, perche' il prezzo l'abbiamo visto e la ricerca nel negozio si
+     apre lo stesso, ma sotto — e non puo' vincere il confronto. */
+  const esiste = (o: Offer) => o.verifica !== "non-raggiungibile";
+
+  const righe = [...(offers?.offerte ?? [])].sort((a, b) => {
+    if (esiste(a) !== esiste(b)) return esiste(a) ? -1 : 1;
+    const pa = a.prezzo ?? Number.POSITIVE_INFINITY;
+    const pb = b.prezzo ?? Number.POSITIVE_INFINITY;
+    return pa - pb;
+  });
+
+  // Il migliore e' il primo CON una pagina e CON un prezzo. Se non ce n'e'
+  // nessuno, non si elegge nessuno: meglio nessun titolo che uno falso.
+  const migliore = righe.find((o) => esiste(o) && o.prezzo != null) ?? null;
 
   return (
     <Modal
@@ -140,7 +184,7 @@ export function PriceCheckSheet({
               <View style={styles.best}>
                 <Body style={styles.bestLabel}>{ui("Più conveniente")}</Body>
                 <Body style={styles.bestPrice}>
-                  {money(migliore.prezzo, migliore.valuta, language)}
+                  {money(migliore.prezzo ?? 0, migliore.valuta, language)}
                 </Body>
                 <Body style={styles.bestSource}>
                   {`${ui("da")} ${migliore.negozio}`}
@@ -182,17 +226,35 @@ export function PriceCheckSheet({
                         prezzo è quello che l'AI ha visto, non uno confermato
                         da noi, e va detto. */}
                     {o.verifica === "bloccato" ? ` · ${ui("da confermare")}` : ""}
+                    {/* La scheda non c'e' piu': il prezzo l'abbiamo visto, ma
+                        toccando si finisce sulla RICERCA nel negozio, non su
+                        quel prodotto. Dirlo evita che qualcuno tocchi
+                        aspettandosi la scheda e trovi un elenco. */}
+                    {o.verifica === "non-raggiungibile"
+                      ? ` · ${ui("cerca nel negozio")}`
+                      : ""}
                   </Body>
                 </View>
                 <View style={styles.rowRight}>
-                  <Body style={styles.rowPrice}>{money(o.prezzo, o.valuta, language)}</Body>
+                  {/* Un trattino, non «0,00»: il prezzo non e' zero, e' che
+                      non lo sappiamo. Zero sarebbe una cifra, e le cifre si
+                      credono. */}
+                  <Body style={styles.rowPrice}>
+                    {o.prezzo != null ? money(o.prezzo, o.valuta, language) : "—"}
+                  </Body>
                   {/* Il prezzo pieno barrato, quando il prodotto è in offerta. */}
                   {o.prezzoListino && o.scontoPercento ? (
                     <Body style={styles.rowWas}>
                       {`${money(o.prezzoListino, o.valuta, language)} −${o.scontoPercento}%`}
                     </Body>
                   ) : null}
-                  {o.link ? <Ionicons name="open-outline" size={15} color={colors.primary} /> : null}
+                  {o.link || o.linkRicerca ? (
+                    <Ionicons
+                      name={o.link ? "open-outline" : "search-outline"}
+                      size={15}
+                      color={o.link ? colors.primary : colors.mutedForeground}
+                    />
+                  ) : null}
                 </View>
               </Pressable>
             ))}
@@ -205,7 +267,14 @@ export function PriceCheckSheet({
             ) : null}
 
             <Body style={styles.note}>
-              {ui("Prezzi trovati sul web quando è stato creato il piano e verificati aprendo la pagina del prodotto. Toccando una riga si apre il negozio.")}
+              {/* NON SI DICE PIU' «VERIFICATI»: non e' sempre vero.
+                  Ocado risponde HTTP 202 con un corpo vuoto, Sainsbury's
+                  scrive «Page not found» con JavaScript: da server quelle
+                  pagine sembrano buone e non lo sono. Promettere un controllo
+                  che non abbiamo fatto e' peggio che ammettere il limite —
+                  l'utente apre il link, trova un 404, e da quel momento non
+                  crede piu' nemmeno ai prezzi giusti. */}
+              {ui("I prezzi sono quelli trovati quando hai creato il piano: possono essere cambiati. Alcuni negozi non ci lasciano controllare la pagina, quindi tocca una riga e verifica sul sito.")}
             </Body>
           </View>
         )}

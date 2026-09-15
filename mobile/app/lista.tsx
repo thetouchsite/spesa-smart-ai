@@ -73,6 +73,13 @@ interface Row {
   source: string;
   quantity: string;
   category: string;
+  /**
+   * Zero quando il prezzo non si e' potuto leggere.
+   *
+   * La voce resta in elenco — prodotto giusto e link che si apre — ma non
+   * porta niente al totale: sommare quello che non si sa e' precisamente
+   * l'errore che l'app esiste per non fare.
+   */
   cost: number;
   /**
    * Da dove viene il prezzo.
@@ -178,7 +185,7 @@ export default function ListaScreen() {
           source: cercato,
           quantity: g.quantity,
           category: g.category || "—",
-          cost: best.prezzo,
+          cost: best.prezzo ?? 0,
           kind: "reale" as const,
           store: best.negozio,
           link: best.link || undefined,
