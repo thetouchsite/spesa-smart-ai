@@ -337,9 +337,38 @@ export interface PlanFullResult {
  * Il margine è largo di proposito: un menù lento ma riuscito vale molto più di
  * un fallimento puntuale. Con 45 secondi una generazione da 50 andava persa —
  * e il server, che l'aveva completata, la teneva in cache per nessuno.
+ *
+ * NEL BROWSER IL MURO NON C'E', E 55 SECONDI NON BASTANO PIU'.
+ * -----------------------------------------------------------
+ * I sessanta secondi sono una regola di iOS, non della rete: la versione che
+ * gira nel browser — quella che facciamo provare a chi ha un iPhone e non puo'
+ * installare niente — non li ha. Tenerci sotto anche li' era autolesionismo.
+ *
+ * E i tempi veri hanno superato la stima scritta qui sopra. Misurato il 15
+ * settembre sul server pubblico, lista di 18 voci a Bologna:
+ *
+ *     /ai/lista    38 s sul server,  50 s dal client
+ *     /ai/prices   51 s sul server,  62 s dal client  (22 ricerche, 16 insegne)
+ *
+ * I prezzi sfondavano il tetto di 55 secondi di sette secondi: la richiesta
+ * veniva annullata, `client.ts` la traduceva in "Connessione non riuscita", e
+ * il flusso dichiarava onestamente "0 su 18 prodotti con pagina aperta".
+ * Tutto il resto funzionava — il server stava finendo il lavoro e rispondeva
+ * a nessuno. Il menu', a 50 secondi su 55, era il prossimo a cadere.
+ *
+ * Quindi: nel browser si aspetta quanto serve, sul telefono si resta sotto il
+ * muro di iOS. Il controllo su `document` distingue i due mondi senza tirare
+ * dentro `react-native` in una cartella che non lo importa mai.
+ *
+ * SUL TELEFONO IL PROBLEMA RESTA APERTO: 51 secondi di lavoro vero contro un
+ * muro di 60 e' un margine che una lista piu' lunga o una giornata storta si
+ * mangiano. La strada non e' alzare un numero che iOS ignora — e' chiedere
+ * meno per richiesta (meno voci, meno insegne) o spezzare i prezzi in due.
  */
-const MENU_TIMEOUT_MS = 55_000;
-const PRICES_TIMEOUT_MS = 55_000;
+const NEL_BROWSER = typeof document !== "undefined";
+
+const MENU_TIMEOUT_MS = NEL_BROWSER ? 120_000 : 55_000;
+const PRICES_TIMEOUT_MS = NEL_BROWSER ? 180_000 : 55_000;
 
 /**
  * Quale strada usare per i prezzi.
