@@ -32,6 +32,8 @@
  * di un negozio all'indirizzo di un altro.
  */
 
+import { cache, isDbConfigured } from "./db.js";
+
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
 
@@ -150,7 +152,8 @@ export const INSEGNE_CON_NEGOZI: InsegnaConNegozi[] = [
   },
 ];
 
-const cache = new Map<string, { negozi: Negozio[]; creatoIl: number }>();
+/** Lo specchio in memoria: evita di interrogare il database a ogni richiesta. */
+const memoria = new Map<string, { negozi: Negozio[]; creatoIl: number }>();
 
 interface RispostaLocator {
   data?: {
@@ -325,13 +328,64 @@ async function scarica(ins: InsegnaConNegozi): Promise<Negozio[]> {
   }
 }
 
-/** I punti vendita di un'insegna, scaricati una volta al giorno. */
+/**
+ * I punti vendita di un'insegna, cercati in memoria, poi su database, poi sul
+ * sito del negozio — in quest'ordine, e per un motivo preciso.
+ *
+ * PERCHE' NON BASTA LA MEMORIA
+ * ----------------------------
+ * Perche' la memoria muore col processo, e su Render il piano gratuito spegne
+ * il servizio dopo quindici minuti di silenzio. Tenendo l'elenco solo in
+ * memoria succedono tre cose, tutte sbagliate: il primo utente dopo ogni pausa
+ * aspetta il riscaricamento, i siti dei negozi vengono interrogati decine di
+ * volte al giorno per un dato che cambia una volta ogni tanto, e la fatica di
+ * costruirlo si butta via a ogni risveglio.
+ *
+ * Su database l'elenco sopravvive ai riavvii e si riscarica una volta al
+ * giorno davvero, non una volta per risveglio. Senza database si continua come
+ * prima: nessuno resta senza risposta, si paga solo di piu' in attesa.
+ */
+const CHIAVE = (insegna: string) => `negozi:${insegna}`;
+
 export async function negoziDi(ins: InsegnaConNegozi): Promise<Negozio[]> {
-  const buono = cache.get(ins.insegna);
+  const buono = memoria.get(ins.insegna);
   if (buono && Date.now() - buono.creatoIl < SCADENZA_MS) return buono.negozi;
+
+  if (isDbConfigured()) {
+    try {
+      const salvato = await (await cache()).findOne({ _id: CHIAVE(ins.insegna) });
+      if (salvato) {
+        const negozi = salvato.value as Negozio[];
+        memoria.set(ins.insegna, { negozi, creatoIl: Date.now() });
+        console.info(`[negozi] ${ins.insegna}: ${negozi.length} dal database`);
+        return negozi;
+      }
+    } catch (err) {
+      // Un database irraggiungibile non deve togliere i negozi: si scarica.
+      console.warn("[negozi] lettura dal database fallita, scarico:", err);
+    }
+  }
+
   const negozi = await scarica(ins);
   if (negozi.length) console.info(`[negozi] ${ins.insegna}: ${negozi.length} punti vendita`);
-  cache.set(ins.insegna, { negozi, creatoIl: Date.now() });
+  memoria.set(ins.insegna, { negozi, creatoIl: Date.now() });
+
+  if (negozi.length && isDbConfigured()) {
+    try {
+      await (await cache()).replaceOne(
+        { _id: CHIAVE(ins.insegna) },
+        {
+          value: negozi,
+          createdAt: new Date(),
+          // Mongo cancella da solo alla scadenza: nessuna pulizia da ricordarsi.
+          expiresAt: new Date(Date.now() + SCADENZA_MS),
+        },
+        { upsert: true },
+      );
+    } catch (err) {
+      console.warn("[negozi] salvataggio non riuscito, resta in memoria:", err);
+    }
+  }
   return negozi;
 }
 
