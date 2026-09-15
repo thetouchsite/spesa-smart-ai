@@ -14,7 +14,8 @@
         "EXPO_PUBLIC_API_URL": "http://192.168.1.4:3000",
         "EXPO_PUBLIC_FLUSSO": "spesa-prima",
         "EXPO_PUBLIC_PRICE_SOURCE": "ai"
-      }
+      },
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
@@ -25,7 +26,8 @@
         "EXPO_PUBLIC_API_URL": "https://spesa-smart-ai.onrender.com",
         "EXPO_PUBLIC_FLUSSO": "spesa-prima",
         "EXPO_PUBLIC_PRICE_SOURCE": "ai"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "autoIncrement": true,
@@ -33,7 +35,8 @@
         "EXPO_PUBLIC_API_URL": "https://spesa-smart-ai.onrender.com",
         "EXPO_PUBLIC_FLUSSO": "spesa-prima",
         "EXPO_PUBLIC_PRICE_SOURCE": "ai"
-      }
+      },
+      "channel": "production"
     }
   },
   "submit": {

@@ -28,6 +28,8 @@
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
       "edgeToEdgeEnabled": true,
@@ -53,6 +55,12 @@
     "icon": "./assets/icon.png",
     "description": "Organizza la spesa della settimana dentro il tuo budget: menù, ricette e lista della spesa.",
     "primaryColor": "#00723B",
-    "owner": "marettax"
+    "owner": "marettax",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/76517650-a7f7-45b9-ac9a-ee398ec35774"
+    }
   }
 }

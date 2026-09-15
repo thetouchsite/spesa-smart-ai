@@ -5,13 +5,14 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
     "verify": "node ../node_modules/esbuild/bin/esbuild scripts/verify-flow.ts --bundle --platform=node --format=esm --outfile=scripts/verify-flow.mjs --alias:@=./src --log-level=error && node scripts/verify-flow.mjs",
     "prebuild": "expo prebuild --platform android",
-    "apk": "expo prebuild --platform android && cd android && gradlew assembleRelease",
-    "apk:apri": "explorer android\\app\\build\\outputs\\apk\\release"
+    "apk": "node scripts/apk.mjs",
+    "apk:apri": "explorer android\\app\\build\\outputs\\apk\\release",
+    "demo": "node scripts/pubblica-demo.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -27,6 +28,7 @@
     "expo-router": "~57.0.18",
     "expo-sharing": "~57.0.17",
     "expo-status-bar": "~57.0.1",
+    "expo-updates": "~57.0.22",
     "expo-web-browser": "~57.0.2",
     "react": "^19.2.8",
     "react-dom": "19.2.8",
