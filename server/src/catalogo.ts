@@ -176,7 +176,45 @@ export function parole(testo: string): string[] {
   return [...new Set(piano.split(/[^a-z0-9]+/).filter((p) => p.length > 2))];
 }
 
+/* ─────────────── Cosa non puo' MAI essere la risposta ─────────────── */
+
+/**
+ * Prodotti che una lista della spesa non chiede mai.
+ *
+ * La lista nasce dalle ricette: e' tutta roba da cucinare. Un croccantino per
+ * gatti o un detersivo non e' un abbinamento debole da pesare piu' in basso —
+ * e' impossibile, e pesarlo e' solo un modo lento di sbagliare.
+ *
+ * Serve soprattutto quando una voce si riduce a una parola sola e generica:
+ * «Uova medie 10» perde «medie» e il numero, resta «uova», e con quella sola
+ * parola le caramelle «uova al tegamino» valgono quanto le uova vere.
+ * Misurato: vincevano pure, perche' costano meno.
+ */
+const NON_ALIMENTARI = [
+  /(crocchett|croccantin|gatt[oi]?|cane|cani|cucciol|cuccioli|mangim)/i,
+  /(detersiv|detergent|ammorbid|candeggi|sgrassat|anticalcar|shampoo|balsamo|bagnoschiuma|sapone|dentifric|deodorant|assorbent|pannolin|salviett|tovagliol|carta igienic|polish|insettic)/i,
+  /(haribo|caramell|gommos|liquiriz|chewing|lecca lecca)/i,
+  /(quaderno|portamine|matite|penna a sfera|astuccio|pila|batteri)/i,
+];
+
+function alimentarePlausibile(nome: string): boolean {
+  return !NON_ALIMENTARI.some((re) => re.test(nome));
+}
+
+/**
+ * La trappola dell'ingrediente dentro la preparazione.
+ *
+ * «Frollini con uova» contiene la parola «uova» ed e' un biscotto; «petto di
+ * pollo al forno» contiene «petto» e «pollo» ed e' un affettato cotto. Queste
+ * parole dicono «sono una preparazione, l'ingrediente che cerchi e' dentro di
+ * me»: se compaiono nel prodotto ma NON nella voce cercata, non e' quello che
+ * serve per cucinare.
+ */
+const PREPARAZIONI =
+  /(frollin|biscott|merendin|brioche|briochin|croissant|cornett|snack|gelat[oi]|budin|torta|tortin|crostat|wafer|crackers|grissin|pandoro|panettone|colomba|ripien[oi]|farcit|arrost|affettat|precott|impanat|affumicat|stagionat|al forno)/i;
+
 /* ──────────────────────── Costruire un paese ───────────────────── */
+
 
 
 /**
@@ -380,7 +418,32 @@ export async function cercaNelCatalogo(
     for (const i of dove) conteggio.set(i, (conteggio.get(i) ?? 0) + 1);
   }
 
-  return [...conteggio.entries()]
+  /* CHI HA TUTTE LE PAROLE VIENE PRIMA, E DI SOLITO BASTA LUI.
+     Il conteggio da solo e' troppo generoso: in «Orata fresca» la parola
+     «fresca» sta in mezzo catalogo, e una ricotta fresca prende un punto
+     esattamente come un'orata. Chiedere TUTTE le parole della voce toglie di
+     mezzo quel genere di abbinamento senza inventare punteggi.
+
+     Ma non si impone: se nessun prodotto le ha tutte si torna al conteggio,
+     perche' una voce scritta in modo insolito — «Cuori di merluzzo surgelati»
+     contro «cuori di filetti di merluzzo» — deve comunque trovare qualcosa, e
+     a scegliere fra i sopravvissuti c'e' comunque il modello, dopo.
+
+     Fuori intanto due categorie che non possono mai essere la risposta: il
+     non-alimentare e le preparazioni che contengono l'ingrediente cercato
+     senza essere l'ingrediente. */
+  const ammesso = (i: number): boolean => {
+    const nome = cat.voci[i].nome;
+    if (!alimentarePlausibile(nome)) return false;
+    if (PREPARAZIONI.test(nome) && !cercate.some((w) => PREPARAZIONI.test(w))) return false;
+    return true;
+  };
+
+  const validi = [...conteggio.entries()].filter(([i]) => ammesso(i));
+  const complete = validi.filter(([, punti]) => punti === cercate.length);
+  const usati = complete.length ? complete : validi;
+
+  return usati
     .sort((a, b) => b[1] - a[1] || cat.voci[a[0]].nome.length - cat.voci[b[0]].nome.length)
     .slice(0, quanti)
     .map(([i, punti]) => ({

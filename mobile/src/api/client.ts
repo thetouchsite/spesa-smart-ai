@@ -136,7 +136,23 @@ async function request<T>(
     throw new ApiError(0, "Connessione non riuscita. Verifica la rete e riprova.");
   }
 
-  const text = await res.text();
+  /**
+   * Il corpo si legge DENTRO un try, e per un pezzo non era cosi'.
+   *
+   * `AbortSignal.timeout` non smette di sorvegliare quando arrivano le
+   * intestazioni: se scade mentre il corpo sta ancora scendendo — ed e' il caso
+   * delle risposte grosse, i prezzi sono una ventina di kilobyte — a rompersi
+   * e' `res.text()`, che stava fuori dal try qui sopra. Il chiamante riceveva
+   * un `TimeoutError: signal timed out` grezzo invece del messaggio
+   * mostrabile, e finiva stampato come errore rosso in console.
+   */
+  let text: string;
+  try {
+    text = await res.text();
+  } catch {
+    throw new ApiError(0, "Connessione non riuscita. Verifica la rete e riprova.");
+  }
+
   let payload: unknown = null;
   if (text) {
     try {
