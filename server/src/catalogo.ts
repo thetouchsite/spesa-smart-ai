@@ -79,6 +79,16 @@ const PAESI_IN_MEMORIA = 3;
 const SCADENZA_MS = 26 * 60 * 60 * 1000;
 
 /**
+ * Quanto si aspetta il primo caricamento di un paese.
+ *
+ * Trentacinque secondi: la fase prezzi ne ha una cinquantina prima che l'app
+ * molli — iOS chiude ogni connessione a sessanta — e un paese si carica fra i
+ * tre e i venticinque. Il margine che resta serve ad aprire le schede e
+ * leggere i prezzi.
+ */
+const ATTESA_CARICAMENTO_MS = 35_000;
+
+/**
  * Tetto per insegna.
  *
  * Alcampo ne dichiara 86.773 e Checkers 98.424: senza un limite un paese solo
@@ -466,11 +476,30 @@ export async function cercaNelCatalogo(
      Quindi se il catalogo non c'e' ancora si comincia a scaricarlo e si
      risponde subito vuoto: questa richiesta usa le altre strade, e la
      prossima trovera' il catalogo pronto. */
-  const pronto = catalogoGiaPronto(paese);
-  if (!pronto) {
-    void catalogoDi(paese);
-    console.info(`[catalogo] ${paese} non ancora pronto: lo carico per la prossima volta`);
-    return [];
+  /* SI ASPETTA, MA NON ALL'INFINITO.
+     Prima si rispondeva subito vuoto quando il catalogo non era in memoria,
+     per non far aspettare nessuno. Aveva senso finche' dietro c'era il motore
+     con la ricerca a coprire il buco. Da quando i prezzi vengono SOLO da qui,
+     rispondere vuoto significa consegnare una lista senza un prezzo — ed e'
+     successo davvero, in produzione: Polonia 0 su 17, Spagna 0 su 16,
+     Portogallo 0 su 18, con `secondiPrezzi: 0`. Il catalogo non partiva mai,
+     perche' su Render ogni richiesta lo trovava freddo.
+
+     Ora si aspetta il caricamento, con un tetto: la fase prezzi ha una
+     cinquantina di secondi prima che l'app molli, e un paese si carica in tre
+     o venti. Se non ce la fa entro il tetto si risponde con quello che c'e' —
+     una lista magra e onesta — e il caricamento prosegue per la volta dopo. */
+  if (!catalogoGiaPronto(paese)) {
+    const atteso = await Promise.race([
+      catalogoDi(paese),
+      new Promise<null>((r) => setTimeout(() => r(null), ATTESA_CARICAMENTO_MS)),
+    ]);
+    if (!atteso) {
+      console.info(
+        `[catalogo] ${paese} non pronto entro ${ATTESA_CARICAMENTO_MS / 1000}s: ` +
+          `rispondo con quello che c'e', il caricamento prosegue`,
+      );
+    }
   }
 
   const cat = await catalogoDi(paese);
