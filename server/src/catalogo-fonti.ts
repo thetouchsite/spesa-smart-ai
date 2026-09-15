@@ -91,12 +91,26 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "IN", insegna: "JioMart", dominio: "www.jiomart.com", sitemap: "https://www.jiomart.com/sitemap/custom.sitemap.xml", stimati: 846 },
   { paese: "IT", insegna: "Carrefour Italia", dominio: "carrefour.it", sitemap: "https://www.carrefour.it/sitemap_0-product.xml", stimati: 26728 },
   { paese: "IT", insegna: "Esselunga a Casa", dominio: "spesaonline.esselunga.it", sitemap: "https://spesaonline.esselunga.it/sitemap_product.xml", stimati: 17709 },
-  { paese: "IT", insegna: "Unes Spesa Online", dominio: "spesaonline.unes.it", sitemap: "https://www.spesaonline.unes.it/medias/Product-it-EUR-12454791521131806173.xml?context=bWFzdGVyfHJvb3R8NTMyNDEyN3x0ZXh0L3htbHxhREptTDJnd1lTODVNVEE1TlRZMk5UVTBNVFF5TDFCeWIyUjFZM1F0YVhRdFJWVlNMVEV5TkRVME56a3hOVEl4TVRNeE9EQTJNVGN6TG5odGJBfGJjMzczNDgxNzNkMTljZGQ0Y2NjNWM1Yzk2YzA2MzQ1OWU4NThjMzllNDUwMWE3MTAxYzVjOTk3Zjg0YjBjZmM", stimati: 15363 },
-  { paese: "IT", insegna: "EasyCoop", dominio: "easycoop.com", sitemap: "https://www.easycoop.com/sitemap/sitemap-1-1.xml", stimati: 6633 },
+  // NON l'indirizzo firmato della sitemap figlia: contiene un token che il
+  // sito ruota, e il giorno che ruota la fonte muore in silenzio. Dall'indice.
+  { paese: "IT", insegna: "Unes", dominio: "spesaonline.unes.it", sitemap: "https://www.spesaonline.unes.it/sitemap.xml", stimati: 15363 },
+  // Dall'INDICE, non da una figlia sola: `sitemap-1-1.xml` e' meta' catalogo,
+  // l'altra meta' sta in `sitemap-1-2.xml`. Verificato: 6.633 -> 13.301.
+  { paese: "IT", insegna: "Coop", dominio: "easycoop.com", sitemap: "https://www.easycoop.com/sitemap/sitemap.xml", stimati: 13301 },
   { paese: "IT", insegna: "Cortilia", dominio: "cortilia.it", sitemap: "https://www.cortilia.it/sitemap.xml", stimati: 6536 },
   { paese: "IT", insegna: "Tigros", dominio: "tigros.it", sitemap: "https://www.tigros.it/product1.xml", stimati: 4500 },
   { paese: "IT", insegna: "CoopShop", dominio: "coopshop.it", sitemap: "https://www.coopshop.it/sitemap/product_0.xml", stimati: 2999 },
   { paese: "IT", insegna: "Iperal Spesa Online", dominio: "iperalspesaonline.it", sitemap: "https://www.iperalspesaonline.it/product1.xml", stimati: 1500 },
+
+  /* AGGIUNTE DOPO AVERLE APERTE UNA PER UNA.
+     Quattro insegne che pubblicano il catalogo E il prezzo leggibile dal
+     server, e che mancavano. Il negozio sta su un dominio diverso da quello
+     dell'insegna — `spesaonline.conad.it`, non `conad.it` — ed e' il motivo
+     per cui non si trovavano cercando dal sito principale. */
+  { paese: "IT", insegna: "Bennet", dominio: "bennet.com", sitemap: "https://www.bennet.com/sitemap.xml", stimati: 20446 },
+  { paese: "IT", insegna: "Unicoop Tirreno", dominio: "coopacasa.coopetruria.coop.it", sitemap: "https://coopacasa.coopetruria.coop.it/sitemap_index.xml", stimati: 10230 },
+  { paese: "IT", insegna: "Conad", dominio: "spesaonline.conad.it", sitemap: "https://spesaonline.conad.it/sitemap/products.xml", stimati: 5026 },
+  { paese: "IT", insegna: "Aldi", dominio: "aldi.it", sitemap: "https://www.aldi.it/sitemap_products.xml", stimati: 678 },
   { paese: "KR", insegna: "Emart Mall", dominio: "emart.ssg.com", sitemap: "https://emart.ssg.com/sitemap/best.xml", stimati: 498 },
   { paese: "LT", insegna: "LastMile", dominio: "lastmile.lt", sitemap: "https://www.lastmile.lt/sitemap-1.xml", stimati: 20000 },
   { paese: "PL", insegna: "Auchan Zakupy", dominio: "zakupy.auchan.pl", sitemap: "https://zakupy.auchan.pl/sitemaps/sitemap-products-part1.xml", stimati: 24140 },
