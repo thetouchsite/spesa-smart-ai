@@ -35,10 +35,25 @@ export interface Offer {
   immagine?: string;
   /** Il nome del prodotto come appare sul sito di quel negozio. */
   nome: string;
-  prezzo: number;
+  /**
+   * `null` quando la scheda si apre ma il prezzo non e' leggibile.
+   *
+   * Succede spesso e non e' un guasto: Tigros, Iperal ed Esselunga il prezzo
+   * lo disegnano con JavaScript e nell'HTML non c'e'. La riga vale lo stesso —
+   * prodotto giusto, link che si apre — e l'app dice che il prezzo manca.
+   */
+  prezzo: number | null;
   valuta: string;
   /** Vuoto se la pagina non si apriva: in quel caso non si mostra il link. */
   link: string;
+  /**
+   * Dove mandare l'utente quando `link` e' vuoto: la ricerca di quel prodotto
+   * sul sito del negozio. Si apre sempre, quindi nessuna riga resta senza un
+   * posto dove andare — ma NON e' la scheda del prodotto, e la riga lo dice.
+   */
+  linkRicerca?: string;
+  /** Il nome da mostrare per il ripiego: «cerca su Morrisons». */
+  ricercaSu?: string;
   /**
    * Quanto ci si può fidare del prezzo.
    *
