@@ -72,6 +72,25 @@ export function partiSuccessive(sitemap: string, quante = 30): string[] {
 }
 
 export const FONTI: FonteCatalogo[] = [
+  { paese: "BA", insegna: "Glovo Sarajevo - Spesa", dominio: "glovoapp.com", sitemap: "https://glovoapp.com/sitemap-a.xml", stimati: 334 },
+  { paese: "EE", insegna: "Barbora Estonia", dominio: "barbora.ee", sitemap: "https://barbora.ee/sitemap.xml", stimati: 384 },
+  { paese: "HU", insegna: "Kifli.hu", dominio: "kifli.hu", sitemap: "https://www.kifli.hu/sitemap_products.xml", stimati: 28 },
+  { paese: "IT", insegna: "Conad Spesa Online", dominio: "spesaonline.conad.it", sitemap: "https://spesaonline.conad.it/sitemap/products.xml", stimati: 5433 },
+  { paese: "LT", insegna: "Rimi e-shop", dominio: "rimi.lt", sitemap: "https://www.rimi.lt/e-parduotuve/sitemaps/categories/siteMap_rimiLtSite_Category_ru_1.xml", stimati: 47170 },
+  { paese: "LV", insegna: "Rimi e-veikals", dominio: "rimi.lv", sitemap: "https://www.rimi.lv/e-veikals/sitemaps/categories/siteMap_rimiLvSite_Category_en_1.xml", stimati: 53814 },
+  { paese: "LV", insegna: "Barbora Latvia", dominio: "barbora.lv", sitemap: "https://barbora.lv/sitemap.xml", stimati: 495 },
+  { paese: "NO", insegna: "MENY Nettbutikk", dominio: "meny.no", sitemap: "https://meny.no/sitemap/product-category/1.xml", stimati: 661 },
+  { paese: "NO", insegna: "SPAR Nettbutikk", dominio: "spar.no", sitemap: "https://spar.no/sitemap/product-category/1.xml", stimati: 421 },
+  { paese: "SI", insegna: "Mercator Online", dominio: "mercatoronline.si", sitemap: "https://mercatoronline.si/sitemap.xml", stimati: 336 },
+  { paese: "TR", insegna: "Migros Sanal Market", dominio: "migros.com.tr", sitemap: "https://www.migros.com.tr/hermes/api/sitemaps/sitemap-products-3.xml", stimati: 338 },
+
+  /* SCOPERTE AL SECONDO GIRO, con il rilevatore che scende piu' a fondo.
+     Il primo passava solo le sitemap che si annunciavano nel nome e si fermava
+     al primo livello: cosi' Rimi, Conad, MENY e le altre risultavano «senza
+     prodotti» pur pubblicando il catalogo. Aprendo TUTTE le figlie e scendendo
+     di due livelli sono tornate — piu' centomila prodotti e cinque paesi che
+     risultavano scoperti. Vedi `scripts/scopri-cataloghi.mjs`. */
+
   { paese: "AL", insegna: "SPAR Albania Online", dominio: "shop.spar.al", sitemap: "https://shop.spar.al/wp-sitemap-posts-product-1.xml", stimati: 2000 },
   { paese: "AR", insegna: "Carrefour Argentina", dominio: "www.carrefour.com.ar", sitemap: "https://www.carrefour.com.ar/sitemap/product-0.xml", stimati: 422 },
   { paese: "AT", insegna: "BILLA Online Shop", dominio: "shop.billa.at", sitemap: "https://shop.billa.at/sitemap.xml", stimati: 12330 },
