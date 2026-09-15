@@ -40,6 +40,24 @@ export interface FonteCatalogo {
   sitemap: string;
   /** Quanti prodotti ci ha trovato la scansione: serve a dimensionare, non e' una promessa. */
   stimati: number;
+  /**
+   * Quante delle sue schede dichiarano il prezzo in modo leggibile, da 0 a 1.
+   *
+   * NON e' una pagella: e' l'ordine in cui conviene provarle. Le insegne non
+   * sono intercambiabili — Carrefour dichiara il prezzo nei dati strutturati e
+   * si legge sempre, Tigros ed Esselunga lo disegnano con JavaScript e
+   * nell'HTML non c'e' niente.
+   *
+   * Finche' un paese aveva due insegne non contava. Con sei conta, e in modo
+   * contro-intuitivo: in Spagna, AGGIUNGENDO quattro catene le voci con prezzo
+   * sono SCESE da quattro a una su nove, perche' i candidati si spostavano
+   * sulle nuove e quelle il prezzo non lo espongono. Con questo numero le
+   * generose si provano per prime.
+   *
+   * Si misura con `scripts/resa-insegne.mjs`, e va rifatta ogni tanto: i
+   * negozi cambiano e le sitemap invecchiano.
+   */
+  resa?: number;
 }
 
 /**
@@ -72,6 +90,25 @@ export function partiSuccessive(sitemap: string, quante = 30): string[] {
 }
 
 export const FONTI: FonteCatalogo[] = [
+  /* CERCATE A MANO, perche' il censimento per Spagna, Portogallo e Polonia
+     aveva una o due insegne ciascuno — e la copertura di un paese si misura in
+     quante catene si possono CONFRONTARE, non in quanti prodotti ha la piu'
+     grossa. Vedi `scripts/cerca-insegne.mjs`.
+
+     Restano fuori quelle che nel loro `robots.txt` vietano le schede: Lidl
+     Spagna, Ahorramas, Hipercor, Pingo Doce, Lidl Polonia. Il catalogo c'e',
+     dicono di non toccarlo.
+
+     LA POLONIA RESTA CON UNA SOLA INSEGNA: Biedronka, Carrefour, Kaufland,
+     Makro, Leclerc e Delikatesy non pubblicano sitemap di prodotti, e Lidl le
+     vieta. Non e' che non abbiamo cercato. */
+  { paese: "ES", insegna: "Bonpreu Esclat", dominio: "www.compraonline.bonpreuesclat.cat", sitemap: "https://www.compraonline.bonpreuesclat.cat/sitemaps/sitemap_index.xml", resa: 0.92, stimati: 21274 },
+  { paese: "ES", insegna: "Consum", dominio: "tienda.consum.es", sitemap: "https://tienda.consum.es/sitemap.xml", resa: 0, stimati: 20222 },
+  { paese: "ES", insegna: "Aldi España", dominio: "www.aldi.es", sitemap: "https://www.aldi.es/.aldi-nord-sitemap.xml", resa: 0, stimati: 2980 },
+  { paese: "ES", insegna: "El Corte Inglés", dominio: "www.elcorteingles.es", sitemap: "https://www.elcorteingles.es/entradas/sitemaps/sitemap.xml", resa: 0, stimati: 1644 },
+  { paese: "PT", insegna: "Continente Online", dominio: "www.continente.pt", sitemap: "https://www.continente.pt/sitemap_index.xml", resa: 0.25, stimati: 195810 },
+  { paese: "PT", insegna: "Lidl Portugal", dominio: "www.lidl.pt", sitemap: "https://www.lidl.pt/static/sitemap.xml", resa: 1, stimati: 333 },
+
   /* IL BRASILE, che la scansione aveva mancato: `mercado.carrefour.com.br`
      era finito fra i «robots non leggibile» per un errore momentaneo. Ha
      quattro sitemap di prodotti, ventimila indirizzi ciascuna.
@@ -82,17 +119,17 @@ export const FONTI: FonteCatalogo[] = [
      copertura sara' piu' magra che in Italia. */
   { paese: "BR", insegna: "Carrefour Brasil", dominio: "mercado.carrefour.com.br", sitemap: "https://mercado.carrefour.com.br/sitemap.xml", stimati: 80000 },
 
-  { paese: "BA", insegna: "Glovo Sarajevo - Spesa", dominio: "glovoapp.com", sitemap: "https://glovoapp.com/sitemap-a.xml", stimati: 334 },
+  { paese: "BA", insegna: "Glovo Sarajevo - Spesa", dominio: "glovoapp.com", sitemap: "https://glovoapp.com/sitemap-index.xml", stimati: 352 },
   { paese: "EE", insegna: "Barbora Estonia", dominio: "barbora.ee", sitemap: "https://barbora.ee/sitemap.xml", stimati: 384 },
   { paese: "HU", insegna: "Kifli.hu", dominio: "kifli.hu", sitemap: "https://www.kifli.hu/sitemap_products.xml", stimati: 28 },
-  { paese: "IT", insegna: "Conad Spesa Online", dominio: "spesaonline.conad.it", sitemap: "https://spesaonline.conad.it/sitemap/products.xml", stimati: 5433 },
+  { paese: "IT", insegna: "Conad Spesa Online", dominio: "spesaonline.conad.it", sitemap: "https://spesaonline.conad.it/sitemap/products.xml", resa: 0.08, stimati: 5433 },
   { paese: "LT", insegna: "Rimi e-shop", dominio: "rimi.lt", sitemap: "https://www.rimi.lt/e-parduotuve/sitemaps/categories/siteMap_rimiLtSite_Category_ru_1.xml", stimati: 47170 },
   { paese: "LV", insegna: "Rimi e-veikals", dominio: "rimi.lv", sitemap: "https://www.rimi.lv/e-veikals/sitemaps/categories/siteMap_rimiLvSite_Category_en_1.xml", stimati: 53814 },
   { paese: "LV", insegna: "Barbora Latvia", dominio: "barbora.lv", sitemap: "https://barbora.lv/sitemap.xml", stimati: 495 },
-  { paese: "NO", insegna: "MENY Nettbutikk", dominio: "meny.no", sitemap: "https://meny.no/sitemap/product-category/1.xml", stimati: 661 },
-  { paese: "NO", insegna: "SPAR Nettbutikk", dominio: "spar.no", sitemap: "https://spar.no/sitemap/product-category/1.xml", stimati: 421 },
+  { paese: "NO", insegna: "MENY Nettbutikk", dominio: "meny.no", sitemap: "https://meny.no/sitemap.xml", stimati: 9928 },
+  { paese: "NO", insegna: "SPAR Nettbutikk", dominio: "spar.no", sitemap: "https://spar.no/sitemap.xml", stimati: 7943 },
   { paese: "SI", insegna: "Mercator Online", dominio: "mercatoronline.si", sitemap: "https://mercatoronline.si/sitemap.xml", stimati: 336 },
-  { paese: "TR", insegna: "Migros Sanal Market", dominio: "migros.com.tr", sitemap: "https://www.migros.com.tr/hermes/api/sitemaps/sitemap-products-3.xml", stimati: 338 },
+  { paese: "TR", insegna: "Migros Sanal Market", dominio: "migros.com.tr", sitemap: "https://www.migros.com.tr/hermes/api/sitemaps/sitemap.xml", stimati: 743 },
 
   /* SCOPERTE AL SECONDO GIRO, con il rilevatore che scende piu' a fondo.
      Il primo passava solo le sitemap che si annunciavano nel nome e si fermava
@@ -101,55 +138,55 @@ export const FONTI: FonteCatalogo[] = [
      di due livelli sono tornate — piu' centomila prodotti e cinque paesi che
      risultavano scoperti. Vedi `scripts/scopri-cataloghi.mjs`. */
 
-  { paese: "AL", insegna: "SPAR Albania Online", dominio: "shop.spar.al", sitemap: "https://shop.spar.al/wp-sitemap-posts-product-1.xml", stimati: 2000 },
+  { paese: "AL", insegna: "SPAR Albania Online", dominio: "shop.spar.al", sitemap: "https://shop.spar.al/wp-sitemap.xml", stimati: 2333 },
   { paese: "AR", insegna: "Carrefour Argentina", dominio: "www.carrefour.com.ar", sitemap: "https://www.carrefour.com.ar/sitemap/product-0.xml", stimati: 422 },
   { paese: "AT", insegna: "BILLA Online Shop", dominio: "shop.billa.at", sitemap: "https://shop.billa.at/sitemap.xml", stimati: 12330 },
   { paese: "BE", insegna: "Delhaize Online", dominio: "delhaize.be", sitemap: "https://www.delhaize.be/sitemap/delhaizesitemap-0.xml.gz", stimati: 14668 },
-  { paese: "BG", insegna: "eBag", dominio: "ebag.bg", sitemap: "https://www.ebag.bg/en/sitemap_products_en.xml", stimati: 34778 },
+  { paese: "BG", insegna: "eBag", dominio: "ebag.bg", sitemap: "https://www.ebag.bg/sitemap.xml", stimati: 60340 },
   { paese: "CA", insegna: "Voila by Sobeys", dominio: "voila.ca", sitemap: "https://voila.ca/sitemaps/sitemap-products-part1.xml", stimati: 72010 },
   { paese: "DE", insegna: "flaschenpost Supermarkt", dominio: "flaschenpost.de", sitemap: "https://www.flaschenpost.de/sitemap_p.xml", stimati: 4154 },
   { paese: "DK", insegna: "BilkaToGo", dominio: "bilkatogo.dk", sitemap: "https://www.bilkatogo.dk/sitemap-products.xml", stimati: 37087 },
   { paese: "DK", insegna: "Nemlig.com", dominio: "nemlig.com", sitemap: "https://www.nemlig.com/googleproductsitemap", stimati: 4046 },
-  { paese: "ES", insegna: "Alcampo Online", dominio: "compraonline.alcampo.es", sitemap: "https://www.compraonline.alcampo.es/sitemaps/sitemap-products-part1.xml", stimati: 86773 },
-  { paese: "ES", insegna: "Mercadona Online", dominio: "tienda.mercadona.es", sitemap: "https://tienda.mercadona.es/sitemap.xml", stimati: 4320 },
-  { paese: "GB", insegna: "Morrisons Groceries", dominio: "groceries.morrisons.com", sitemap: "https://groceries.morrisons.com/sitemaps/sitemap-products-part1.xml", stimati: 31023 },
-  { paese: "GB", insegna: "Waitrose", dominio: "waitrose.com", sitemap: "https://www.waitrose.com/sitemaps/products_sitemap_0.xml", stimati: 18182 },
+  { paese: "ES", insegna: "Alcampo Online", dominio: "compraonline.alcampo.es", sitemap: "https://www.compraonline.alcampo.es/sitemaps/sitemap-products-part1.xml", resa: 0, stimati: 86773 },
+  { paese: "ES", insegna: "Mercadona Online", dominio: "tienda.mercadona.es", sitemap: "https://tienda.mercadona.es/sitemap.xml", resa: 0, stimati: 4320 },
+  { paese: "GB", insegna: "Morrisons Groceries", dominio: "groceries.morrisons.com", sitemap: "https://groceries.morrisons.com/sitemaps/sitemap_index.xml", stimati: 33675 },
+  { paese: "GB", insegna: "Waitrose", dominio: "waitrose.com", sitemap: "https://www.waitrose.com/sitemapIndex.xml", stimati: 21212 },
   { paese: "HR", insegna: "Konzum Online", dominio: "konzum.hr", sitemap: "https://www.konzum.hr/sitemap_products.xml", stimati: 11153 },
-  { paese: "HU", insegna: "Auchan Online", dominio: "auchan.hu", sitemap: "https://auchan.hu/sitemaps/product-sitemap-0.xml", stimati: 52 },
+  { paese: "HU", insegna: "Auchan Online", dominio: "auchan.hu", sitemap: "https://auchan.hu/sitemap.xml", stimati: 249 },
   { paese: "IE", insegna: "SuperValu Online", dominio: "shop.supervalu.ie", sitemap: "https://shop.supervalu.ie/sitemap.xml", stimati: 11807 },
-  { paese: "IN", insegna: "JioMart", dominio: "www.jiomart.com", sitemap: "https://www.jiomart.com/sitemap/custom.sitemap.xml", stimati: 846 },
-  { paese: "IT", insegna: "Carrefour Italia", dominio: "carrefour.it", sitemap: "https://www.carrefour.it/sitemap_0-product.xml", stimati: 26728 },
-  { paese: "IT", insegna: "Esselunga a Casa", dominio: "spesaonline.esselunga.it", sitemap: "https://spesaonline.esselunga.it/sitemap_product.xml", stimati: 17709 },
+  { paese: "IN", insegna: "JioMart", dominio: "www.jiomart.com", sitemap: "https://www.jiomart.com/sitemap.xml", stimati: 9354 },
+  { paese: "IT", insegna: "Carrefour Italia", dominio: "carrefour.it", sitemap: "https://www.carrefour.it/sitemap_index.xml", resa: 1, stimati: 28352 },
+  { paese: "IT", insegna: "Esselunga a Casa", dominio: "spesaonline.esselunga.it", sitemap: "https://spesaonline.esselunga.it/sitemap_index.xml", resa: 0, stimati: 17716 },
   // NON l'indirizzo firmato della sitemap figlia: contiene un token che il
   // sito ruota, e il giorno che ruota la fonte muore in silenzio. Dall'indice.
-  { paese: "IT", insegna: "Unes", dominio: "spesaonline.unes.it", sitemap: "https://www.spesaonline.unes.it/sitemap.xml", stimati: 15363 },
+  { paese: "IT", insegna: "Unes", dominio: "spesaonline.unes.it", sitemap: "https://www.spesaonline.unes.it/sitemap.xml", resa: 1, stimati: 15363 },
   // Dall'INDICE, non da una figlia sola: `sitemap-1-1.xml` e' meta' catalogo,
   // l'altra meta' sta in `sitemap-1-2.xml`. Verificato: 6.633 -> 13.301.
-  { paese: "IT", insegna: "Coop", dominio: "easycoop.com", sitemap: "https://www.easycoop.com/sitemap/sitemap.xml", stimati: 13301 },
-  { paese: "IT", insegna: "Cortilia", dominio: "cortilia.it", sitemap: "https://www.cortilia.it/sitemap.xml", stimati: 6536 },
-  { paese: "IT", insegna: "Tigros", dominio: "tigros.it", sitemap: "https://www.tigros.it/product1.xml", stimati: 4500 },
-  { paese: "IT", insegna: "CoopShop", dominio: "coopshop.it", sitemap: "https://www.coopshop.it/sitemap/product_0.xml", stimati: 2999 },
-  { paese: "IT", insegna: "Iperal Spesa Online", dominio: "iperalspesaonline.it", sitemap: "https://www.iperalspesaonline.it/product1.xml", stimati: 1500 },
+  { paese: "IT", insegna: "Coop", dominio: "easycoop.com", sitemap: "https://www.easycoop.com/sitemap/sitemap.xml", resa: 1, stimati: 13301 },
+  { paese: "IT", insegna: "Cortilia", dominio: "cortilia.it", sitemap: "https://www.cortilia.it/sitemap.xml", resa: 1, stimati: 6536 },
+  { paese: "IT", insegna: "Tigros", dominio: "tigros.it", sitemap: "https://www.tigros.it/sitemap.xml", resa: 0, stimati: 12500 },
+  { paese: "IT", insegna: "CoopShop", dominio: "coopshop.it", sitemap: "https://coopshop.it/sitemap.xml", resa: 0, stimati: 47491 },
+  { paese: "IT", insegna: "Iperal Spesa Online", dominio: "iperalspesaonline.it", sitemap: "https://www.iperalspesaonline.it/sitemap.xml", resa: 0, stimati: 22574 },
 
   /* AGGIUNTE DOPO AVERLE APERTE UNA PER UNA.
      Quattro insegne che pubblicano il catalogo E il prezzo leggibile dal
      server, e che mancavano. Il negozio sta su un dominio diverso da quello
      dell'insegna — `spesaonline.conad.it`, non `conad.it` — ed e' il motivo
      per cui non si trovavano cercando dal sito principale. */
-  { paese: "IT", insegna: "Bennet", dominio: "bennet.com", sitemap: "https://www.bennet.com/sitemap.xml", stimati: 20446 },
-  { paese: "IT", insegna: "Unicoop Tirreno", dominio: "coopacasa.coopetruria.coop.it", sitemap: "https://coopacasa.coopetruria.coop.it/sitemap_index.xml", stimati: 10230 },
-  { paese: "IT", insegna: "Conad", dominio: "spesaonline.conad.it", sitemap: "https://spesaonline.conad.it/sitemap/products.xml", stimati: 5026 },
-  { paese: "IT", insegna: "Aldi", dominio: "aldi.it", sitemap: "https://www.aldi.it/sitemap_products.xml", stimati: 678 },
+  { paese: "IT", insegna: "Bennet", dominio: "bennet.com", sitemap: "https://www.bennet.com/sitemap.xml", resa: 1, stimati: 20446 },
+  { paese: "IT", insegna: "Unicoop Tirreno", dominio: "coopacasa.coopetruria.coop.it", sitemap: "https://coopacasa.coopetruria.coop.it/sitemap_index.xml", resa: 0.67, stimati: 10230 },
+  { paese: "IT", insegna: "Conad", dominio: "spesaonline.conad.it", sitemap: "https://spesaonline.conad.it/sitemap/products.xml", resa: 0.08, stimati: 5026 },
+  { paese: "IT", insegna: "Aldi", dominio: "aldi.it", sitemap: "https://www.aldi.it/sitemap_products.xml", resa: 1, stimati: 678 },
   { paese: "KR", insegna: "Emart Mall", dominio: "emart.ssg.com", sitemap: "https://emart.ssg.com/sitemap/best.xml", stimati: 498 },
-  { paese: "LT", insegna: "LastMile", dominio: "lastmile.lt", sitemap: "https://www.lastmile.lt/sitemap-1.xml", stimati: 20000 },
-  { paese: "PL", insegna: "Auchan Zakupy", dominio: "zakupy.auchan.pl", sitemap: "https://zakupy.auchan.pl/sitemaps/sitemap-products-part1.xml", stimati: 24140 },
-  { paese: "PT", insegna: "Auchan Portugal", dominio: "auchan.pt", sitemap: "https://www.auchan.pt/sitemap_0-product.xml", stimati: 79274 },
-  { paese: "RO", insegna: "Freshful", dominio: "freshful.ro", sitemap: "https://www.freshful.ro/sitemap/products.xml", stimati: 46413 },
+  { paese: "LT", insegna: "LastMile", dominio: "lastmile.lt", sitemap: "https://www.lastmile.lt/sitemap.xml", stimati: 58333 },
+  { paese: "PL", insegna: "Auchan Zakupy", dominio: "zakupy.auchan.pl", sitemap: "https://zakupy.auchan.pl/sitemaps/sitemap-products-part1.xml", resa: 1, stimati: 24140 },
+  { paese: "PT", insegna: "Auchan Portugal", dominio: "auchan.pt", sitemap: "https://www.auchan.pt/sitemap_index.xml", resa: 0.92, stimati: 161020 },
+  { paese: "RO", insegna: "Freshful", dominio: "freshful.ro", sitemap: "https://www.freshful.ro/sitemap_index.xml", stimati: 46531 },
   { paese: "RS", insegna: "IDEA Online", dominio: "online.idea.rs", sitemap: "https://online.idea.rs/sitemap.xml", stimati: 10762 },
   { paese: "RS", insegna: "Maxi Online", dominio: "maxi.rs", sitemap: "https://www.maxi.rs/sitemap/delhaizesitemap-0.xml.gz", stimati: 9955 },
-  { paese: "SE", insegna: "ICA Handla Online", dominio: "ica.se", sitemap: "https://www.ica.se/sitemap/inspiration/", stimati: 1876 },
+  { paese: "SE", insegna: "ICA Handla Online", dominio: "ica.se", sitemap: "https://www.ica.se/recept/sitemaps/", stimati: 16539 },
   { paese: "US", insegna: "Kroger", dominio: "www.kroger.com", sitemap: "https://www.kroger.com/pdp-sitemap/kroger-product-details-sitemap-1.xml", stimati: 40923 },
-  { paese: "ZA", insegna: "Checkers Sixty60", dominio: "www.checkers.co.za", sitemap: "https://www.checkers.co.za/api/sitemaps/seq_product-sitemap_00.xml", stimati: 98424 },
+  { paese: "ZA", insegna: "Checkers Sixty60", dominio: "www.checkers.co.za", sitemap: "https://www.checkers.co.za/sitemap.xml", stimati: 98447 },
 ];
 
 /** I paesi per cui abbiamo almeno una fonte. */

@@ -46,6 +46,7 @@
 
 import { gunzipSync } from "node:zlib";
 import { fontiDi, paesiConCatalogo, partiSuccessive, type FonteCatalogo } from "./catalogo-fonti.js";
+import { conSinonimi } from "./sinonimi.js";
 
 /** Un prodotto del catalogo. */
 export interface VoceCatalogo {
@@ -55,6 +56,14 @@ export interface VoceCatalogo {
   insegna: string;
   /** Parole del nome, gia' ripulite: si calcolano una volta, non a ogni ricerca. */
   parole: string[];
+  /**
+   * Quanto rende l'insegna di questa voce: vedi `FonteCatalogo.resa`.
+   *
+   * Si copia qui perche' l'ordinamento dei candidati la consulta per ogni
+   * riga, e risalire alla fonte a ogni confronto costerebbe piu' di un numero
+   * duplicato.
+   */
+  resa: number;
 }
 
 interface CatalogoPaese {
@@ -340,7 +349,16 @@ async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> {
       if (!nome) continue;
       const p = parole(nome);
       if (p.length === 0) continue;
-      voci.push({ nome, url: u, insegna: fonte.insegna, parole: p });
+      /* Anche sotto il nome dell'altra lingua del paese, dove ce n'e' una.
+         Bonpreu vende `llet` e la lista chiede `leche`: senza questo passaggio
+         l'unica catena spagnola che dichiara i prezzi resta invisibile. */
+      voci.push({
+        nome,
+        url: u,
+        insegna: fonte.insegna,
+        parole: conSinonimi(p, fonte.paese),
+        resa: fonte.resa ?? 0.5,
+      });
       if (voci.length >= MAX_PER_INSEGNA) break;
     }
 
@@ -543,9 +561,46 @@ export async function cercaNelCatalogo(
   const complete = validi.filter(([, punti]) => punti === cercate.length);
   const usati = complete.length ? complete : validi;
 
-  return usati
-    .sort((a, b) => b[1] - a[1] || cat.voci[a[0]].nome.length - cat.voci[b[0]].nome.length)
-    .slice(0, quanti)
+  const ordinati = usati.sort(
+    (a, b) => b[1] - a[1] || cat.voci[a[0]].nome.length - cat.voci[b[0]].nome.length,
+  );
+
+  /* UN CANDIDATO PER INSEGNA, PRIMA DI RIPETERE.
+     Ordinando solo per parole in comune, i candidati di una voce finivano
+     quasi sempre nella STESSA catena — quella con i nomi piu' descrittivi — e
+     se quella non espone i prezzi la voce restava vuota.
+
+     Misurato in Spagna: aggiungendo quattro insegne le voci con prezzo sono
+     SCESE da quattro a una su nove. Piu' catalogo e meno prezzi, perche' i
+     candidati si concentravano invece di distribuirsi.
+
+     Ora si prende il migliore di ogni insegna prima di prenderne un secondo
+     dalla stessa. E' anche cio' che serve a un'app di confronto: tre offerte
+     dello stesso negozio non sono un confronto. */
+  /* LE INSEGNE GENEROSE PER PRIME.
+     A parita' di parole in comune conviene provare la catena che il prezzo lo
+     dichiara. In Spagna solo Bonpreu lo fa — Alcampo, Consum, Mercadona, Aldi
+     ed El Corte Ingles sono a zero — e senza questo ordine i candidati
+     finivano su quelle mute. */
+  const perResa = [...ordinati].sort(
+    (a, b) => cat.voci[b[0]].resa - cat.voci[a[0]].resa || b[1] - a[1],
+  );
+
+  const scelti: typeof ordinati = [];
+  const viste = new Set<string>();
+  for (const riga of perResa) {
+    if (scelti.length >= quanti) break;
+    const insegna = cat.voci[riga[0]].insegna;
+    if (viste.has(insegna)) continue;
+    viste.add(insegna);
+    scelti.push(riga);
+  }
+  for (const riga of ordinati) {
+    if (scelti.length >= quanti) break;
+    if (!scelti.includes(riga)) scelti.push(riga);
+  }
+
+  return scelti
     .map(([i, punti]) => ({
       nome: cat.voci[i].nome,
       url: cat.voci[i].url,
