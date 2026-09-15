@@ -757,7 +757,20 @@ async function prezzaLista(
     );
   }
 
-  const offerte = migliori.filter((r) => r.risparmio && r.risparmio > 0).length;
+  /* QUANTI PRODOTTI SONO IN PROMOZIONE.
+     Contava solo `risparmio`, che e' l'importo risparmiato, e lo scrive solo
+     chi legge lo sconto dalla pagina. Le insegne interrogate via API la
+     promozione la dichiarano in un altro modo — listino barrato e percentuale —
+     e quelle righe non venivano contate: la risposta conteneva uno sconto del
+     30% e il riepilogo diceva "0 in promozione". Chi legge solo il riepilogo
+     concludeva che non ci fossero offerte, e ce n'erano.
+     Ora si guarda la promozione da qualunque parte arrivi. */
+  const inPromozione = (r: { risparmio?: number; scontoPercento?: number; prezzoListino?: number; prezzo?: number | null }) =>
+    (r.risparmio ?? 0) > 0 ||
+    (r.scontoPercento ?? 0) > 0 ||
+    (r.prezzoListino != null && r.prezzo != null && r.prezzoListino > r.prezzo);
+
+  const offerte = migliori.filter(inPromozione).length;
 
   // Nel totale entrano SOLO i prezzi verificati: sommare cio' che non si e'
   // potuto controllare da' un numero sbagliato con l'aria di essere esatto.

@@ -264,8 +264,22 @@ export interface CheckedRow {
   /** Vuoto quando la pagina non si apre: non si mostra un link rotto. */
   link: string;
   verifica: VerifyStatus;
-  /** Il negozio fisico a cui il prezzo si riferisce, quando lo sappiamo. */
-  puntoVendita?: string;
+  /**
+   * Il negozio dell'insegna piu' vicino a chi ha chiesto.
+   *
+   * NON E' LA FONTE DEL PREZZO, e il nome di prima lo lasciava credere.
+   * Si chiamava `puntoVendita` e compariva accanto all'importo: sembrava dire
+   * "questo prezzo e' di questo negozio". Non lo e': il listino e'
+   * dell'INSEGNA — verificato aprendo lo stesso prodotto su sei Eurospin da
+   * Milano a Palermo, 1,19 € dappertutto — e il negozio e' solo quello dove
+   * l'utente puo' andare a prenderlo.
+   *
+   * Sul listino la differenza non si vedeva. Su una PROMOZIONE si': quelle il
+   * sito le calcola sul negozio che serve te, e mostrare uno sconto del 30%
+   * accanto al nome di un negozio che potrebbe non applicarlo e' un numero
+   * vero nel posto sbagliato — l'errore di cui l'utente non si accorge.
+   */
+  negozioPiuVicino?: string;
   /** Prezzo pieno, presente solo se il prodotto è in offerta. */
   prezzoListino?: number;
   risparmio?: number;
@@ -305,8 +319,8 @@ export async function verifyPrices(
     risparmio?: number;
     scontoPercento?: number;
     offertaFinoAl?: string;
-    /** Il negozio fisico a cui il prezzo si riferisce, quando lo sappiamo. */
-    puntoVendita?: string;
+    /** Il negozio dell'insegna piu' vicino a chi chiede. NON e' la fonte del prezzo. */
+    negozioPiuVicino?: string;
   }>,
   batchSize = 10,
 ): Promise<{ rows: CheckedRow[]; verificati: number; totali: number }> {
@@ -515,8 +529,8 @@ export interface Offer {
   valuta: string;
   link: string;
   verifica: VerifyStatus;
-  /** Il punto vendita a cui il prezzo si riferisce, quando lo sappiamo. */
-  puntoVendita?: string;
+  /** Il negozio dell'insegna piu' vicino a chi chiede. NON e' la fonte del prezzo. */
+  negozioPiuVicino?: string;
   /** Presenti solo se il prodotto è in promozione in quel negozio. */
   prezzoListino?: number;
   risparmio?: number;
@@ -573,7 +587,7 @@ export function groupByProduct(rows: CheckedRow[]): ProductOffers[] {
       linkRicerca: r.linkRicerca,
       ricercaSu: r.ricercaSu,
       nome: r.nome,
-      puntoVendita: r.puntoVendita,
+      negozioPiuVicino: r.negozioPiuVicino,
       prezzo: r.prezzo,
       valuta: r.valuta,
       // Un link che non si apre non si consegna mai: e' l'unica cosa che

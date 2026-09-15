@@ -557,8 +557,8 @@ export interface RigaCatalogo {
   prezzoListino?: number;
   /** Di quanto si risparmia, in percentuale. */
   scontoPercento?: number;
-  /** Il punto vendita a cui questo prezzo si riferisce, quando lo sappiamo. */
-  puntoVendita?: string;
+  /** Il negozio dell'insegna piu' vicino a chi chiede. Non e' la fonte del prezzo. */
+  negozioPiuVicino?: string;
 }
 
 function cerca(idx: Indice, richiesta: string): { voce: Voce; score: number } | null {
@@ -1085,7 +1085,7 @@ async function cercaSuEbsn(
           ...(listino != null ? { prezzoListino: listino } : {}),
           ...(scontoPercento != null ? { scontoPercento } : {}),
           ...(negozioDi.get(ins.id)
-            ? { puntoVendita: `${negozioDi.get(ins.id)!.nome} (${negozioDi.get(ins.id)!.provincia})` }
+            ? { negozioPiuVicino: `${negozioDi.get(ins.id)!.nome} (${negozioDi.get(ins.id)!.provincia})` }
             : {}),
         };
         // Senza prezzo si tiene il primo che combacia: non c'e' niente da
