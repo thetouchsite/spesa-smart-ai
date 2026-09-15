@@ -61,6 +61,7 @@ import {
   verifyPrices,
 } from "./price-page.js";
 import { generatePricesSerpapi } from "./prices-serpapi.js";
+import { catalogoDisponibilePer, generatePricesCatalogo } from "./prices-catalogo.js";
 import { cercaProdottoAmazon, isAmazonSearchConfigured } from "./amazon-search.js";
 import { linkDiRipiego } from "./fallback-link.js";
 import { isoDaPaese } from "./insegne-online.js";
@@ -413,11 +414,29 @@ const GroundedInput = z.object({
    * decidere cosa promettere. Il valore predefinito si imposta con
    * PRICE_SOURCE nell'ambiente; il client può forzarlo per singola richiesta.
    */
-  priceSource: z.enum(["ai", "serpapi"]).optional(),
+  priceSource: z.enum(["ai", "serpapi", "catalogo"]).optional(),
 });
 
 /** La strada predefinita, se il client non ne chiede una. */
-const PRICE_SOURCE_DEFAULT = process.env.PRICE_SOURCE === "serpapi" ? "serpapi" : "ai";
+/** Le tre strade per arrivare a un prezzo. */
+type FontePrezzi = "ai" | "serpapi" | "catalogo";
+
+/**
+ * La strada predefinita, se il client non ne chiede una.
+ *
+ *   ai         il modello cerca sul web; copre ovunque, ma a volte inventa
+ *              gli indirizzi e costa sei centesimi a piano
+ *   catalogo   dalle sitemap dei negozi: link garantiti e costo zero, ma solo
+ *              nei paesi censiti — fuori, ricade su "ai" da sola
+ *   serpapi    Google Shopping, come il prototipo: consuma una quota che in
+ *              produzione non abbiamo
+ */
+const PRICE_SOURCE_DEFAULT: FontePrezzi =
+  process.env.PRICE_SOURCE === "serpapi"
+    ? "serpapi"
+    : process.env.PRICE_SOURCE === "catalogo"
+      ? "catalogo"
+      : "ai";
 
 /**
  * Da nome di paese a codice ISO, per Google Shopping.
@@ -474,7 +493,7 @@ async function prezzaLista(
   city: string,
   country: string,
   currency: string,
-  fonte: "ai" | "serpapi",
+  fonte: FontePrezzi,
 ) {
   let prezziGrezzi: Array<{
     prodotto?: string;
@@ -490,7 +509,29 @@ async function prezzaLista(
   let hacercato = false;
 
   try {
-    if (fonte === "serpapi") {
+    if (fonte === "catalogo") {
+      /* LA STRADA SENZA MODELLO.
+         L'indirizzo viene dal catalogo che ci costruiamo dalle sitemap dei
+         negozi, il prezzo si legge aprendo quella pagina. Non c'e' niente da
+         indovinare e niente da pagare: zero chiamate al modello, quindi
+         spariscono i cinque centesimi di grounding su sei.
+
+         Se il paese non e' censito non si finge: si ricade sul motore con la
+         ricerca, che copre ovunque. */
+      if (!catalogoDisponibilePer(paeseIso(country))) {
+        console.info(
+          `[prezzi] nessun catalogo per ${country}: passo al motore con la ricerca`,
+        );
+        return prezzaLista(items, city, country, currency, "ai");
+      }
+      const cat = await generatePricesCatalogo(items, paeseIso(country), currency);
+      prezziGrezzi = cat.prezzi;
+      secondi = cat.secondi;
+      // Nessuna ricerca sul web e nessun modello: le pagine le abbiamo aperte
+      // noi, una per una, ed e' la forma piu' forte di "ha cercato davvero".
+      hacercato = true;
+      ricerche = cat.pagineAperte;
+    } else if (fonte === "serpapi") {
       // La strada del prototipo: una ricerca per prodotto su Google Shopping.
       if (!isShoppingConfigured()) {
         throw new HttpError(503, "SERPAPI_KEY non configurata: la strada 'serpapi' non e' disponibile");
@@ -882,7 +923,7 @@ const PricesInput = z.object({
   city: z.string().max(80).default(""),
   country: z.string().max(40).default("Italia"),
   currency: z.string().min(3).max(3).default("EUR"),
-  priceSource: z.enum(["ai", "serpapi"]).optional(),
+  priceSource: z.enum(["ai", "serpapi", "catalogo"]).optional(),
 });
 
 /**

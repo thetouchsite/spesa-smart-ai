@@ -345,7 +345,16 @@ const PRICES_TIMEOUT_MS = 55_000;
  * Quale strada usare per i prezzi.
  *
  * Si imposta in `mobile/.env` con EXPO_PUBLIC_PRICE_SOURCE, e serve a poter
- * confrontare le due sullo stesso profilo:
+ * confrontare le tre sullo stesso profilo:
+ *
+ *   "catalogo" dal catalogo che ci costruiamo dalle sitemap dei negozi. Gli
+ *              indirizzi li pubblica il negozio, quindi NON POSSONO essere
+ *              sbagliati, e il prezzo si legge aprendo la scheda. COSTO ZERO:
+ *              nessuna chiamata al modello. Misurato su Napoli: 20 secondi,
+ *              9 voci su 17 con prezzo, link di Carrefour e Cortilia.
+ *              Copre 24 paesi; fuori, ricade da sola su "ai".
+ *              Il limite oggi e' l'abbinamento: lo fa un conteggio di parole,
+ *              e «Orata fresca» puo' finire su «Ricotta fresca».
  *
  *   "ai"       il motore con ricerca — cerca LO STESSO prodotto della lista
  *              nei supermercati della città e apre ogni pagina per
