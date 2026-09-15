@@ -69,7 +69,7 @@ export default function RootLayout() {
         {/* Il nome dell'app non si traduce, ed e' un bene: qui il provider
             della lingua non e' ancora montato — monta dopo l'idratazione,
             perche' deve poter leggere la lingua salvata. */}
-        <Text style={styles.splashTitle}>Spesa Smart</Text>
+        <Text style={styles.splashTitle}>MealMint</Text>
         <ActivityIndicator color={colors.primaryForeground} />
       </View>
     );

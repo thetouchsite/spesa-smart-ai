@@ -1,5 +1,5 @@
 /**
- * Spesa Smart Insights — pure derivations from plan + form state.
+ * MealMint Insights — pure derivations from plan + form state.
  *
  * Returns i18n-ready payloads (`key` + `params`) rather than pre-formatted
  * English strings so the UI can render them in the user's selected language.

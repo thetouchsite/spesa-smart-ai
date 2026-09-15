@@ -70,7 +70,8 @@ const UI: Record<string, Entry> = {
   "Sette giorni di pasti pensati per il tuo budget.": {"it": "Sette giorni di pasti pensati per il tuo budget.", "en": "Seven days of meals designed for your budget.", "fr": "Sept jours de repas pensés pour votre budget.", "es": "Siete días de comidas pensadas para tu presupuesto.", "de": "Sieben Tage Mahlzeiten, abgestimmt auf dein Budget."},
   "Sono": {"it": "Sono", "en": "I am", "fr": "Je suis", "es": "Soy", "de": "Ich bin"},
   "Sopra il budget": {"it": "Sopra il budget", "en": "Over budget", "fr": "Hors budget", "es": "Supera el presupuesto", "de": "Über dem Budget"},
-  "Spesa Smart": {"it": "Spesa Smart", "en": "Smart Grocery", "fr": "Courses Smart", "es": "Compra Smart", "de": "Smart Einkaufen"},
+  // Il nome del marchio non si traduce: MealMint resta MealMint ovunque.
+  "MealMint": {"it": "MealMint", "en": "MealMint", "fr": "MealMint", "es": "MealMint", "de": "MealMint"},
   "Sui prezzi e sui link": {"it": "Sui prezzi e sui link", "en": "About prices and links", "fr": "À propos des prix et des liens", "es": "Sobre precios y enlaces", "de": "Zu Preisen und Links"},
   "Torna ai risultati": {"it": "Torna ai risultati", "en": "Back to results", "fr": "Retour aux résultats", "es": "Volver a los resultados", "de": "Zurück zu den Ergebnissen"},
   "Torna indietro": {"it": "Torna indietro", "en": "Go back", "fr": "Retour", "es": "Volver atrás", "de": "Zurück"},

@@ -29,10 +29,10 @@ interface Strings {
 }
 
 const STRINGS: Record<Language, Strings> = {
-  en: { title: "🛒 My Spesa Smart plan", budget: "Budget", spend: "Estimated spend", savings: "Expected savings", list: "Shopping list", cta: "Build your own plan" },
-  it: { title: "🛒 Il mio piano Spesa Smart", budget: "Budget", spend: "Spesa stimata", savings: "Risparmio previsto", list: "Lista della spesa", cta: "Crea il tuo piano" },
-  fr: { title: "🛒 Mon plan Spesa Smart", budget: "Budget", spend: "Dépense estimée", savings: "Économies prévues", list: "Liste de courses", cta: "Créez votre plan" },
-  es: { title: "🛒 Mi plan Spesa Smart", budget: "Presupuesto", spend: "Gasto estimado", savings: "Ahorro previsto", list: "Lista de la compra", cta: "Crea tu plan" },
+  en: { title: "🛒 My MealMint plan", budget: "Budget", spend: "Estimated spend", savings: "Expected savings", list: "Shopping list", cta: "Build your own plan" },
+  it: { title: "🛒 Il mio piano MealMint", budget: "Budget", spend: "Spesa stimata", savings: "Risparmio previsto", list: "Lista della spesa", cta: "Crea il tuo piano" },
+  fr: { title: "🛒 Mon plan MealMint", budget: "Budget", spend: "Dépense estimée", savings: "Économies prévues", list: "Liste de courses", cta: "Créez votre plan" },
+  es: { title: "🛒 Mi plan MealMint", budget: "Presupuesto", spend: "Gasto estimado", savings: "Ahorro previsto", list: "Lista de la compra", cta: "Crea tu plan" },
   de: { title: "🛒 Mein Spesa-Smart-Plan", budget: "Budget", spend: "Geschätzte Ausgaben", savings: "Erwartete Ersparnis", list: "Einkaufsliste", cta: "Erstelle deinen Plan" },
 };
 

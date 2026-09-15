@@ -510,68 +510,67 @@ async function prezzaLista(
 
   try {
     if (fonte === "catalogo") {
-      /* LA STRADA SENZA MODELLO.
-         L'indirizzo viene dal catalogo che ci costruiamo dalle sitemap dei
-         negozi, il prezzo si legge aprendo quella pagina. Non c'e' niente da
-         indovinare e niente da pagare: zero chiamate al modello, quindi
-         spariscono i cinque centesimi di grounding su sei.
+      /* LE DUE STRADE INSIEME, NON IN FILA.
+         Il catalogo da' link garantiti dal negozio ma copre otto voci su
+         diciassette; il motore copre tutto ma ogni tanto inventa un indirizzo.
+         Servono entrambi.
 
-         Se il paese non e' censito non si finge: si ricade sul motore con la
-         ricerca, che copre ovunque. */
-      if (!catalogoDisponibilePer(paeseIso(country))) {
-        console.info(
-          `[prezzi] nessun catalogo per ${country}: passo al motore con la ricerca`,
-        );
-        return prezzaLista(items, city, country, currency, "ai");
+         In fila costavano 70 SECONDI — venti il catalogo piu' trentotto il
+         motore — e l'app molla a cinquantacinque, perche' iOS chiude ogni
+         connessione a sessanta. Sul telefono sarebbe fallito sempre.
+
+         Insieme costano il tempo del piu' lento, una quarantina di secondi. E
+         non costano di piu' in denaro: il grounding si paga A CHIAMATA, non a
+         prodotto, quindi chiedere al motore diciassette voci o nove e' lo
+         stesso prezzo. Chiederle tutte, e preferire il catalogo dove c'e', e'
+         gratis in confronto.
+
+         Se il paese non e' censito non si finge: resta il solo motore. */
+      const iso = paeseIso(country);
+      const conCatalogo = catalogoDisponibilePer(iso);
+      if (!conCatalogo) {
+        console.info(`[prezzi] nessun catalogo per ${country}: solo motore con ricerca`);
       }
-      const cat = await generatePricesCatalogo(items, paeseIso(country), currency);
-      prezziGrezzi = cat.prezzi;
-      secondi = cat.secondi;
-      // Nessuna ricerca sul web e nessun modello: le pagine le abbiamo aperte
-      // noi, una per una, ed e' la forma piu' forte di "ha cercato davvero".
-      hacercato = true;
-      ricerche = cat.pagineAperte;
 
-      /* IL CATALOGO NON COPRE TUTTO, E PER IL RESTO C'E' IL MOTORE.
-         Misurato su Napoli: otto voci su diciassette, tutte con il prodotto
-         giusto e il link garantito. Le altre nove restavano vuote — o il
-         prodotto in catalogo non c'era, o la pagina non dichiara il prezzo.
+      const t0 = Date.now();
+      recordUse("gemini");
+      recordUse("grounding");
 
-         Lasciarle vuote sarebbe uno spreco: il motore con la ricerca quelle
-         le trova quasi sempre. Quindi si usa il catalogo dove arriva, e si
-         chiede al modello SOLO il resto — nove voci invece di diciassette, e
-         il costo scende in proporzione.
+      const [cat, motore] = await Promise.all([
+        conCatalogo
+          ? generatePricesCatalogo(items, iso, currency).catch((err) => {
+              console.warn("[prezzi] catalogo fallito, proseguo col motore:", err);
+              return null;
+            })
+          : Promise.resolve(null),
+        generatePricesParallel(items, city, country, currency).catch((err) => {
+          // Il catalogo da solo consegna comunque qualcosa: e' successo
+          // davvero, con il progetto Gemini oltre il tetto di spesa.
+          console.warn("[prezzi] motore fallito, tengo il catalogo:", err);
+          return null;
+        }),
+      ]);
 
-         L'ordine conta: prima il catalogo, che da' link garantiti, e il
-         motore solo dove il catalogo tace. Il contrario darebbe link
-         inventati dove ne avevamo di veri. */
-      const gia = new Set(prezziGrezzi.map((p) => p.prodotto));
-      const rimasti = items.filter((i) => !gia.has(i));
+      /* IL CATALOGO PRIMA, SEMPRE.
+         Dove entrambi hanno una risposta vince il catalogo: il suo link lo ha
+         scritto il negozio e non puo' essere sbagliato, mentre quello del
+         motore va aperto per sapere se esiste. */
+      const daCatalogo = cat?.prezzi ?? [];
+      const coperte = new Set(daCatalogo.map((p) => p.prodotto));
+      const daMotore = (motore?.data.prezzi ?? []).filter((p) => !coperte.has(p.prodotto ?? ""));
 
-      if (rimasti.length > 0) {
-        console.info(
-          `[prezzi] catalogo: ${gia.size}/${items.length} voci. ` +
-            `Chiedo al motore le altre ${rimasti.length}`,
-        );
-        try {
-          recordUse("gemini");
-          recordUse("grounding");
-          const extra = await generatePricesParallel(rimasti, city, country, currency);
-          prezziGrezzi = [...prezziGrezzi, ...extra.data.prezzi];
-          secondi += extra.seconds;
-          costo = extra.cost;
-          ricerche += extra.data.searches;
-          recordCost(extra.cost);
-          console.info(
-            `[prezzi] il motore ha aggiunto ${extra.data.prezzi.length} prezzi ` +
-              `in ${extra.seconds.toFixed(0)}s, $${extra.cost.toFixed(4)}`,
-          );
-        } catch (err) {
-          // Il catalogo ha gia' dato dei prezzi: se il completamento fallisce
-          // si consegna quello che c'e', invece di perdere tutto.
-          console.warn("[prezzi] completamento col motore fallito, tengo il catalogo:", err);
-        }
-      }
+      prezziGrezzi = [...daCatalogo, ...daMotore];
+      secondi = (Date.now() - t0) / 1000;
+      costo = motore?.cost ?? 0;
+      ricerche = (motore?.data.searches ?? 0) + (cat?.pagineAperte ?? 0);
+      hacercato = motore?.data.grounded ?? daCatalogo.length > 0;
+      if (motore) recordCost(motore.cost);
+
+      console.info(
+        `[prezzi] insieme in ${secondi.toFixed(0)}s: ` +
+          `${coperte.size} voci dal catalogo (link garantiti), ` +
+          `${daMotore.length} prezzi dal motore ($${(motore?.cost ?? 0).toFixed(4)})`,
+      );
     } else if (fonte === "serpapi") {
       // La strada del prototipo: una ricerca per prodotto su Google Shopping.
       if (!isShoppingConfigured()) {

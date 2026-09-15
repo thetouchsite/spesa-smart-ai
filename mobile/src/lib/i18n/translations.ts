@@ -1,5 +1,5 @@
 /**
- * Translation dictionaries for Spesa Smart.
+ * Translation dictionaries for MealMint.
  *
  * Keys are flat dot-paths. Values may include {placeholders} replaced at
  * runtime by `t(key, vars)`. Add new strings here, not inline in components.
@@ -22,7 +22,7 @@ export type TranslationKey = keyof typeof EN;
 
 const EN = {
   // App
-  "app.name": "Spesa Smart",
+  "app.name": "MealMint",
 
   // Settings
   "settings.title": "Settings",
@@ -147,7 +147,7 @@ const EN = {
   "results.yourArea": "your area",
 
   // Score
-  "results.score": "Spesa Smart Score",
+  "results.score": "MealMint Score",
   "score.budgetEfficiency": "Budget Efficiency",
   "score.wasteReduction": "Waste Reduction",
   "score.nutrition": "Nutrition Balance",
@@ -299,7 +299,7 @@ const EN = {
   "results.comingSoon": "More local prices are being added.",
 
   // Insights / tips / alternatives
-  "results.insights": "Spesa Smart Insights",
+  "results.insights": "MealMint Insights",
   "results.whySaves": "Why this plan saves you money",
   "results.smartAlternatives": "Smart swaps",
   "results.altDesc": "Easy swaps that lower your bill — nutrition impact shown for each.",
@@ -445,7 +445,7 @@ const EN = {
 type Dict = Record<keyof typeof EN, string>;
 
 const IT: Dict = {
-  "app.name": "Spesa Smart",
+  "app.name": "MealMint",
   "settings.title": "Impostazioni",
   "settings.language": "Lingua",
   "settings.open": "Apri impostazioni",
@@ -559,7 +559,7 @@ const IT: Dict = {
   "results.pricingFetchFailed.body": "{msg} Mostriamo la struttura del piano — tocca riprova per caricare i totali.",
   "results.yourArea": "la tua zona",
 
-  "results.score": "Punteggio Spesa Smart",
+  "results.score": "Punteggio MealMint",
   "score.budgetEfficiency": "Efficienza Budget",
   "score.wasteReduction": "Riduzione Sprechi",
   "score.nutrition": "Equilibrio Nutrizionale",
@@ -699,7 +699,7 @@ const IT: Dict = {
   "results.potentialSavings": "Risparmio extra potenziale presso",
   "results.comingSoon": "Stiamo aggiungendo altri prezzi locali.",
 
-  "results.insights": "Suggerimenti Spesa Smart",
+  "results.insights": "Suggerimenti MealMint",
   "results.whySaves": "Perché questo piano ti fa risparmiare",
   "results.smartAlternatives": "Sostituzioni intelligenti",
   "results.altDesc": "Sostituzioni facili per ridurre la spesa — impatto nutrizionale indicato.",
@@ -835,7 +835,7 @@ const IT: Dict = {
 };
 
 const FR: Dict = {
-  "app.name": "Spesa Smart",
+  "app.name": "MealMint",
   "settings.title": "Paramètres",
   "settings.language": "Langue",
   "settings.open": "Ouvrir les paramètres",
@@ -949,7 +949,7 @@ const FR: Dict = {
   "results.pricingFetchFailed.body": "{msg} Affichage de la structure du plan — touchez réessayer pour charger les totaux.",
   "results.yourArea": "votre région",
 
-  "results.score": "Score Spesa Smart",
+  "results.score": "Score MealMint",
   "score.budgetEfficiency": "Efficacité Budgétaire",
   "score.wasteReduction": "Réduction du Gaspillage",
   "score.nutrition": "Équilibre Nutritionnel",
@@ -1089,7 +1089,7 @@ const FR: Dict = {
   "results.potentialSavings": "Économies supplémentaires potentielles chez",
   "results.comingSoon": "D'autres prix locaux sont en cours d'ajout.",
 
-  "results.insights": "Conseils Spesa Smart",
+  "results.insights": "Conseils MealMint",
   "results.whySaves": "Pourquoi ce plan vous fait économiser",
   "results.smartAlternatives": "Échanges malins",
   "results.altDesc": "Substitutions faciles pour réduire la facture — impact nutritionnel indiqué.",
@@ -1225,7 +1225,7 @@ const FR: Dict = {
 };
 
 const ES: Dict = {
-  "app.name": "Spesa Smart",
+  "app.name": "MealMint",
   "settings.title": "Ajustes",
   "settings.language": "Idioma",
   "settings.open": "Abrir ajustes",
@@ -1339,7 +1339,7 @@ const ES: Dict = {
   "results.pricingFetchFailed.body": "{msg} Mostrando la estructura del plan — toca reintentar para cargar los totales.",
   "results.yourArea": "tu zona",
 
-  "results.score": "Puntuación Spesa Smart",
+  "results.score": "Puntuación MealMint",
   "score.budgetEfficiency": "Eficiencia del Presupuesto",
   "score.wasteReduction": "Reducción de Desperdicio",
   "score.nutrition": "Equilibrio Nutricional",
@@ -1479,7 +1479,7 @@ const ES: Dict = {
   "results.potentialSavings": "Ahorro extra potencial en",
   "results.comingSoon": "Estamos añadiendo más precios locales.",
 
-  "results.insights": "Consejos Spesa Smart",
+  "results.insights": "Consejos MealMint",
   "results.whySaves": "Por qué este plan te hace ahorrar",
   "results.smartAlternatives": "Cambios inteligentes",
   "results.altDesc": "Cambios sencillos para bajar la factura — impacto nutricional indicado.",
@@ -1615,7 +1615,7 @@ const ES: Dict = {
 };
 
 const DE: Dict = {
-  "app.name": "Spesa Smart",
+  "app.name": "MealMint",
   "settings.title": "Einstellungen",
   "settings.language": "Sprache",
   "settings.open": "Einstellungen öffnen",
@@ -1729,7 +1729,7 @@ const DE: Dict = {
   "results.pricingFetchFailed.body": "{msg} Planstruktur wird angezeigt — auf Wiederholen tippen, um Summen zu laden.",
   "results.yourArea": "deine Region",
 
-  "results.score": "Spesa Smart Score",
+  "results.score": "MealMint Score",
   "score.budgetEfficiency": "Budget-Effizienz",
   "score.wasteReduction": "Abfallreduktion",
   "score.nutrition": "Ernährungs-Balance",
@@ -1869,7 +1869,7 @@ const DE: Dict = {
   "results.potentialSavings": "Mögliche Mehrersparnis bei",
   "results.comingSoon": "Weitere lokale Preise werden ergänzt.",
 
-  "results.insights": "Spesa Smart Tipps",
+  "results.insights": "MealMint Tipps",
   "results.whySaves": "Warum dieser Plan Geld spart",
   "results.smartAlternatives": "Clevere Tauschideen",
   "results.altDesc": "Einfache Tauschvorschläge, die die Rechnung senken — Nährwert-Wirkung angezeigt.",

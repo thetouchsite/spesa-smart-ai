@@ -1,5 +1,5 @@
 /**
- * Lightweight i18n for Spesa Smart.
+ * Lightweight i18n for MealMint.
  *
  * - React Context provider keeps the active language in memory.
  * - localStorage persists the user's explicit choice across sessions.

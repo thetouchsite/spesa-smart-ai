@@ -97,7 +97,7 @@ export default function Home() {
       <QuotaBanner />
 
       <View style={styles.hero}>
-        <Pill tone="success" icon="leaf-outline">{ui("Spesa Smart")}</Pill>
+        <Pill tone="success" icon="leaf-outline">{ui("MealMint")}</Pill>
         <Title>Mangia bene{"\n"}spendendo meno</Title>
         <Subtitle>{ui("Rispondi a sei domande e ricevi un menù settimanale con la lista della spesa già organizzata, dentro il tuo budget.")}</Subtitle>
       </View>
