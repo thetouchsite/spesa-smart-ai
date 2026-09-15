@@ -455,12 +455,26 @@ export class ProdottiInsufficientiError extends Error {
 export type Flusso = "menu-prima" | "spesa-prima";
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    p,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`tempo scaduto dopo ${ms} ms`)), ms),
-    ),
-  ]);
+  /* L'ERRORE DI CHI PERDE LA CORSA VA ASCOLTATO LO STESSO.
+     `Promise.race` decide chi arriva primo, ma l'altra promessa continua a
+     vivere: quando la richiesta scade anche per conto suo — `AbortSignal` la
+     interrompe — quel rifiuto non ha piu' nessuno in ascolto, e diventa un
+     errore non catturato che sul web spacca la schermata:
+
+         Uncaught Error: signal timed out
+
+     Un `catch` vuoto qui non nasconde niente: chi chiama ha gia' ricevuto il
+     nostro errore dal timer, e questo e' lo stesso guasto detto due volte. */
+  p.catch(() => {});
+
+  let timer: ReturnType<typeof setTimeout>;
+  const scadenza = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`tempo scaduto dopo ${ms} ms`)), ms);
+  });
+
+  // E il timer si spegne appena la risposta arriva, altrimenti resta acceso
+  // per i suoi cinquantacinque secondi anche a lavoro finito.
+  return Promise.race([p, scadenza]).finally(() => clearTimeout(timer));
 }
 
 /**

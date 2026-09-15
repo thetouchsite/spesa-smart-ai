@@ -30,6 +30,7 @@ import { ping } from "../src/api/client";
 import { useSession } from "../src/lib/state/session";
 import { QuotaBanner } from "../src/components/quota-banner";
 import { deviceDefaults } from "../src/lib/format";
+import { BottoneCaldo, GrigliaPromesse, HeroHome } from "../src/components/hero-home";
 import { colors, font, radius, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 import { useI18n } from "../src/lib/i18n";
@@ -73,34 +74,46 @@ export default function Home() {
   }, []);
 
   return (
-    <Screen
-      footer={
-        <View style={styles.actions}>
-          <Button
-            label={ui(currentPlan ? "Crea un nuovo piano" : "Crea il mio piano")}
-            icon="sparkles-outline"
-            onPress={() => router.push("/onboarding/citta")}
-          />
-          {currentPlan ? (
-            <Button
-              label={ui("Riprendi l'ultimo piano")}
-              variant="secondary"
-              icon="arrow-forward-outline"
-              onPress={() => router.push("/risultati")}
-            />
-          ) : null}
-        </View>
-      }
-    >
+    <Screen>
       <TopBar />
 
       <QuotaBanner />
 
-      <View style={styles.hero}>
-        <Pill tone="success" icon="leaf-outline">{ui("MealMint")}</Pill>
-        <Title>Mangia bene{"\n"}spendendo meno</Title>
-        <Subtitle>{ui("Rispondi a sei domande e ricevi un menù settimanale con la lista della spesa già organizzata, dentro il tuo budget.")}</Subtitle>
-      </View>
+      {/* L'INTESTAZIONE PORTA DENTRO IL PULSANTE.
+          Prima stava in fondo allo schermo, in una barra fissa: corretto, ma
+          separava la promessa dal gesto. Nel prototipo del cliente il tasto e'
+          dentro la carta, sotto la frase che lo giustifica, e si legge come
+          una cosa sola invece che come due. */}
+      <HeroHome
+        titolo={ui("Risparmia sulla spesa")}
+        titoloCorsivo={ui("con l'IA")}
+        sottotitolo={ui("Pianifica i pasti, trova i prezzi migliori e fai la spesa in modo intelligente ogni settimana.")}
+        azioni={
+          <>
+            <BottoneCaldo
+              etichetta={ui(currentPlan ? "Crea un nuovo piano" : "Crea il mio piano")}
+              onPress={() => router.push("/onboarding/citta")}
+            />
+            {currentPlan ? (
+              <Button
+                label={ui("Riprendi l'ultimo piano")}
+                variant="secondary"
+                icon="arrow-forward-outline"
+                onPress={() => router.push("/risultati")}
+              />
+            ) : null}
+          </>
+        }
+      />
+
+      <GrigliaPromesse
+        voci={[
+          { icona: "restaurant-outline", testo: ui("Ricette smart") },
+          { icona: "location-outline", testo: ui("Negozi locali") },
+          { icona: "pricetag-outline", testo: ui("Prezzi migliori") },
+          { icona: "leaf-outline", testo: ui("Meno sprechi") },
+        ]}
+      />
 
       {currentPlan ? (
         <GradientCard>

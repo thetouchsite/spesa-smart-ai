@@ -19,6 +19,7 @@ import { Body, Button, Loading, Screen, Subtitle, Title } from "../src/component
 import { useSession } from "../src/lib/state/session";
 import { fetchPlan, type ContentSource } from "../src/lib/content";
 import { ProdottiInsufficientiError } from "../src/lib/plan-full";
+import { LoaderPiano } from "../src/components/loader-piano";
 import { deviceDefaults } from "../src/lib/format";
 import { useI18n } from "../src/lib/i18n";
 import { colors, font, spacing } from "../src/theme";
@@ -179,9 +180,17 @@ export default function ElaborazioneScreen() {
   return (
     <Screen scroll={false}>
       <View style={styles.center}>
-        <Loading />
         <Title style={styles.title}>{ui("Sto preparando il tuo piano")}</Title>
-        <Body style={styles.beat}>{BEATS[beat]}</Body>
+        {/* I tre passi li mostra il loader, con i tempi veri: i messaggi a
+            rotazione che c'erano qui dicevano cose generiche mentre il piano
+            passava per fasi precise, e una di quelle dura quaranta secondi. */}
+        <LoaderPiano
+          etichette={[
+            ui("Scelgo i piatti della settimana"),
+            ui("Cerco i prezzi nei negozi della tua città"),
+            ui("Metto insieme il piano"),
+          ]}
+        />
       </View>
     </Screen>
   );

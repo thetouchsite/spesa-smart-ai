@@ -533,22 +533,33 @@ async function prezzaLista(
       }
 
       const t0 = Date.now();
-      recordUse("gemini");
-      recordUse("grounding");
+
+      /* IL MOTORE SI AGGIUNGE SOLO SE GLIELO SI CHIEDE.
+         `catalogo` significa: la nostra API e basta. Nessuna ricerca sul web,
+         nessun grounding, nessun indirizzo che qualcuno possa immaginare —
+         costo zero e link che il negozio ha scritto di suo pugno.
+
+         Chi vuole anche il motore per coprire cio' che il catalogo non ha usa
+         `CATALOGO_CON_MOTORE=1`: allora partono insieme, e dove entrambi
+         rispondono vince il catalogo. Costa quanto la strada "ai", perche' il
+         grounding si paga a chiamata. */
+      const conMotore = process.env.CATALOGO_CON_MOTORE === "1";
 
       const [cat, motore] = await Promise.all([
         conCatalogo
           ? generatePricesCatalogo(items, iso, currency).catch((err) => {
-              console.warn("[prezzi] catalogo fallito, proseguo col motore:", err);
+              console.warn("[prezzi] catalogo fallito:", err);
               return null;
             })
           : Promise.resolve(null),
-        generatePricesParallel(items, city, country, currency).catch((err) => {
-          // Il catalogo da solo consegna comunque qualcosa: e' successo
-          // davvero, con il progetto Gemini oltre il tetto di spesa.
-          console.warn("[prezzi] motore fallito, tengo il catalogo:", err);
-          return null;
-        }),
+        conMotore || !conCatalogo
+          ? generatePricesParallel(items, city, country, currency).catch((err) => {
+              // Il catalogo da solo consegna comunque qualcosa: e' successo
+              // davvero, con il progetto Gemini oltre il tetto di spesa.
+              console.warn("[prezzi] motore fallito, tengo il catalogo:", err);
+              return null;
+            })
+          : Promise.resolve(null),
       ]);
 
       /* IL CATALOGO PRIMA, SEMPRE.
@@ -564,7 +575,11 @@ async function prezzaLista(
       costo = motore?.cost ?? 0;
       ricerche = (motore?.data.searches ?? 0) + (cat?.pagineAperte ?? 0);
       hacercato = motore?.data.grounded ?? daCatalogo.length > 0;
-      if (motore) recordCost(motore.cost);
+      if (motore) {
+        recordUse("gemini");
+        recordUse("grounding");
+        recordCost(motore.cost);
+      }
 
       console.info(
         `[prezzi] insieme in ${secondi.toFixed(0)}s: ` +

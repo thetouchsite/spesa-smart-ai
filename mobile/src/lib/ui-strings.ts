@@ -169,6 +169,16 @@ const UI: Record<string, Entry> = {
   "Paese e valuta": {"it": "Paese e valuta", "en": "Country and currency", "fr": "Pays et devise", "es": "País y moneda", "de": "Land und Währung"},
   "Stile alimentare": {"it": "Stile alimentare", "en": "Eating style", "fr": "Style alimentaire", "es": "Estilo de alimentación", "de": "Ernährungsstil"},
   "Cancella i miei dati": {"it": "Cancella i miei dati", "en": "Delete my data", "fr": "Supprimer mes données", "es": "Borrar mis datos", "de": "Meine Daten löschen"},
+  "Risparmia sulla spesa": {"it": "Risparmia sulla spesa", "en": "Save on your groceries", "fr": "Économisez sur vos courses", "es": "Ahorra en la compra", "de": "Spare beim Einkauf"},
+  "con l'IA": {"it": "con l'IA", "en": "with AI", "fr": "avec l'IA", "es": "con la IA", "de": "mit KI"},
+  "Pianifica i pasti, trova i prezzi migliori e fai la spesa in modo intelligente ogni settimana.": {"it": "Pianifica i pasti, trova i prezzi migliori e fai la spesa in modo intelligente ogni settimana.", "en": "Plan your meals, find the best prices and shop smarter every week.", "fr": "Planifiez vos repas, trouvez les meilleurs prix et faites vos courses intelligemment chaque semaine.", "es": "Planifica las comidas, encuentra los mejores precios y compra de forma inteligente cada semana.", "de": "Plane deine Mahlzeiten, finde die besten Preise und kaufe jede Woche klüger ein."},
+  "Ricette smart": {"it": "Ricette smart", "en": "Smart recipes", "fr": "Recettes malignes", "es": "Recetas smart", "de": "Clevere Rezepte"},
+  "Negozi locali": {"it": "Negozi locali", "en": "Local shops", "fr": "Commerces locaux", "es": "Tiendas locales", "de": "Läden in der Nähe"},
+  "Prezzi migliori": {"it": "Prezzi migliori", "en": "Better prices", "fr": "Meilleurs prix", "es": "Mejores precios", "de": "Bessere Preise"},
+  "Meno sprechi": {"it": "Meno sprechi", "en": "Less waste", "fr": "Moins de gaspillage", "es": "Menos desperdicio", "de": "Weniger Verschwendung"},
+  "Scelgo i piatti della settimana": {"it": "Scelgo i piatti della settimana", "en": "Choosing this week's dishes", "fr": "Je choisis les plats de la semaine", "es": "Elijo los platos de la semana", "de": "Ich wähle die Gerichte der Woche"},
+  "Cerco i prezzi nei negozi della tua città": {"it": "Cerco i prezzi nei negozi della tua città", "en": "Looking up prices in shops near you", "fr": "Je cherche les prix dans les magasins près de chez vous", "es": "Busco precios en tiendas de tu ciudad", "de": "Ich suche Preise in Geschäften in deiner Stadt"},
+  "Metto insieme il piano": {"it": "Metto insieme il piano", "en": "Putting your plan together", "fr": "J'assemble votre plan", "es": "Estoy montando tu plan", "de": "Ich stelle deinen Plan zusammen"},
 };
 
 /**

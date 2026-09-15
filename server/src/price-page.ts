@@ -96,11 +96,38 @@ function firstNumber(html: string, patterns: RegExp[]): number | null {
 
 /** Legge prezzo, listino e scadenza dell'offerta dai dati strutturati. */
 function readPrices(html: string): PagePrice | null {
+  /* PIU' MODI DI SCRIVERE LO STESSO NUMERO.
+     Prima si guardavano solo `"price":` e `itemprop=price` con l'attributo, e
+     su quarantotto pagine aperte se ne leggevano otto. Non perche' le altre
+     non dichiarassero il prezzo: perche' lo dichiaravano in un altro modo.
+
+     I `<meta>` di Open Graph e di Facebook Commerce sono i piu' comuni dopo
+     JSON-LD, e parecchi negozi mettono il numero nel TESTO dell'elemento
+     invece che in un attributo. L'ordine conta: le forme piu' precise per
+     prime, quelle generiche — `amount`, `value` — in fondo, perche' in una
+     pagina possono significare anche altro.
+
+     Restano fuori i siti che il prezzo lo disegnano con JavaScript: li' non
+     c'e' niente da leggere, e nessuna espressione lo cambia. */
   const current = firstNumber(html, [
+    // Dati strutturati: la forma che i motori di ricerca chiedono.
     /"price"\s*:\s*"?([\d.,]+)"?/i,
     /"lowPrice"\s*:\s*"?([\d.,]+)"?/i,
-    /itemprop=["']price["'][^>]*content=["']([\d.,]+)["']/i,
     /"salePrice"\s*:\s*"?([\d.,]+)"?/i,
+    // Microdati, nell'attributo o nel testo.
+    /itemprop=["']price["'][^>]*content=["']([\d.,]+)["']/i,
+    /itemprop=["']price["'][^>]*>\s*[^\d<]{0,6}([\d.,]+)/i,
+    // I meta di Open Graph e di Facebook Commerce.
+    /<meta[^>]+(?:property|name)=["'](?:product:price:amount|og:price:amount|twitter:data1)["'][^>]+content=["']\s*([\d.,]+)/i,
+    /<meta[^>]+content=["']\s*([\d.,]+)["'][^>]+(?:property|name)=["'](?:product:price:amount|og:price:amount)["']/i,
+    // Attributi che i negozi usano per i propri script.
+    /data-(?:product-)?price(?:-amount)?=["']\s*([\d.,]+)["']/i,
+    // Altri nomi dentro i blocchi JSON della pagina.
+    /"(?:currentPrice|finalPrice|unitPrice|sellingPrice|priceValue|grossPrice)"\s*:\s*"?([\d.,]+)"?/i,
+    // Generici, per ultimi: da soli non provano niente, ma vicino a una
+    // valuta sono quasi sempre il prezzo.
+    /"amount"\s*:\s*"?([\d.,]+)"?\s*,\s*"currency/i,
+    /"value"\s*:\s*"?([\d.,]+)"?\s*,\s*"currency/i,
   ]);
   if (current === null) return null;
 

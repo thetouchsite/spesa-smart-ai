@@ -287,6 +287,12 @@ async function costruisci(paese: string): Promise<CatalogoPaese | null> {
  * la seconda aspetta la prima. Senza, due utenti che aprono l'app insieme
  * farebbero partire due scaricamenti da centomila prodotti.
  */
+/** E' gia' in memoria e ancora valido? Non scarica niente, guarda e basta. */
+export function catalogoGiaPronto(paese: string): boolean {
+  const c = caricati.get((paese || "").toUpperCase().slice(0, 2));
+  return Boolean(c && Date.now() - c.aggiornato < SCADENZA_MS);
+}
+
 export async function catalogoDi(paese: string): Promise<CatalogoPaese | null> {
   const cc = (paese || "").toUpperCase().slice(0, 2);
 
@@ -341,6 +347,23 @@ export async function cercaNelCatalogo(
   richiesta: string,
   quanti = 5,
 ): Promise<RisultatoCatalogo[]> {
+  /* NESSUNO ASPETTA IL PRIMO CARICAMENTO.
+     Scaricare il catalogo di un paese sono centoquarantamila prodotti e
+     cinquantasette secondi su Render. Farlo DENTRO la richiesta di un utente
+     significa che il primo della giornata aspetta un minuto in piu' — e
+     l'app molla a cinquantacinque secondi, perche' iOS chiude le connessioni
+     a sessanta. Misurato: `prices` annullata a 55,08 s.
+
+     Quindi se il catalogo non c'e' ancora si comincia a scaricarlo e si
+     risponde subito vuoto: questa richiesta usa le altre strade, e la
+     prossima trovera' il catalogo pronto. */
+  const pronto = catalogoGiaPronto(paese);
+  if (!pronto) {
+    void catalogoDi(paese);
+    console.info(`[catalogo] ${paese} non ancora pronto: lo carico per la prossima volta`);
+    return [];
+  }
+
   const cat = await catalogoDi(paese);
   if (!cat) return [];
 

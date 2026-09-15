@@ -232,10 +232,25 @@ export async function generatePricesCatalogo(
   const letti = await aBrani(daAprire, INSIEME, async (c) => {
     const v = await verifyProductPage(c.url);
 
-    // Il prezzo si prende solo se la pagina lo dichiara davvero. Qui non c'e'
-    // un modello che possa proporne uno: o lo leggiamo, o non c'e'.
+    /* LA PAGINA CHE NON DICHIARA IL PREZZO NON SI BUTTA.
+       Misurato: su ventiquattro schede aperte, ventidue rispondono 200 ma il
+       prezzo non e' nell'HTML — Tigros, Iperal, Esselunga, Unes e CoopShop lo
+       disegnano con JavaScript, e li' non c'e' niente da leggere.
+
+       Buttarle era uno spreco, perche' il PRODOTTO era quello giusto:
+       `pere-abate`, `zucchine-chiare`, `podere-uova-fresche-medie`. Si perdeva
+       un abbinamento corretto e un indirizzo che si apre, per una cifra
+       mancante.
+
+       Quindi restano, con `prezzo: null`. L'app le mostra come voce con il suo
+       prodotto e il suo link: manca il prezzo, e lo dice. Non entrano nel
+       totale — sommare quello che non si sa e' precisamente cio' che non
+       vogliamo fare. */
     const prezzo = v.page?.current ?? null;
-    if (prezzo == null) return null;
+
+    // Se la pagina non si apre proprio, quella si butta: un link rotto non
+    // serve a nessuno.
+    if (v.status === "non-raggiungibile") return null;
 
     const riga = {
       prodotto: c.voce,
@@ -256,19 +271,32 @@ export async function generatePricesCatalogo(
      con la posizione piu' bassa, cioe' il preferito del modello se ha un
      prezzo, altrimenti il migliore degli altri. Mostrarli tutti darebbe la
      stessa voce due volte con due prodotti diversi. */
+  /* UNA RIGA CON IL PREZZO BATTE SEMPRE UNA SENZA.
+     Tenendo solo la posizione, il candidato preferito dal modello vinceva
+     anche quando la sua pagina non dichiarava il prezzo — e poi veniva
+     scartato piu' avanti, portandosi via una riga con il prezzo che stava
+     appena dietro. Otto voci diventavano sette.
+
+     Quindi prima si guarda se c'e' il prezzo, e solo a parita' la posizione. */
   const perVoce = new Map<string, { riga: PrezzoGrezzo; posto: number }>();
   for (const r of letti) {
     if (!r) continue;
     const gia = perVoce.get(r.riga.prodotto);
-    if (!gia || r.posto < gia.posto) perVoce.set(r.riga.prodotto, r);
+    if (!gia) { perVoce.set(r.riga.prodotto, r); continue; }
+    const hoPrezzo = r.riga.prezzo != null;
+    const avevaPrezzo = gia.riga.prezzo != null;
+    const meglio = hoPrezzo !== avevaPrezzo ? hoPrezzo : r.posto < gia.posto;
+    if (meglio) perVoce.set(r.riga.prodotto, r);
   }
   const prezzi: PrezzoGrezzo[] = [...perVoce.values()].map((x) => x.riga);
   const secondi = (Date.now() - t0) / 1000;
 
-  const conPrezzo = new Set(prezzi.map((p) => p.prodotto)).size;
+  const conPrezzo = new Set(prezzi.filter((p) => p.prezzo != null).map((p) => p.prodotto)).size;
+  const conProdotto = new Set(prezzi.map((p) => p.prodotto)).size;
   console.info(
-    `[catalogo] ${secondi.toFixed(0)}s, ${daAprire.length} pagine aperte, ` +
-      `${prezzi.length} prezzi letti per ${conPrezzo}/${items.length} voci`,
+    `[catalogo] ${secondi.toFixed(0)}s, ${daAprire.length} pagine aperte — ` +
+      `${conProdotto}/${items.length} voci con prodotto e link, ` +
+      `di cui ${conPrezzo} con il prezzo leggibile`,
   );
 
   return { prezzi, senzaCandidati, pagineAperte: daAprire.length, secondi };
