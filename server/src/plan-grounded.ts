@@ -144,7 +144,7 @@ function quotaFinita(messaggio: string): boolean {
  * ha finito. Le tre generazioni senza ricerca — menù, lista, menù dai
  * prodotti — passano tutte di qui, così la regola sta in un posto solo.
  */
-async function chiamaMenu(
+export async function chiamaMenu(
   modelId: string,
   prompt: string,
   timeoutMs: number,
@@ -207,7 +207,7 @@ export interface GroundedPlanInput {
  *
  * Meglio sei ricette su sette che nessun piano.
  */
-function parseJson(text: string): unknown {
+export function parseJson(text: string): unknown {
   const clean = text.replace(/^```(?:json)?\s*/m, "").replace(/```\s*$/m, "");
   const start = clean.indexOf("{");
   if (start === -1) throw new Error("nessun JSON nella risposta del modello");
@@ -295,7 +295,7 @@ function repairTruncatedJson(body: string): string | null {
   return body.slice(0, cut) + chiusure;
 }
 
-interface CallResult {
+export interface CallResult {
   text: string;
   seconds: number;
   searches: number;

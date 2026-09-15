@@ -22,13 +22,20 @@
  * il grounding, che sono cinque dei sei centesimi che costa un piano. Questa
  * strada costa zero in chiamate al modello.
  *
- * COSA SI PERDE
- * -------------
- * L'abbinamento fra la voce della lista e il prodotto del catalogo lo fa un
- * conteggio di parole, non un'intelligenza: «pasta di semola» puo' finire su
- * «pasta e fagioli». Su diciassette voci ne azzecca una dozzina. Il passo
- * successivo e' far scegliere al modello fra i candidati che il catalogo
- * propone — poche centinaia di token, nessuna ricerca, quindi quasi gratis.
+ * CHI SCEGLIE FRA I CANDIDATI
+ * ---------------------------
+ * Il catalogo propone tre prodotti per ogni voce, confrontando le parole. E'
+ * un criterio povero e si vedeva: «Orata fresca» finiva su «Ricotta fresca»,
+ * «Pomodori da insalata» su «Rio Mare insalatissime» — nove voci su
+ * diciassette, e non tutte giuste.
+ *
+ * Allora la scelta la fa il modello, ma solo la SCELTA: legge i tre nomi e
+ * dice quale e' il prodotto giusto, o nessuno. Non cerca, non inventa
+ * indirizzi, non naviga. Una chiamata sola per tutta la lista, poche centinaia
+ * di token e ZERO grounding — che e' la voce cara, cinque centesimi su sei.
+ *
+ * Se la chiamata fallisce si tiene la scelta a parole: un abbinamento
+ * imperfetto vale piu' di nessun prezzo.
  *
  * E copre solo i paesi censiti: fuori, restituisce vuoto e chi chiama ricade
  * sulle altre strade.
@@ -37,6 +44,7 @@
 import { cercaNelCatalogo } from "./catalogo.js";
 import { paesiConCatalogo } from "./catalogo-fonti.js";
 import { verifyProductPage } from "./price-page.js";
+import { chiamaMenu, MENU_MODEL, parseJson } from "./plan-grounded.js";
 
 /** La stessa forma che producono le altre due strade. */
 export interface PrezzoGrezzo {
@@ -81,6 +89,77 @@ async function aBrani<T, R>(cose: T[], quante: number, lavoro: (c: T) => Promise
   return fuori;
 }
 
+
+/** La scelta del modello per una voce: quale candidato, o nessuno. */
+interface Scelta {
+  voce: number;
+  scelto: number | null;
+}
+
+/**
+ * Fa scegliere al modello quale candidato corrisponde a ogni voce.
+ *
+ * Il prompt e' volutamente minuscolo: nomi, niente altro. Non gli si chiede
+ * di cercare, di valutare prezzi o di essere creativo — solo di riconoscere
+ * che «passata di pomodoro» e' quel Mutti da 700 g e non una passata di
+ * verdure. E' la cosa che sa fare meglio, ed e' l'unica che gli resta.
+ *
+ * Restituisce una mappa voce → indice scelto. Se qualcosa va storto,
+ * restituisce vuoto e chi chiama tiene l'ordine del catalogo.
+ */
+async function facciScegliere(
+  candidature: Array<{ voce: string; candidati: Array<{ nome: string; insegna: string }> }>,
+): Promise<Map<number, number | null>> {
+  const utili = candidature
+    .map((c, i) => ({ ...c, i }))
+    .filter((c) => c.candidati.length > 0);
+  if (utili.length === 0) return new Map();
+
+  /** A capo come costante: dentro un template annidato l'escape si perde. */
+  const NL = String.fromCharCode(10);
+
+  const elenco = utili
+    .map(
+      (c) =>
+        `${c.i}. "${c.voce}"` +
+        NL +
+        c.candidati.map((k, j) => `   ${j}) ${k.nome} — ${k.insegna}`).join(NL),
+    )
+    .join(NL);
+
+  const prompt = `Per ogni voce della spesa, scegli quale prodotto le corrisponde.
+
+${elenco}
+
+Rispondi con il numero del prodotto scelto, oppure null se NESSUNO corrisponde
+davvero — meglio nessuno che uno sbagliato. Una passata di pomodoro non e' una
+passata di verdure, un'orata non e' una ricotta.
+Preferisci il prodotto semplice a quello in confezione multipla o gia' cucinato.
+
+Solo JSON:
+{"scelte":[{"voce":0,"scelto":1},{"voce":1,"scelto":null}]}`;
+
+  try {
+    // Nessuna ricerca: e' la differenza fra qualche millesimo e cinque
+    // centesimi. E il modello qui non deve sapere niente del mondo, solo
+    // leggere dei nomi.
+    const r = await chiamaMenu(MENU_MODEL, prompt, 60_000);
+    const dati = parseJson(r.text) as { scelte?: Scelta[] };
+    const mappa = new Map<number, number | null>();
+    for (const s of dati.scelte ?? []) {
+      if (typeof s?.voce === "number") mappa.set(s.voce, typeof s.scelto === "number" ? s.scelto : null);
+    }
+    console.info(
+      `[catalogo] il modello ha scelto per ${mappa.size} voci ` +
+        `($${r.cost.toFixed(4)}, nessuna ricerca)`,
+    );
+    return mappa;
+  } catch (err) {
+    console.warn("[catalogo] scelta non riuscita, tengo l'ordine del catalogo:", err);
+    return new Map();
+  }
+}
+
 /**
  * Prezzi per una lista della spesa, presi dal catalogo.
  *
@@ -113,10 +192,34 @@ export async function generatePricesCatalogo(
     console.info(`[catalogo] ${senzaCandidati}/${items.length} voci senza nessun candidato`);
   }
 
-  // Poi le pagine, che sono la parte lenta.
-  const daAprire = candidature.flatMap((c) =>
-    c.candidati.map((k) => ({ voce: c.voce, ...k })),
-  );
+  // La scelta: una chiamata sola, senza ricerca, per tutta la lista.
+  const scelte = await facciScegliere(candidature);
+
+  /* SI APRE SOLO CIO' CHE IL MODELLO HA SCELTO.
+     Prima si aprivano tutti e tre i candidati di ogni voce — cinquantuno
+     pagine per diciassette prodotti — e si teneva il primo con un prezzo
+     leggibile, cioe' spesso quello sbagliato. Ora la scelta arriva prima:
+     meno pagine aperte, meno tempo, e quella giusta. */
+  const daAprire = candidature.flatMap((c, i) => {
+    const scelto = scelte.get(i);
+    // Il modello dice "nessuno": la voce resta senza, ed e' la risposta giusta.
+    // Meglio una voce vuota che un'orata che diventa una ricotta.
+    if (scelte.has(i) && scelto === null) return [];
+
+    /* IL SUO PREFERITO PER PRIMO, MA GLI ALTRI RESTANO DIETRO.
+       Aprendo solo la pagina scelta la qualita' saliva — «Orata fresca»
+       trovava finalmente un'orata — ma la copertura crollava da nove voci a
+       cinque: se quella singola pagina non dichiara il prezzo in modo
+       leggibile, la voce resta vuota anche se il prodotto era giusto.
+
+       Quindi si tengono tutti, con il preferito in testa. Piu' avanti si
+       prende il primo che ha un prezzo, e l'ordine fa il resto. */
+    const preferito = typeof scelto === "number" ? c.candidati[scelto] : undefined;
+    const ordinati = preferito
+      ? [preferito, ...c.candidati.filter((k) => k !== preferito)]
+      : c.candidati;
+    return ordinati.map((k, posto) => ({ voce: c.voce, posto, ...k }));
+  });
 
   const letti = await aBrani(daAprire, INSIEME, async (c) => {
     const v = await verifyProductPage(c.url);
@@ -126,7 +229,7 @@ export async function generatePricesCatalogo(
     const prezzo = v.page?.current ?? null;
     if (prezzo == null) return null;
 
-    return {
+    const riga = {
       prodotto: c.voce,
       // Il nome del catalogo viene dall'indirizzo ed e' tutto minuscolo:
       // la prima lettera maiuscola lo rende leggibile in elenco.
@@ -136,9 +239,21 @@ export async function generatePricesCatalogo(
       negozio: c.insegna,
       link: c.url,
     } satisfies PrezzoGrezzo;
+    return { riga, posto: c.posto };
   });
 
-  const prezzi: PrezzoGrezzo[] = letti.filter((r) => r !== null);
+  /* UNO PER VOCE, IL PRIMO CHE HA UN PREZZO.
+     `letti` puo' contenere piu' candidati della stessa voce: si tiene quello
+     con la posizione piu' bassa, cioe' il preferito del modello se ha un
+     prezzo, altrimenti il migliore degli altri. Mostrarli tutti darebbe la
+     stessa voce due volte con due prodotti diversi. */
+  const perVoce = new Map<string, { riga: PrezzoGrezzo; posto: number }>();
+  for (const r of letti) {
+    if (!r) continue;
+    const gia = perVoce.get(r.riga.prodotto);
+    if (!gia || r.posto < gia.posto) perVoce.set(r.riga.prodotto, r);
+  }
+  const prezzi: PrezzoGrezzo[] = [...perVoce.values()].map((x) => x.riga);
   const secondi = (Date.now() - t0) / 1000;
 
   const conPrezzo = new Set(prezzi.map((p) => p.prodotto)).size;
