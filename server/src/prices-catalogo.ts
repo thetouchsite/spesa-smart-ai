@@ -54,6 +54,14 @@ export interface PrezzoGrezzo {
   valuta: string;
   negozio: string;
   link: string;
+  /**
+   * Questa pagina l'abbiamo GIA' aperta per leggerne il prezzo.
+   *
+   * Senza questo segno il verificatore la riapriva una seconda volta, per
+   * scoprire cio' che sapevamo gia': meta' del tempo di questa strada se ne
+   * andava a rifare un lavoro appena fatto.
+   */
+  giaVerificato?: boolean;
 }
 
 export interface EsitoCatalogo {
@@ -238,6 +246,7 @@ export async function generatePricesCatalogo(
       valuta: v.page?.currency ?? valuta,
       negozio: c.insegna,
       link: c.url,
+      giaVerificato: true,
     } satisfies PrezzoGrezzo;
     return { riga, posto: c.posto };
   });

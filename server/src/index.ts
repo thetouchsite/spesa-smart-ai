@@ -531,6 +531,47 @@ async function prezzaLista(
       // noi, una per una, ed e' la forma piu' forte di "ha cercato davvero".
       hacercato = true;
       ricerche = cat.pagineAperte;
+
+      /* IL CATALOGO NON COPRE TUTTO, E PER IL RESTO C'E' IL MOTORE.
+         Misurato su Napoli: otto voci su diciassette, tutte con il prodotto
+         giusto e il link garantito. Le altre nove restavano vuote — o il
+         prodotto in catalogo non c'era, o la pagina non dichiara il prezzo.
+
+         Lasciarle vuote sarebbe uno spreco: il motore con la ricerca quelle
+         le trova quasi sempre. Quindi si usa il catalogo dove arriva, e si
+         chiede al modello SOLO il resto — nove voci invece di diciassette, e
+         il costo scende in proporzione.
+
+         L'ordine conta: prima il catalogo, che da' link garantiti, e il
+         motore solo dove il catalogo tace. Il contrario darebbe link
+         inventati dove ne avevamo di veri. */
+      const gia = new Set(prezziGrezzi.map((p) => p.prodotto));
+      const rimasti = items.filter((i) => !gia.has(i));
+
+      if (rimasti.length > 0) {
+        console.info(
+          `[prezzi] catalogo: ${gia.size}/${items.length} voci. ` +
+            `Chiedo al motore le altre ${rimasti.length}`,
+        );
+        try {
+          recordUse("gemini");
+          recordUse("grounding");
+          const extra = await generatePricesParallel(rimasti, city, country, currency);
+          prezziGrezzi = [...prezziGrezzi, ...extra.data.prezzi];
+          secondi += extra.seconds;
+          costo = extra.cost;
+          ricerche += extra.data.searches;
+          recordCost(extra.cost);
+          console.info(
+            `[prezzi] il motore ha aggiunto ${extra.data.prezzi.length} prezzi ` +
+              `in ${extra.seconds.toFixed(0)}s, $${extra.cost.toFixed(4)}`,
+          );
+        } catch (err) {
+          // Il catalogo ha gia' dato dei prezzi: se il completamento fallisce
+          // si consegna quello che c'e', invece di perdere tutto.
+          console.warn("[prezzi] completamento col motore fallito, tengo il catalogo:", err);
+        }
+      }
     } else if (fonte === "serpapi") {
       // La strada del prototipo: una ricerca per prodotto su Google Shopping.
       if (!isShoppingConfigured()) {
@@ -599,7 +640,22 @@ async function prezzaLista(
      scheda. La stessa etichetta che portano da sempre le pagine che si aprono
      ma non dichiarano il prezzo in modo leggibile. */
   const daCostruire = tenute.filter((r) => !r.link);
-  const daAprire = tenute.filter((r) => r.link);
+
+  /* LE PAGINE GIA' APERTE NON SI RIAPRONO.
+     Le righe che vengono dal catalogo hanno il prezzo LETTO dalla loro pagina:
+     riaprirla per verificarla significa rifare, uno per uno, un lavoro appena
+     fatto — ed era meta' del tempo di quella strada. Passano direttamente come
+     "verificato", che e' esattamente cio' che sono. */
+  const giaAperte: CheckedRow[] = tenute
+    .filter((r) => r.link && (r as { giaVerificato?: boolean }).giaVerificato)
+    .map((r) => ({ ...r, verifica: "verificato" as const }));
+  if (giaAperte.length > 0) {
+    console.info(`[prezzi] ${giaAperte.length} righe gia' verificate dal catalogo: non le riapro`);
+  }
+
+  const daAprire = tenute.filter(
+    (r) => r.link && !(r as { giaVerificato?: boolean }).giaVerificato,
+  );
 
   const costruite: CheckedRow[] = daCostruire.flatMap((r) => {
     const rip = linkDiRipiego(r.prodotto || r.nome, r.negozio, country);
@@ -614,9 +670,9 @@ async function prezzaLista(
   // aperto". Dieci per volta, con trenta o quaranta pagine da aprire.
   const aperte = await verifyPrices(daAprire, 10);
   const checked = {
-    rows: [...aperte.rows, ...costruite],
-    verificati: aperte.verificati + costruite.length,
-    totali: aperte.totali + costruite.length,
+    rows: [...aperte.rows, ...giaAperte, ...costruite],
+    verificati: aperte.verificati + giaAperte.length + costruite.length,
+    totali: aperte.totali + giaAperte.length + costruite.length,
   };
   console.info(`[prezzi] pagine aperte con esito ${aperte.verificati}/${aperte.totali}`);
 
