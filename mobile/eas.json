@@ -1,26 +1,4 @@
 {
-  "//": [
-    "Come si costruisce l'app installabile.",
-    "",
-    "TRE PROFILI, E SERVE SAPERE QUALE.",
-    "  development  con gli strumenti di sviluppo dentro: si ricarica il codice",
-    "               senza ricostruire, ma pesa e non si da' a nessuno",
-    "  preview      APK vero, da mandare via WhatsApp e installare: e' questo",
-    "               quello che serve per far provare l'app a qualcuno",
-    "  production   AAB per il Play Store, che NON si installa a mano",
-    "",
-    "PERCHE' preview DICHIARA buildType apk. Android per il Play Store vuole",
-    "un .aab, che e' un formato che il negozio apre e ricompila: sul telefono",
-    "non si installa. Senza questa riga si ottiene un file che non serve a",
-    "nessuno fuori dallo Store — ed e' il default.",
-    "",
-    "L'INDIRIZZO DEL BACKEND SI CUOCE DENTRO L'APK.",
-    "Le variabili EXPO_PUBLIC_ non si leggono a runtime: vengono sostituite nel",
-    "codice al momento della build. Quindi l'indirizzo qui sotto e' quello che",
-    "l'app usera' per sempre, e cambiarlo richiede una build nuova. Va messo",
-    "l'indirizzo pubblico di Render, non un 192.168.* che esiste solo sulla tua",
-    "rete di casa."
-  ],
   "cli": {
     "version": ">= 12.0.0",
     "appVersionSource": "local"
