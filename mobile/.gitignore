@@ -10,7 +10,13 @@ web-build/
 .env
 .env.local
 expo-env.d.ts
-scripts/*.mjs
+# `verify-flow.mjs` lo PRODUCE esbuild da `verify-flow.ts` a ogni `npm run
+# verify`: e' un file generato e non va in git. La regola pero' era
+# `scripts/*.mjs`, che prendeva dentro anche gli script scritti a mano —
+# `apk.mjs`, `pubblica-demo.mjs`, `build-ingredient-map.mjs` sono rimasti
+# fuori dal repo senza che nessuno se ne accorgesse, perche' `git add` di un
+# file ignorato non e' un errore rumoroso.
+scripts/verify-flow.mjs
 
 # Le cartelle native le GENERA `expo prebuild`, non si scrivono a mano.
 #
