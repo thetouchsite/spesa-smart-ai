@@ -11,3 +11,16 @@ web-build/
 .env.local
 expo-env.d.ts
 scripts/*.mjs
+
+# Le cartelle native le GENERA `expo prebuild`, non si scrivono a mano.
+#
+# Tenerle fuori da git e' una scelta, non una dimenticanza: finche' non ci
+# sono, `app.json` e' l'unica verita' sulla configurazione dell'app — nome,
+# icona, permessi, package — e ogni build la rilegge. Dal momento in cui
+# `android/` viene committato diventa lui la verita': cambiare `app.json` non
+# ha piu' effetto finche' qualcuno non rifa' prebuild, e la differenza non la
+# segnala nessuno.
+#
+# Si committano il giorno che serve scriverci dentro codice nativo a mano.
+android/
+ios/

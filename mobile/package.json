@@ -8,7 +8,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "typecheck": "tsc --noEmit",
-    "verify": "node ../node_modules/esbuild/bin/esbuild scripts/verify-flow.ts --bundle --platform=node --format=esm --outfile=scripts/verify-flow.mjs --alias:@=./src --log-level=error && node scripts/verify-flow.mjs"
+    "verify": "node ../node_modules/esbuild/bin/esbuild scripts/verify-flow.ts --bundle --platform=node --format=esm --outfile=scripts/verify-flow.mjs --alias:@=./src --log-level=error && node scripts/verify-flow.mjs",
+    "prebuild": "expo prebuild --platform android",
+    "apk": "expo prebuild --platform android && cd android && gradlew assembleRelease",
+    "apk:apri": "explorer android\\app\\build\\outputs\\apk\\release"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
