@@ -77,13 +77,13 @@ export default function Home() {
       footer={
         <View style={styles.actions}>
           <Button
-            label={currentPlan ? "Crea un nuovo piano" : "Crea il mio piano"}
+            label={ui(currentPlan ? "Crea un nuovo piano" : "Crea il mio piano")}
             icon="sparkles-outline"
             onPress={() => router.push("/onboarding/citta")}
           />
           {currentPlan ? (
             <Button
-              label="Riprendi l'ultimo piano"
+              label={ui("Riprendi l'ultimo piano")}
               variant="secondary"
               icon="arrow-forward-outline"
               onPress={() => router.push("/risultati")}
@@ -134,8 +134,8 @@ export default function Home() {
       <Card>
         <ListRow
           icon="settings-outline"
-          title="Impostazioni"
-          subtitle="Lingua, profilo, dati"
+          title={ui("Impostazioni")}
+          subtitle={ui("Lingua, profilo, dati")}
           onPress={() => router.push("/impostazioni")}
         />
         {/* L'indagine Altroconsumo copre solo il mercato italiano:
@@ -144,23 +144,33 @@ export default function Home() {
         <ListRow
             icon="trophy-outline"
             title={ui("Le catene più economiche")}
-            subtitle="Indagine Altroconsumo 2026"
+            subtitle={ui("Indagine Altroconsumo 2026")}
             onPress={() => router.push("/dove-conviene")}
           />
         ) : null}
         <ListRow
           icon="map-outline"
-          title="Supermercati vicini"
-          subtitle="Negozi alimentari intorno a te"
+          title={ui("Supermercati vicini")}
+          subtitle={ui("Negozi alimentari intorno a te")}
           onPress={() => router.push("/negozi")}
         />
       </Card>
 
       <Card style={styles.disclaimer}>
         <Label icon="information-circle-outline">{ui("I prezzi mostrati")}</Label>
-        <Body style={styles.small}>{ui("Sono")}<Body style={styles.bold}>stime indicative</Body> basate su una tabella di
-          riferimento per il tuo paese, non rilevazioni dai supermercati. Dalla lista della spesa
-          puoi aprire la pagina del prodotto sul sito del negozio.
+        {/* UNA FRASE INTERA, NON PEZZI CUCITI. Qui c'era `ui("Sono")` seguito
+            dal resto della frase come testo: in inglese "Sono" diventava "I am"
+            e si incollava a quello che seguiva — «I amstime indicative basate su
+            una tabella…». `uiText` cerca la stringa COMPLETA in un dizionario,
+            quindi una parola isolata non si traduce, si sostituisce.
+
+            E il testo diceva il falso. Parlava di «stime basate su una tabella
+            di riferimento»: era vero nel prototipo, non piu' da quando i prezzi
+            si cercano davvero online con i link verificati. Era la prima cosa
+            che si leggeva aprendo l'app, e negava esattamente cio' che l'app fa
+            di meglio. */}
+        <Body style={styles.small}>
+          {ui("I prezzi li cerchiamo online nei negozi che consegnano dove vivi, e ogni link viene aperto e controllato prima di mostrartelo. Dove nessun negozio pubblica il prezzo, la voce resta senza: preferiamo dirtelo che inventarlo.")}
         </Body>
       </Card>
 

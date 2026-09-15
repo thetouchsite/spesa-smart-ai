@@ -52,7 +52,7 @@ export default function MenuScreen() {
         <View style={styles.empty}>
           <Title>{ui("Nessun menù")}</Title>
           <Subtitle>{ui("Crea prima un piano.")}</Subtitle>
-          <Button label="Comincia" onPress={() => router.replace("/onboarding/citta")} />
+          <Button label={ui("Comincia")} onPress={() => router.replace("/onboarding/citta")} />
         </View>
       </Screen>
     );

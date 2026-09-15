@@ -99,3 +99,51 @@ services:
       # riavvii. Senza, la cache resta in memoria e si perde a ogni risveglio.
       - key: MONGODB_URI
         sync: false
+
+  # ── L'app nel browser ───────────────────────────────────────────────
+  #
+  # PERCHE' ESISTE
+  # --------------
+  # Per far provare l'app a chi ha un iPhone senza che nessuno dei due spenda
+  # niente. Installare su iOS richiede l'account Apple Developer, 99 $/anno, e
+  # il muro e' di Apple: nemmeno EAS lo aggira. La strada di Expo Go sembrava
+  # risolverlo, ma su un telefono estraneo risponde
+  #
+  #   403: this project requires authentication. Sign in to Expo Go with an
+  #   Expo account that is a member of the account that owns this project
+  #
+  # e far registrare il cliente a Expo e' esattamente la complicazione che si
+  # voleva evitare.
+  #
+  # Nel browser non serve niente: si apre un indirizzo in Safari e l'app c'e'.
+  # Il codice e' lo stesso — React Native gira sul web tramite react-native-web
+  # — quindi non c'e' una seconda app da mantenere.
+  #
+  # COSA NON SI VEDE NEL BROWSER
+  # ----------------------------
+  # La posizione chiede il permesso a Safari invece che al sistema, e la
+  # condivisione del PDF passa dal menu del browser. Tutto il resto — piano,
+  # prezzi, link ai negozi — e' identico.
+  #
+  # LA RISCRITTURA NON E' UN DETTAGLIO. Le schermate hanno indirizzi propri
+  # (/risultati, /lista), ma il file e' uno solo: senza la regola qui sotto,
+  # chi ricarica la pagina o arriva da un link diretto riceve 404. Verificato
+  # prima di scriverla.
+  - type: web
+    name: spesa-smart-app
+    runtime: static
+    rootDir: mobile
+    buildCommand: npm ci && npx expo export --platform web --output-dir dist-web
+    staticPublishPath: dist-web
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Cotte dentro il pacchetto al momento della build, come nell'APK.
+      - key: EXPO_PUBLIC_API_URL
+        value: https://spesa-smart-ai.onrender.com
+      - key: EXPO_PUBLIC_FLUSSO
+        value: spesa-prima
+      - key: EXPO_PUBLIC_PRICE_SOURCE
+        value: ai

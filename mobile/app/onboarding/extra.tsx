@@ -41,9 +41,7 @@ export default function ExtraScreen() {
       />
 
       <Note>
-        I prezzi mostrati sono stime indicative per il tuo paese e servono a organizzare la
-        spesa dentro il budget. Non sono rilevazioni dai supermercati: dalla lista potrai
-        verificare il prezzo reale di ogni prodotto.
+        {ui("I prezzi non sono stime: li cerchiamo online, nei negozi che consegnano dove vivi, nel momento in cui creiamo il piano. Dove non li troviamo, te lo diciamo.")}
       </Note>
     </Step>
   );

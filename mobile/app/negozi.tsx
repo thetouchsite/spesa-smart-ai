@@ -94,7 +94,7 @@ export default function NegoziScreen() {
 
   return (
     <Screen>
-      <TopBar title="Supermercati vicini" onBack={() => tornaIndietro()} />
+      <TopBar title={ui("Supermercati vicini")} onBack={() => tornaIndietro()} />
 
       <View style={styles.head}>
         <Title>{ui("Dove fare la spesa")}</Title>

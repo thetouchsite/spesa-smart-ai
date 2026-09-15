@@ -106,7 +106,7 @@ export default function RisultatiScreen() {
           <Ionicons name="clipboard-outline" size={44} color={colors.mutedForeground} />
           <Title>{ui("Nessun piano")}</Title>
           <Subtitle>Rispondi alle domande e te ne prepariamo uno.</Subtitle>
-          <Button label="Comincia" onPress={() => router.replace("/onboarding/citta")} />
+          <Button label={ui("Comincia")} onPress={() => router.replace("/onboarding/citta")} />
         </View>
       </Screen>
     );
@@ -214,7 +214,7 @@ export default function RisultatiScreen() {
 
       <View style={styles.grid}>
         <Stat icon="person-outline" label={ui("A persona / giorno")} value={money(results.costPerPersonPerDay, cur, language)} />
-        <Stat icon="ribbon-outline" label="Punteggio" value={`${results.score.total}/100`} />
+        <Stat icon="ribbon-outline" label={ui("Punteggio")} value={`${results.score.total}/100`} />
       </View>
 
       {results.annualSavings > 0 ? (
@@ -231,7 +231,7 @@ export default function RisultatiScreen() {
 
         <ListRow
           icon="map-outline"
-          title="Supermercati vicini"
+          title={ui("Supermercati vicini")}
           subtitle={ui("Negozi alimentari intorno a te, con distanza")}
           onPress={() => router.push("/negozi")}
         />
@@ -244,7 +244,7 @@ export default function RisultatiScreen() {
         <ListRow
           icon="refresh-outline"
           title={ui("Rifai il piano")}
-          subtitle="Ricomincia dalle domande"
+          subtitle={ui("Ricomincia dalle domande")}
           onPress={() => router.replace("/onboarding/citta")}
         />
       </Card>
@@ -266,12 +266,15 @@ export default function RisultatiScreen() {
         <Label icon="information-circle-outline">{ui("Come leggere questi numeri")}</Label>
         <Body style={styles.small}>
           {loading
-            ? "Sto calcolando i prezzi…"
+            ? ui("Sto calcolando i prezzi…")
             : results.savingsAvailable
-              ? "Sono stime indicative basate sui prezzi medi del tuo paese, non rilevazioni dai supermercati. Dalla lista della spesa puoi verificare il prezzo reale di ogni prodotto."
+              ? ui("Prezzi trovati online nei negozi della tua zona, con i link controllati uno per uno. Dove nessun negozio pubblica il prezzo, la voce resta senza.")
               : results.estimatedSpend > 0
-                ? `Totale parziale: ${results.missingPrices.length} prodotti su ${currentPlan.groceryList.length} non hanno un prezzo di riferimento, quindi la spesa reale sarà un po' più alta. Gli altri sono stime indicative, non rilevazioni dai supermercati.`
-                : "Non abbiamo prezzi di riferimento sufficienti per questa lista. Menù e lista della spesa restano completi, e dalla lista puoi verificare il prezzo reale di ogni prodotto."}
+                // I numeri fuori dalla traduzione: sono uguali in ogni lingua,
+                // e tenerli dentro obbligherebbe a un dizionario per ogni conta.
+                ? `${results.missingPrices.length}/${currentPlan.groceryList.length} ` +
+                  ui("prodotti sono rimasti senza prezzo, quindi la spesa vera sarà un po' più alta. Gli altri sono prezzi trovati online, non stime.")
+                : ui("Non siamo riusciti a trovare abbastanza prezzi per questa lista. Il menù e la lista della spesa restano completi, e da ogni voce puoi cercare il prodotto nei negozi.")}
         </Body>
       </Card>
     </Screen>

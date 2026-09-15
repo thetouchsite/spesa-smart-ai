@@ -81,7 +81,7 @@ export default function ImpostazioniScreen() {
 
   return (
     <Screen>
-      <TopBar title="Impostazioni" onBack={() => tornaIndietro()} />
+      <TopBar title={ui("Impostazioni")} onBack={() => tornaIndietro()} />
 
       <View style={styles.head}>
         <Title>Impostazioni</Title>
@@ -117,7 +117,7 @@ export default function ImpostazioniScreen() {
         />
         <ListRow
           icon="globe-outline"
-          title="Paese e valuta"
+          title={ui("Paese e valuta")}
           subtitle={country ? `${country.name} · ${country.currency}` : "non riconosciuto"}
         />
         <ListRow
@@ -138,7 +138,7 @@ export default function ImpostazioniScreen() {
         />
         <ListRow
           icon="restaurant-outline"
-          title="Stile alimentare"
+          title={ui("Stile alimentare")}
           subtitle={profile.style || "non impostato"}
           onPress={() => router.push("/onboarding/stile")}
         />
@@ -148,7 +148,7 @@ export default function ImpostazioniScreen() {
         <Label icon="storefront-outline">Vicino a te</Label>
         <ListRow
           icon="map-outline"
-          title="Supermercati vicini"
+          title={ui("Supermercati vicini")}
           subtitle={ui("Cerca i negozi alimentari intorno alla tua posizione")}
           onPress={() => router.push("/negozi")}
         />
@@ -168,7 +168,7 @@ export default function ImpostazioniScreen() {
           un server: quando arriveranno gli account, i dati potranno seguirti fra dispositivi e
           la sincronizzazione sarà una tua scelta.
         </Body>
-        <Button label="Cancella i miei dati" variant="secondary" icon="trash-outline" onPress={wipe} />
+        <Button label={ui("Cancella i miei dati")} variant="secondary" icon="trash-outline" onPress={wipe} />
       </Card>
     </Screen>
   );

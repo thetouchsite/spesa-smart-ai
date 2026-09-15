@@ -30,3 +30,6 @@ scripts/verify-flow.mjs
 # Si committano il giorno che serve scriverci dentro codice nativo a mano.
 android/
 ios/
+
+# Il pacchetto per il browser lo produce `expo export`: si rigenera, non si versiona.
+dist-web/

@@ -117,7 +117,7 @@ export default function BudgetScreen() {
         onPress={() => updateProfile({ frequency: "monthly" })}
       />
 
-      <Note>{ui("I prezzi che vedrai sono stime basate su una tabella di riferimento per il tuo paese. Dalla lista della spesa potrai verificare il prezzo reale di ogni prodotto.")}</Note>
+      <Note>{ui("I prezzi non sono stime: li cerchiamo online, nei negozi che consegnano dove vivi, nel momento in cui creiamo il piano. Dove non li troviamo, te lo diciamo.")}</Note>
     </Step>
   );
 }
