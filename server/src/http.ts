@@ -76,7 +76,11 @@ function applyCors(req: IncomingMessage, res: ServerResponse) {
   if (allowed.length === 0) res.setHeader("Access-Control-Allow-Origin", "*");
   else if (origin && allowed.includes(origin)) res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  // `Authorization` serve o il browser rifiuta ogni richiesta autenticata
+  // PRIMA di inviarla, nel controllo preliminare. L'app nativa non passa da
+  // qui — CORS e' una regola del browser — quindi il difetto era invisibile
+  // finche' non si prova la versione web.
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Max-Age", "86400");
 }
 

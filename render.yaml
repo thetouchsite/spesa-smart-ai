@@ -1,0 +1,101 @@
+# Il backend su Render.
+#
+# PERCHE' RENDER E NON GLI ALTRI
+# ------------------------------
+# Perche' il nostro e' un server sempre acceso, non funzioni, e qui gira com'e'
+# senza riscrivere niente. Le alternative guardate il 2026-09-10:
+#
+#   Railway   il piano gratuito da' 1 $ di credito al mese, un servizio acceso
+#             ne consuma cinque. Non basta.
+#   Vercel    Hobby arriva a 300 secondi, quindi i nostri 26-55 ci starebbero,
+#             ma il server andrebbe riscritto come funzioni serverless — e il
+#             tetto di spesa, che vive in memoria, si azzererebbe a ogni
+#             invocazione lasciando senza freno proprio cio' che protegge il
+#             credito. In piu' Hobby nei loro termini e' per uso non
+#             commerciale.
+#   Render    750 ore gratuite al mese; un servizio acceso 24/7 ne fa 720.
+#
+# LA COSA DA SAPERE PRIMA DI PROMETTERLO A QUALCUNO
+# -------------------------------------------------
+# Il piano gratuito SI SPEGNE dopo quindici minuti senza traffico, e
+# riaccendersi prende circa un minuto. La prima richiesta dopo una pausa
+# morirebbe: l'app aspetta 55 secondi e poi molla — e succederebbe proprio nel
+# momento peggiore, davanti a chi guarda la demo.
+#
+# Per questo l'app chiama `/health` appena si apre (vedi `sveglia.ts`): mentre
+# l'utente fa l'onboarding, che di schermate ne ha sei, il server si sveglia da
+# solo ed e' gia' caldo quando serve.
+#
+# Per la consegna vera si passa al piano a pagamento — 7 $ al mese — e il
+# problema sparisce: basta cambiare `plan: free` in `plan: starter`.
+#
+# COME SI USA
+# -----------
+# Su Render: New → Blueprint, si punta a questa repo, lui legge questo file.
+# Le chiavi NON stanno qui — `sync: false` significa "chiedimela nel
+# cruscotto", ed e' l'unico posto dove vanno messe.
+
+services:
+  - type: web
+    name: spesa-smart-api
+    runtime: node
+    plan: free
+    # La regione conta: il modello e i negozi che interroghiamo stanno in
+    # Europa, e da Francoforte il giro e' piu' corto che dall'Ohio.
+    region: frankfurt
+    rootDir: server
+    # `npm ci` e non `npm install`: installa esattamente il lockfile, cosi' il
+    # server pubblicato e' quello provato e non una versione vicina.
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    # Render considera riuscito il deploy solo se questo risponde. E' anche il
+    # percorso che l'app chiama per svegliare il servizio.
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+
+      # ── Le chiavi. `sync: false` = si inseriscono nel cruscotto Render ──
+      # La chiave con la fatturazione attiva: e' l'unica che puo' cercare sul
+      # web, ed e' quella che si paga.
+      - key: GOOGLE_GENERATIVE_AI_API_KEY
+        sync: false
+      # La chiave gratuita, per il menu' e la lista, che non cercano.
+      # Venti richieste al giorno; finite quelle si passa da sola all'altra.
+      - key: GEMINI_FREE_KEY
+        sync: false
+      # Firma i token di accesso. Se manca, l'autenticazione non regge.
+      - key: AUTH_SECRET
+        sync: false
+
+      # ── Interruttori: qui stanno i valori provati ──────────────────────
+      - key: GEMINI_MENU_MODEL
+        value: gemini-3-flash-preview
+      - key: GEMINI_GROUNDED_MODEL
+        value: gemini-3-flash-preview
+      # "ai" = il modello con la ricerca. L'alternativa "serpapi" esiste per
+      # il confronto e consuma una quota che in produzione non abbiamo.
+      - key: PRICE_SOURCE
+        value: ai
+      # lista → prezzi → menu' costruito su cio' che si compra davvero.
+      - key: FLUSSO
+        value: spesa-prima
+      # Il tetto di spesa per riavvio. Vive in memoria, quindi su questo piano
+      # si azzera a ogni risveglio: e' un freno, non una garanzia. La garanzia
+      # vera si mette sul budget del progetto Google, dove nessun riavvio la
+      # cancella.
+      - key: SPESA_MAX_USD
+        value: "5"
+
+      # ── Facoltative: senza, i pezzi che le usano restano spenti ────────
+      # Prodotti Amazon veri al tocco su una voce.
+      - key: SOCIALCRAWL_KEY
+        sync: false
+      # Google Shopping, per confrontare le due strade dei prezzi.
+      - key: SERPAPI_KEY
+        sync: false
+      # Account e piani salvati, e la cache dei prezzi che sopravvive ai
+      # riavvii. Senza, la cache resta in memoria e si perde a ogni risveglio.
+      - key: MONGODB_URI
+        sync: false

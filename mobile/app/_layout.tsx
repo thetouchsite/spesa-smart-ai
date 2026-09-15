@@ -27,6 +27,7 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { I18nProvider, useI18n } from "../src/lib/i18n";
 import { hydrate } from "../src/lib/kv";
+import { svegliaIlBackend } from "../src/lib/sveglia";
 import { useSession } from "../src/lib/state/session";
 import { colors, font, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
@@ -37,6 +38,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // Si bussa PRIMA di leggere l'archivio, e senza aspettare: il backend
+    // gratuito impiega un minuto a svegliarsi, e quel minuto deve scorrere
+    // mentre l'utente fa l'onboarding, non mentre guarda una rotella.
+    svegliaIlBackend();
+
     (async () => {
       try {
         await hydrate();
