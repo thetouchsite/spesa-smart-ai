@@ -112,6 +112,42 @@ export const INSEGNE_CON_NEGOZI: InsegnaConNegozi[] = [
     via: "sitemap",
     schema: /\/negozi\/negozio\.esselunga-di-([^/?#]+)$/i,
   },
+
+  /* Altre quattro trovate con la stessa sonda. Nova Coop e Unicoop Firenze
+     sono cooperative Coop distinte da quelle gia' presenti: hanno negozi loro
+     e — questo conta — listini loro, che e' il motivo per cui si tengono
+     separate invece di fonderle in un unico "Coop". */
+  {
+    insegna: "Pam Panorama",
+    paese: "IT",
+    base: "https://www.pampanorama.it",
+    via: "sitemap",
+    schema: /\/punti-vendita\/([^/?#]+)$/i,
+  },
+  {
+    insegna: "Unes",
+    paese: "IT",
+    base: "https://www.unes.it",
+    via: "sitemap",
+    // /it/punti-vendita/186-fagnano-olona: il numero davanti e' il codice del
+    // negozio, e va tolto o la citta' diventa "186 Fagnano Olona".
+    schema: /\/punti-vendita\/(?:\d+-)?([^/?#]+)$/i,
+  },
+  {
+    insegna: "Unicoop Firenze",
+    paese: "IT",
+    base: "https://www.coopfirenze.it",
+    via: "sitemap",
+    schema: /\/negozi\/([^/?#]+)$/i,
+  },
+  {
+    insegna: "Nova Coop",
+    paese: "IT",
+    base: "https://www.novacoop.it",
+    via: "sitemap",
+    // /punti-vendita/coop-torino-belgio: il prefisso "coop-" non e' la citta'.
+    schema: /\/punti-vendita\/(?:coop-)?([^/?#]+)$/i,
+  },
 ];
 
 const cache = new Map<string, { negozi: Negozio[]; creatoIl: number }>();
@@ -230,7 +266,13 @@ async function daSitemap(ins: InsegnaConNegozi): Promise<Negozio[]> {
     }
 
     for (const u of dentro) {
-      const m = u.match(ins.schema);
+      /* Si toglie la query PRIMA di riconoscere l'indirizzo.
+         Unicoop Firenze scrive `/negozi/serre-di-rapolano?id=003452`, e uno
+         schema che pretende la fine della stringa dopo il nome non combacia
+         mai: l'insegna dava zero negozi mentre la sua sitemap ne elencava
+         centosessanta. Vale per tutte, non solo per lei. */
+      const pulito = u.split(/[?#]/)[0];
+      const m = pulito.match(ins.schema);
       if (!m) continue;
       const citta = cittaDaSlug(m[1]);
       if (!citta || visti.has(u)) continue;
