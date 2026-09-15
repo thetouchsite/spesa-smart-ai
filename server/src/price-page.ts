@@ -141,6 +141,14 @@ export function readPrices(html: string): PagePrice | null {
   // Lo sconto può essere espresso come importo risparmiato oppure come prezzo
   // pieno: si prova prima l'importo, che è quello che Carrefour usa.
   const discountAmount = firstNumber(html, [/"discount"\s*:\s*"?([\d.,]+)"?/i]);
+  /* ATTENZIONE AL PREZZO AL CHILO TRAVESTITO DA LISTINO.
+     Cortilia accanto al prezzo scrive `listpriceperquantityunit`: 13,68 su un
+     prodotto da 3,42 €. Non e' un prezzo barrato, e' il costo al chilo — e
+     preso per listino diventerebbe uno sconto del 75% che non esiste, cioe'
+     esattamente la bugia che un'app di risparmio non puo' permettersi.
+     Le espressioni qui sotto chiudono il nome con le virgolette apposta:
+     "listPrice" combacia, "listpriceperquantityunit" no. Misurato su sei
+     schede Cortilia: nessuna promozione dichiarata, che e' la risposta giusta. */
   const listed = firstNumber(html, [
     /"listPrice"\s*:\s*"?([\d.,]+)"?/i,
     /"regularPrice"\s*:\s*"?([\d.,]+)"?/i,
