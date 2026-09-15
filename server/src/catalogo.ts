@@ -87,20 +87,59 @@ const SCADENZA_MS = 26 * 60 * 60 * 1000;
  */
 const MAX_PER_INSEGNA = 50_000;
 
+/**
+ * Quante sitemap figlie aprire per ogni indice.
+ *
+ * Quaranta: i cataloghi veri sono spezzati in decine di file — Alcampo ne ha
+ * una ventina — e fermarsi a poche significa caricare un frammento. Oltre, si
+ * scaricano megabyte per prodotti che il tetto per insegna non fa entrare
+ * comunque.
+ */
+const MAX_FIGLIE = 40;
+
 const caricati = new Map<string, CatalogoPaese>();
 /** Chi sta gia' scaricando un paese: due richieste insieme non lo scaricano due volte. */
 const inCorso = new Map<string, Promise<CatalogoPaese | null>>();
 
-const UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-  "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+/**
+ * Gli header di un browser vero, non solo il suo nome.
+ *
+ * Mandare il solo `User-Agent` non basta: i sistemi anti-bot guardano TUTTA
+ * l'intestazione, e `fetch` di Node ne manda molti meno di un browser.
+ * Misurato su `mercado.carrefour.com.br`:
+ *
+ *     curl con lo stesso User-Agent   →  200, sitemap intera
+ *     fetch di Node                   →  403
+ *
+ * Stessa identita' dichiarata, esito opposto. Mancavano `Accept`,
+ * `Accept-Language` e i `Sec-Fetch-*`, che un browser manda sempre — e la loro
+ * assenza e' l'impronta che tradisce un programma.
+ *
+ * Non e' un travestimento per entrare dove non si potrebbe: `robots.txt` lo
+ * leggiamo e lo rispettiamo, e queste sono le stesse richieste che farebbe
+ * una persona. E' per non misurare il nostro difetto al posto del loro sito.
+ */
+const INTESTAZIONE = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+  "Cache-Control": "no-cache",
+} as const;
 
 /* ─────────────────────────── Scaricare ─────────────────────────── */
 
 async function scarica(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, {
-      headers: { "User-Agent": UA, "Accept-Encoding": "gzip, deflate" },
+      headers: INTESTAZIONE,
       redirect: "follow",
       signal: AbortSignal.timeout(45_000),
     });
@@ -247,17 +286,40 @@ async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> {
   const voci: VoceCatalogo[] = [];
   const visti = new Set<string>();
 
-  // La prima parte, poi le successive finche' rispondono: molte sitemap sono
-  // spezzate, e fermarsi alla prima significa perdere il grosso del catalogo.
-  const daProvare = [fonte.sitemap, ...partiSuccessive(fonte.sitemap)];
+  /* SI SEGUE L'INDICE, NON SI PRENDE UN FILE SOLO.
+     Prima si apriva la sitemap indicata e si leggevano i suoi indirizzi come
+     se fossero prodotti. Quando quella sitemap e' un INDICE — cioe' punta ad
+     altre sitemap — dentro non ci sono prodotti ma altri file, che il filtro
+     scartava: il catalogo veniva su vuoto o quasi.
 
-  for (const url of daProvare) {
-    if (voci.length >= MAX_PER_INSEGNA) break;
+     Misurato: Migros Turchia caricava 70 prodotti sui 338 trovati dalla
+     scansione, e quei settanta erano bicchieri e shampoo; Barbora Estonia
+     otto, tutti elettrodomestici. Non era il catalogo a essere magro, era il
+     nostro modo di leggerlo.
+
+     Ora: se e' un indice si aprono le figlie, una per una, fino al tetto per
+     insegna. Se e' piatta si legge com'e', e si tentano comunque le parti
+     successive — `...part2.xml`, `-1.xml` — perche' i cataloghi grossi sono
+     spezzati e fermarsi al primo file ne darebbe un decimo. */
+  const daAprire: string[] = [fonte.sitemap];
+  const gia = new Set<string>();
+
+  while (daAprire.length > 0 && voci.length < MAX_PER_INSEGNA) {
+    const url = daAprire.shift()!;
+    if (gia.has(url)) continue;
+    gia.add(url);
+
     const xml = await scarica(url);
-    if (!xml) {
-      // La prima deve rispondere; se cade una delle successive, e' finita.
-      if (url === fonte.sitemap) return voci;
-      break;
+    if (!xml) continue;
+
+    // Un indice: le sue voci sono altre sitemap, non prodotti.
+    if (/<sitemapindex/i.test(xml)) {
+      // Tetto sulle figlie: alcuni indici ne hanno centinaia, e oltre un certo
+      // punto si scaricano megabyte per prodotti che non entrano comunque.
+      for (const figlia of indirizzi(xml).slice(0, MAX_FIGLIE)) {
+        if (!gia.has(figlia)) daAprire.push(figlia);
+      }
+      continue;
     }
 
     for (const u of indirizzi(xml)) {
@@ -271,10 +333,19 @@ async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> {
       voci.push({ nome, url: u, insegna: fonte.insegna, parole: p });
       if (voci.length >= MAX_PER_INSEGNA) break;
     }
+
+    // Se questa era la sitemap dichiarata ed era piatta, si prova a chiedere
+    // anche le sue parti successive.
+    if (url === fonte.sitemap) {
+      for (const parte of partiSuccessive(fonte.sitemap)) {
+        if (!gia.has(parte)) daAprire.push(parte);
+      }
+    }
   }
 
   return voci;
 }
+
 
 async function costruisci(paese: string): Promise<CatalogoPaese | null> {
   const fonti = fontiDi(paese);

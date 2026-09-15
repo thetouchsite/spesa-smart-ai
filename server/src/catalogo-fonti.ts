@@ -72,6 +72,16 @@ export function partiSuccessive(sitemap: string, quante = 30): string[] {
 }
 
 export const FONTI: FonteCatalogo[] = [
+  /* IL BRASILE, che la scansione aveva mancato: `mercado.carrefour.com.br`
+     era finito fra i «robots non leggibile» per un errore momentaneo. Ha
+     quattro sitemap di prodotti, ventimila indirizzi ciascuna.
+
+     META' DEGLI INDIRIZZI E' VECCHIA: su sei campionati, tre danno 404 e tre
+     si aprono (due con il prezzo). Va bene lo stesso — si provano tre
+     candidati per voce e i 404 si scartano — ma spiega perche' li' la
+     copertura sara' piu' magra che in Italia. */
+  { paese: "BR", insegna: "Carrefour Brasil", dominio: "mercado.carrefour.com.br", sitemap: "https://mercado.carrefour.com.br/sitemap.xml", stimati: 80000 },
+
   { paese: "BA", insegna: "Glovo Sarajevo - Spesa", dominio: "glovoapp.com", sitemap: "https://glovoapp.com/sitemap-a.xml", stimati: 334 },
   { paese: "EE", insegna: "Barbora Estonia", dominio: "barbora.ee", sitemap: "https://barbora.ee/sitemap.xml", stimati: 384 },
   { paese: "HU", insegna: "Kifli.hu", dominio: "kifli.hu", sitemap: "https://www.kifli.hu/sitemap_products.xml", stimati: 28 },
