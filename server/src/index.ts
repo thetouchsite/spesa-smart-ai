@@ -65,6 +65,9 @@ import { cercaProdottoAmazon, isAmazonSearchConfigured } from "./amazon-search.j
 import { linkDiRipiego } from "./fallback-link.js";
 import { isoDaPaese } from "./insegne-online.js";
 import { annota } from "./diario.js";
+import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./catalogo.js";
+import { paesiConCatalogo } from "./catalogo-fonti.js";
+import { aggiornaCatalogo, avviaCatalogoNotturno } from "./catalogo-notturno.js";
 import {
   AiRecipeInput,
   ChefInput,
@@ -1186,6 +1189,68 @@ app.post("/product/shopping", async (body) => {
  * Meglio annotare e restare in piedi: una singola richiesta persa e' molto meno
  * grave di un servizio spento.
  */
+
+/* ═══════════════════ IL CATALOGO DEI PRODOTTI ═══════════════════ */
+
+/**
+ * Il catalogo che ci costruiamo noi, esposto come API.
+ *
+ * DA DOVE VIENE. I supermercati pubblicano l'elenco completo delle loro schede
+ * prodotto in `sitemap.xml`, per farsi trovare dai motori di ricerca. Noi lo
+ * scarichiamo una volta al giorno e lo teniamo indicizzato: indirizzi VERI,
+ * scritti dal negozio, che non possono essere sbagliati.
+ *
+ * A COSA SERVE. A togliere al modello il lavoro in cui e' incapace. Finora gli
+ * chiedevamo due cose insieme — quale prodotto e a quale indirizzo — e la
+ * seconda se la inventava: Cortilia 0 pagine aperte su 12, Eataly 0 su 4.
+ * Con il catalogo l'indirizzo non glielo chiediamo piu'.
+ *
+ * QUESTE ROTTE NON COSTANO NIENTE: nessuna chiamata al modello, nessuna quota.
+ */
+
+/** Cosa copriamo, e cosa e' pronto adesso. */
+app.get("/catalogo/stato", async () => ({
+  ...statoCatalogo(),
+  quantiPaesi: paesiConCatalogo().length,
+}));
+
+const CercaCatalogo = z.object({
+  q: z.string().min(1).max(160),
+  paese: z.string().max(40).default("Italia"),
+  quanti: z.number().int().min(1).max(20).default(5),
+});
+
+/**
+ * Cerca un prodotto nel catalogo di un paese.
+ *
+ * La prima richiesta per un paese scarica il suo catalogo e puo' prendere
+ * qualche decina di secondi; le successive rispondono in millisecondi.
+ */
+app.post("/catalogo/cerca", async (body) => {
+  const data = parse(CercaCatalogo, body);
+  const iso = paeseIso(data.paese).toUpperCase();
+
+  const trovati = await cercaNelCatalogo(iso, data.q, data.quanti);
+  return {
+    paese: iso,
+    richiesta: data.q,
+    trovati,
+    // Se e' vuoto, chi chiama deve sapere se e' perche' non copriamo quel
+    // paese o perche' li' quel prodotto non c'e': sono due cose diverse.
+    paeseCoperto: paesiConCatalogo().includes(iso),
+  };
+});
+
+/** Rifa' il catalogo adesso, senza aspettare mezzanotte. */
+app.post("/catalogo/aggiorna", async (body) => {
+  const data = parse(z.object({ svuota: z.boolean().default(false) }), body ?? {});
+  if (data.svuota) svuotaCatalogo();
+  // Non si aspetta: il lavoro sono decine di megabyte e chi chiama non deve
+  // restare appeso. Lo stato si guarda da /catalogo/stato.
+  void aggiornaCatalogo("richiesto a mano");
+  return { avviato: true, stato: statoCatalogo() };
+});
+
 process.on("unhandledRejection", (reason) => {
   console.error("[server] promessa non gestita, resto in piedi:", reason);
 });
@@ -1197,4 +1262,6 @@ const port = Number(process.env.PORT ?? 3000);
 if (!isConfigured()) console.warn("ATTENZIONE: GOOGLE_GENERATIVE_AI_API_KEY assente — /ai/* risponde 503.");
 if (!isDbConfigured()) console.warn("ATTENZIONE: MONGODB_URI assente — account e piani non disponibili, cache solo in memoria.");
 if (!isShoppingConfigured()) console.warn("ATTENZIONE: SERPAPI_KEY assente — /product/shopping risponde 503.");
+console.info(`[catalogo] ${paesiConCatalogo().length} paesi con catalogo disponibile`);
+avviaCatalogoNotturno();
 app.listen(port);
