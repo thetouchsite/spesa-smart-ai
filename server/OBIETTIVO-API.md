@@ -525,6 +525,36 @@ nessuna riga di logica cambiata, così il diff si legge e il merge non fa male.
 > Le misure si scrivono qui: numero, data, e **come** è stato ottenuto. Un
 > numero senza il metodo è un'opinione con le cifre.
 
+**16 settembre 2026 — duecento prove sui cinque paesi, e la velocita'**
+
+`prove/ricerca.json` e' completo: 40 voci per paese, 200 in tutto, con le
+trappole viste nei cataloghi veri.
+
+| | IT | GB | DE | ES | FR | **totale** |
+|---|---|---|---|---|---|---|
+| **sola ricerca** | 90% | 95% | 90% | 93% | 83% | **180/200 · 90%** |
+
+La Francia e' la piu' debole, ed e' coerente: sei fonti, tre delle quali
+negozi bio. E' un'informazione per Antonio, non un difetto del codice.
+
+**E la velocita', criterio 4.** Dieci voci, Milano, catalogo caldo, modello
+spento, tre giri: **1,1 secondi** — con 10 prodotti su 10 trovati, sette
+insegne confrontate e quattro promozioni. L'obiettivo era sotto i cinque.
+Erano diciassette.
+
+```
+prima      17 s   di cui 14,6 la chiamata al modello
+adesso      1,1 s
+```
+
+Le trappole che il metro ha raccolto strada facendo meritano di essere lette,
+perche' dicono com'e' fatto davvero un catalogo di supermercato: `dreamies
+tuna treats` e `dreamies kaese` sono croccantini per gatti, `barbie coffee
+shop` e' un giocattolo, `oeufs en bois` sono uova di legno, `pince a sucre`
+sono le pinze per lo zucchero, `baratte a beurre` e' una zangola, `marzipan
+kartoffeln` sono dolcetti, `lacteos y huevos` e `uova latte e burro` sono
+pagine di categoria.
+
 **16 settembre 2026 — Fase 2: il metro esiste, e il primo numero**
 
 `prove/ricerca.json`, 80 voci fra IT e GB, con le trappole viste nei cataloghi
