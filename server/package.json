@@ -5,7 +5,8 @@
   "description": "Micro-backend Node.js: custodisce le chiavi API e inoltra a Gemini. Nessun database, nessuna autenticazione — solo ciò che l'app mobile non può fare da sola in sicurezza.",
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "confine": "node scripts/confine.mjs --dettaglio",
+    "build": "node scripts/confine.mjs && tsc -p tsconfig.json",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
