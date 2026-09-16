@@ -61,7 +61,7 @@ import {
   verifyPrices,
 } from "./price-page.js";
 import { generatePricesSerpapi } from "./prices-serpapi.js";
-import { catalogoDisponibilePer, generatePricesCatalogo } from "./prices-catalogo.js";
+import { catalogoDisponibilePer, generatePricesCatalogo, type PrezzoGrezzo } from "./prices-catalogo.js";
 import { cercaProdottoAmazon, isAmazonSearchConfigured } from "./amazon-search.js";
 import { linkDiRipiego } from "./fallback-link.js";
 import { isoDaPaese } from "./insegne-online.js";
@@ -563,14 +563,53 @@ async function prezzaLista(
          dietro a numeri inventati. */
       const inizio = Date.now();
 
-      const cat = conCatalogo
-        ? await generatePricesCatalogo(items, iso, currency).catch((err) => {
-            console.warn("[prezzi] catalogo fallito:", err);
-            return null;
-          })
-        : null;
+      /* I DUE CATALOGHI INSIEME, NON IN FILA.
+         Il nostro e quello italiano non si parlano e non dipendono l'uno
+         dall'altro: uno legge le sitemap censite, l'altro cerca su EBSN e nei
+         volantini. Aspettare che il primo finisca per far partire il secondo
+         costava nove secondi buoni a ogni piano italiano, per niente.
+
+         `Promise.all` non fa fallire nessuno dei due: entrambi hanno gia' il
+         loro `catch` e restituiscono vuoto invece di alzare le mani. */
+      const [cat, dallItalia] = await Promise.all([
+        conCatalogo
+          ? generatePricesCatalogo(items, iso, currency).catch((err) => {
+              console.warn("[prezzi] catalogo fallito:", err);
+              return null;
+            })
+          : Promise.resolve(null),
+        prezziDaiCataloghiIT(items, iso.toUpperCase(), currency, city).catch((err) => {
+          console.warn("[catalogo] italiano non disponibile:", err);
+          return [] as PrezzoGrezzo[];
+        }),
+      ]);
 
       prezziGrezzi = cat?.prezzi ?? [];
+
+      /* QUELLO ITALIANO AGGIUNGE, NON RIFA'.
+         Le sue righe servono al confronto fra insegne — Eurospin, Cortilia,
+         Unicoop, che nel nostro catalogo non ci sono — ma per le voci che
+         abbiamo GIA' risolto con un prezzo letto dalla pagina non aggiungono
+         niente di necessario, e ognuna costa un'apertura di pagina in fase di
+         verifica. Misurato: ventidue secondi su una richiesta da cinquanta,
+         per arricchire voci che erano gia' complete.
+
+         Quindi entrano tutte quelle su voci scoperte, e delle altre solo
+         quelle che il prezzo ce l'hanno gia' — che sono alternative vere e
+         non costano nulla da mostrare. */
+      if (dallItalia.length) {
+        const risolte = new Set(
+          prezziGrezzi.filter((r) => r.prezzo != null).map((r) => r.prodotto),
+        );
+        const utili = dallItalia.filter((r) => !risolte.has(r.prodotto) || r.prezzo != null);
+        if (utili.length < dallItalia.length) {
+          console.info(
+            `[catalogo] italiano: ${utili.length}/${dallItalia.length} righe tenute, ` +
+              `le altre erano su voci gia' risolte`,
+          );
+        }
+        prezziGrezzi = [...utili, ...prezziGrezzi];
+      }
       secondi = (Date.now() - inizio) / 1000;
       costo = 0;
       ricerche = cat?.pagineAperte ?? 0;
@@ -635,13 +674,17 @@ async function prezzaLista(
 
      Non lancia mai: se la sitemap non si scarica, si prosegue con quello che
      il motore ha trovato, che e' esattamente il comportamento di prima. */
-  try {
-    const dalCatalogo = await prezziDaiCataloghiIT(items, paeseIso(country).toUpperCase(), currency, city);
-    if (dalCatalogo.length) {
-      prezziGrezzi = [...dalCatalogo, ...prezziGrezzi];
+  /* Solo per le altre strade: con `fonte=catalogo` il catalogo italiano e'
+     gia' girato insieme al nostro, li' sopra, e rifarlo qui lo raddoppierebbe. */
+  if (fonte !== "catalogo") {
+    try {
+      const dalCatalogo = await prezziDaiCataloghiIT(items, paeseIso(country).toUpperCase(), currency, city);
+      if (dalCatalogo.length) {
+        prezziGrezzi = [...dalCatalogo, ...prezziGrezzi];
+      }
+    } catch (err) {
+      console.warn("[catalogo] non disponibile, proseguo col solo motore:", err);
     }
-  } catch (err) {
-    console.warn("[catalogo] non disponibile, proseguo col solo motore:", err);
   }
 
   /* AMAZON NON SI CERCA QUI

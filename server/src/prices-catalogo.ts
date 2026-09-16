@@ -193,7 +193,12 @@ Solo JSON:
     // Nessuna ricerca: e' la differenza fra qualche millesimo e cinque
     // centesimi. E il modello qui non deve sapere niente del mondo, solo
     // leggere dei nomi.
+    const t0 = Date.now();
     const r = await chiamaMenu(MENU_MODEL, prompt, 60_000);
+    console.info(
+      `[catalogo] la scelta del modello: ${((Date.now() - t0) / 1000).toFixed(1)}s ` +
+        `per ${utili.length} voci, ${prompt.length} caratteri di prompt`,
+    );
     const dati = parseJson(r.text) as { scelte?: Scelta[] };
     const mappa = new Map<number, number | null>();
     for (const s of dati.scelte ?? []) {
