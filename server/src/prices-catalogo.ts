@@ -45,6 +45,11 @@ import { cercaNelCatalogo } from "./catalogo.js";
 import { paesiConCatalogo } from "./catalogo-fonti.js";
 import { verifyProductPage } from "./price-page.js";
 import { chiamaMenu, MENU_MODEL, parseJson } from "./plan-grounded.js";
+import {
+  traduciVoce,
+  impara,
+  LINGUA_DEL_PAESE as LINGUA_VOCABOLARIO,
+} from "./vocabolario.js";
 import { prezziGiaVisti, salvaPrezzi, type PrezzoSalvato } from "./prezzi-magazzino.js";
 
 /** La stessa forma che producono le altre due strade. */
@@ -100,15 +105,28 @@ const CANDIDATI_PER_VOCE = 6;
  */
 const ALTERNATIVE_MAX = 5;
 
-/** Quante pagine aprire insieme. Otto e' gentile e abbastanza veloce. */
-const INSIEME = 8;
+/**
+ * Quante pagine tenere aperte in tutto.
+ *
+ * SEDICI, ED ERANO OTTO. Il numero e' salito perche' ora c'e' un secondo
+ * freno, piu' preciso: al massimo due pagine per volta sullo stesso negozio
+ * (vedi `aBrani`). Prima le otto potevano finire tutte sulla stessa insegna,
+ * quindi il tetto basso serviva a proteggere LEI, non noi.
+ *
+ * Con il limite per dominio, sedici insieme su otto insegne sono due a testa:
+ * il doppio del lavoro nello stesso tempo, e ogni negozio riceve meno
+ * richieste di prima.
+ *
+ * Misurato su un piano londinese da sedici voci: 75 pagine, 62 secondi.
+ */
+const INSIEME = 16;
 
 export function catalogoDisponibilePer(iso: string): boolean {
   return paesiConCatalogo().includes((iso || "").toUpperCase().slice(0, 2));
 }
 
 /**
- * Otto pagine insieme, e appena una finisce ne parte un'altra.
+ * Le pagine insieme, e appena una finisce ne parte un'altra.
  *
  * PERCHE' NON A ONDATE
  * --------------------
@@ -126,20 +144,55 @@ export function catalogoDisponibilePer(iso: string): boolean {
  *
  * Con la finestra scorrevole il totale non dipende piu' dalla somma delle
  * pagine lente, ma dal lavoro diviso per quante ne corrono insieme. Le
- * connessioni aperte nello stesso momento restano otto: non stiamo chiedendo
+ * connessioni per singolo negozio restano poche: non stiamo chiedendo
  * di piu' ai negozi, stiamo solo smettendo di stare fermi.
  *
  * I risultati tornano nell'ordine di partenza, non di arrivo: chi chiama si
  * aspetta che la riga `i` sia la pagina `i`.
  */
-async function aBrani<T, R>(cose: T[], quante: number, lavoro: (c: T) => Promise<R>): Promise<R[]> {
+async function aBrani<T, R>(
+  cose: T[],
+  quante: number,
+  lavoro: (c: T) => Promise<R>,
+  dominioDi?: (c: T) => string,
+): Promise<R[]> {
   const fuori: R[] = new Array(cose.length);
   let prossima = 0;
+
+  /* AL MASSIMO DUE PAGINE PER VOLTA SULLO STESSO NEGOZIO.
+     Finora il limite era solo sul totale: otto pagine insieme, ma potevano
+     essere tutte e otto dello stesso sito. E' esattamente il modo di prendersi
+     un 429 — oggi e' successo misurando le rese, dodici schede simultanee a
+     Poundland e MuscleFood, entrambe finite fra le insegne mute per un'ora.
+
+     Contando per dominio si possono tenere PIU' connessioni aperte in tutto
+     restando piu' gentili con ciascun negozio: sedici pagine insieme su otto
+     insegne sono due a testa, meno di quanto ne prendesse una sola prima.
+
+     Il conteggio e' per dominio e non per insegna perche' due insegne del
+     nostro elenco possono stare sullo stesso server. */
+  const aperte = new Map<string, number>();
+  const PER_DOMINIO = 2;
 
   const lavoratore = async (): Promise<void> => {
     while (prossima < cose.length) {
       const mio = prossima++;
-      fuori[mio] = await lavoro(cose[mio]);
+      const dom = dominioDi ? dominioDi(cose[mio]) : "";
+
+      if (dom) {
+        // Si aspetta che quel negozio abbia un posto libero, non che si liberi
+        // tutta la coda: gli altri intanto continuano.
+        while ((aperte.get(dom) ?? 0) >= PER_DOMINIO) {
+          await new Promise((s) => setTimeout(s, 60));
+        }
+        aperte.set(dom, (aperte.get(dom) ?? 0) + 1);
+      }
+
+      try {
+        fuori[mio] = await lavoro(cose[mio]);
+      } finally {
+        if (dom) aperte.set(dom, (aperte.get(dom) ?? 1) - 1);
+      }
     }
   };
 
@@ -153,7 +206,10 @@ async function aBrani<T, R>(cose: T[], quante: number, lavoro: (c: T) => Promise
 /** La scelta del modello per una voce: quale candidato, o nessuno. */
 interface Scelta {
   voce: number;
-  scelto: number | null;
+  /** Tutti i candidati che corrispondono, il piu' adatto per primo. */
+  scelti?: number[];
+  /** La forma vecchia, una scelta sola: si accetta ancora se il modello la usa. */
+  scelto?: number | null;
 }
 
 /**
@@ -169,7 +225,7 @@ interface Scelta {
  */
 async function facciScegliere(
   candidature: Array<{ voce: string; candidati: Array<{ nome: string; insegna: string }> }>,
-): Promise<Map<number, number | null>> {
+): Promise<Map<number, number[]>> {
   const utili = candidature
     .map((c, i) => ({ ...c, i }))
     .filter((c) => c.candidati.length > 0);
@@ -191,13 +247,17 @@ async function facciScegliere(
 
 ${elenco}
 
-Rispondi con il numero del prodotto scelto, oppure null se NESSUNO corrisponde
-davvero — meglio nessuno che uno sbagliato. Una passata di pomodoro non e' una
-passata di verdure, un'orata non e' una ricotta.
-Preferisci il prodotto semplice a quello in confezione multipla o gia' cucinato.
+Rispondi con i numeri di TUTTI i prodotti che corrispondono davvero a quella
+voce — servono a confrontare i prezzi fra negozi diversi. Elenco vuoto se non
+corrisponde nessuno: meglio nessuno che uno sbagliato.
+
+Una passata di pomodoro non e' una passata di verdure, un'orata non e' una
+ricotta, la pasta integrale non e' la pasta sfoglia integrale.
+Metti per primo il piu' adatto, e preferisci il prodotto semplice a quello in
+confezione multipla o gia' cucinato.
 
 Solo JSON:
-{"scelte":[{"voce":0,"scelto":1},{"voce":1,"scelto":null}]}`;
+{"scelte":[{"voce":0,"scelti":[1,3]},{"voce":1,"scelti":[]}]}`;
 
   try {
     // Nessuna ricerca: e' la differenza fra qualche millesimo e cinque
@@ -210,9 +270,19 @@ Solo JSON:
         `per ${utili.length} voci, ${prompt.length} caratteri di prompt`,
     );
     const dati = parseJson(r.text) as { scelte?: Scelta[] };
-    const mappa = new Map<number, number | null>();
+    const mappa = new Map<number, number[]>();
     for (const s of dati.scelte ?? []) {
-      if (typeof s?.voce === "number") mappa.set(s.voce, typeof s.scelto === "number" ? s.scelto : null);
+      if (typeof s?.voce !== "number") continue;
+      /* Si accettano tutte e due le forme. Il modello a volte risponde con la
+         vecchia — un numero solo invece di un elenco — e rifiutarla
+         significherebbe buttare una risposta giusta per un dettaglio di
+         formato. */
+      const elenco = Array.isArray(s.scelti)
+        ? s.scelti.filter((x): x is number => typeof x === "number")
+        : typeof s.scelto === "number"
+          ? [s.scelto]
+          : [];
+      mappa.set(s.voce, elenco);
     }
     console.info(
       `[catalogo] il modello ha scelto per ${mappa.size} voci ` +
@@ -263,17 +333,117 @@ const LINGUA_DEL_PAESE: Record<string, string> = {
   KR: "coreano", AL: "albanese", BA: "bosniaco",
 };
 
-/** Le traduzioni gia' fatte: la stessa lista non si ripaga due volte. */
+/** Le liste gia' risolte: la stessa spesa non si ripaga due volte. */
 const tradotte = new Map<string, string[]>();
 
+/**
+ * PRIMA IL DIZIONARIO, POI — SE SERVE — IL MODELLO.
+ *
+ * `vocabolario.ts` conosce le parole della spesa in sei lingue. Nella
+ * stragrande maggioranza delle liste le conosce TUTTE, e allora qui non si
+ * chiama nessuno: la traduzione e' istantanea, gratis, e domani sara' identica.
+ *
+ * Quando avanza qualcosa che il dizionario non sa — «scamorza», «halloumi» —
+ * si chiede al modello quelle parole li' e basta, non tutta la lista. E la
+ * risposta si insegna al dizionario, cosi' la volta dopo non si chiede piu'.
+ *
+ * Il risultato: la prima spesa strana costa una chiamata, tutte le successive
+ * costano zero. E se il modello e' spento — quota finita, rete giu' — la
+ * traduzione NON si ferma: le parole conosciute passano lo stesso, e solo le
+ * strane restano nella lingua di partenza. Prima, in quel caso, non passava
+ * niente, e Londra dava tre voci su sei.
+ */
 async function nelleParoleDelPaese(items: string[], paeseIso: string): Promise<string[]> {
-  const lingua = LINGUA_DEL_PAESE[paeseIso.toUpperCase()];
+  const paese = paeseIso.toUpperCase();
+  const lingua = LINGUA_DEL_PAESE[paese];
   if (!lingua || lingua === "italiano") return items;
 
-  const chiave = `${paeseIso}|${items.join("|").toLowerCase()}`;
+  const chiave = `${paese}|${items.join("|").toLowerCase()}`;
   const gia = tradotte.get(chiave);
   if (gia) return gia;
 
+  const codice = LINGUA_VOCABOLARIO[paese];
+
+  /* Paesi che il vocabolario non copre — polacco, rumeno, turco... — restano
+     sulla vecchia strada: tutta la lista al modello. Sono pochi prodotti e
+     poche richieste, e scrivere seicento parole di polacco a mano per coprirli
+     non si ripaga. */
+  if (!codice) return tuttoAlModello(items, chiave, lingua);
+
+  const rese = items.map((voce) => traduciVoce(voce, codice));
+  const sconosciute = [...new Set(rese.flatMap((r) => r.sconosciute))];
+
+  if (sconosciute.length === 0) {
+    const pulite = rese.map((r, i) => r.tradotta || items[i]);
+    tradotte.set(chiave, pulite);
+    console.info(
+      `[vocabolario] ${paese}: lista risolta dal dizionario, nessuna chiamata — ` +
+        pulite.slice(0, 4).map((x, i) => `${items[i]}->${x}`).join(", "),
+    );
+    return pulite;
+  }
+
+  /* Restano parole ignote. Si chiedono UNA A UNA — cioe' un elenco di parole,
+     non di frasi — perche' solo una parola singola si puo' rimettere nel
+     dizionario e riusare domani. Una frase tradotta in blocco serve una volta
+     sola e poi non torna mai piu' identica. */
+  try {
+    const prompt =
+      `Come si chiamano queste cose al supermercato in ${lingua}? Il nome ` +
+      `commerciale, quello scritto sullo scaffale, non la traduzione letterale: ` +
+      `«funghi» in inglese e' "mushrooms", non "fungi".
+` +
+      `Una parola o due per voce, minuscolo, stesso ordine, stessa lunghezza. Solo JSON:
+` +
+      `{"tradotte":["...","..."]}
+
+${JSON.stringify(sconosciute)}`;
+
+    const r = await chiamaMenu(MENU_MODEL, prompt, 45_000);
+    const dati = parseJson(r.text) as { tradotte?: unknown };
+    const fuori = dati.tradotte;
+    if (!Array.isArray(fuori) || fuori.length !== sconosciute.length) {
+      throw new Error("forma inattesa");
+    }
+
+    let apprese = 0;
+    for (const [i, parola] of sconosciute.entries()) {
+      const t = fuori[i];
+      if (typeof t === "string" && t.trim()) {
+        impara(parola, codice, t.trim());
+        apprese++;
+      }
+    }
+
+    // Rifatta ORA, con le parole appena imparate dentro al dizionario.
+    const pulite = items.map((voce, i) => traduciVoce(voce, codice).tradotta || items[i]);
+    tradotte.set(chiave, pulite);
+    console.info(
+      `[vocabolario] ${paese}: ${apprese} parole nuove imparate ($${r.cost.toFixed(4)}) — ` +
+        sconosciute.slice(0, 5).join(", "),
+    );
+    return pulite;
+  } catch (err) {
+    /* IL PUNTO DI TUTTO QUESTO. Il modello non ha risposto, ma le parole che il
+       dizionario conosceva sono gia' tradotte: si tengono quelle. Le ignote
+       restano com'erano, e magari qualcuna combacia lo stesso — i marchi si
+       scrivono uguali dappertutto. */
+    const parziali = rese.map((r, i) => r.tradotta || items[i]);
+    console.warn(
+      `[vocabolario] ${paese}: modello non raggiungibile, uso il dizionario da solo ` +
+        `(${sconosciute.length} parole restano in lingua originale):`,
+      err,
+    );
+    return parziali;
+  }
+}
+
+/** La vecchia strada, per le lingue che il vocabolario non copre. */
+async function tuttoAlModello(
+  items: string[],
+  chiave: string,
+  lingua: string,
+): Promise<string[]> {
   try {
     /* Un oggetto e non un array nudo, perche' `parseJson` cerca la prima
        graffa: a un array risponderebbe «nessun JSON nella risposta». */
@@ -281,9 +451,13 @@ async function nelleParoleDelPaese(items: string[], paeseIso: string): Promise<s
       `Traduci in ${lingua} questa lista della spesa, usando le parole con cui il ` +
       `prodotto e' scritto sugli scaffali dei supermercati di quel paese — il nome ` +
       `commerciale, non la traduzione letterale. «Funghi» in inglese e' ` +
-      `"mushrooms", non "fungi".\n` +
-      `Stesso ordine, stessa lunghezza. Solo JSON:\n` +
-      `{"tradotte":["...","..."]}\n\n${JSON.stringify(items)}`;
+      `"mushrooms", non "fungi".
+` +
+      `Stesso ordine, stessa lunghezza. Solo JSON:
+` +
+      `{"tradotte":["...","..."]}
+
+${JSON.stringify(items)}`;
 
     const r = await chiamaMenu(MENU_MODEL, prompt, 45_000);
     const dati = parseJson(r.text) as { tradotte?: unknown };
@@ -351,24 +525,37 @@ export async function generatePricesCatalogo(
      leggibile, cioe' spesso quello sbagliato. Ora la scelta arriva prima:
      meno pagine aperte, meno tempo, e quella giusta. */
   const daAprire = candidature.flatMap((c, i) => {
-    const scelto = scelte.get(i);
+    const approvati = scelte.get(i);
+
+    /* SI APRONO SOLO I CANDIDATI APPROVATI, E PRIMA NON ERA COSI'.
+       Il modello sceglieva UN prodotto, poi si aprivano tutti e sei i
+       candidati e si mostravano come alternative quelli che avevano un
+       prezzo — compresi quelli che lui aveva scartato.
+
+       Si vedeva: per «pasta integrale» finivano in elenco «pasta sfoglia
+       integrale» e «pasta sfoglia con farina integrale», per «riso» una
+       pagina di categoria chiamata «pasta pane riso». Prodotti veri, prezzi
+       veri, voce sbagliata — l'errore che l'utente non puo' riconoscere.
+
+       Ora al modello si chiedono TUTTI quelli che corrispondono, non uno, e
+       si apre solo quell'elenco. Costa meno pagine e le alternative sono
+       tutte vagliate: il confronto fra negozi resta, la spazzatura no. */
+    if (approvati && approvati.length > 0) {
+      return approvati
+        .map((n) => c.candidati[n])
+        .filter((k): k is (typeof c.candidati)[number] => Boolean(k))
+        .map((k, posto) => ({ voce: c.voce, posto, ...k }));
+    }
+
     // Il modello dice "nessuno": la voce resta senza, ed e' la risposta giusta.
     // Meglio una voce vuota che un'orata che diventa una ricotta.
-    if (scelte.has(i) && scelto === null) return [];
+    if (approvati) return [];
 
-    /* IL SUO PREFERITO PER PRIMO, MA GLI ALTRI RESTANO DIETRO.
-       Aprendo solo la pagina scelta la qualita' saliva — «Orata fresca»
-       trovava finalmente un'orata — ma la copertura crollava da nove voci a
-       cinque: se quella singola pagina non dichiara il prezzo in modo
-       leggibile, la voce resta vuota anche se il prodotto era giusto.
-
-       Quindi si tengono tutti, con il preferito in testa. Piu' avanti si
-       prende il primo che ha un prezzo, e l'ordine fa il resto. */
-    const preferito = typeof scelto === "number" ? c.candidati[scelto] : undefined;
-    const ordinati = preferito
-      ? [preferito, ...c.candidati.filter((k) => k !== preferito)]
-      : c.candidati;
-    return ordinati.map((k, posto) => ({ voce: c.voce, posto, ...k }));
+    /* Il modello non ha risposto affatto — chiamata fallita, quota finita.
+       Allora si tengono tutti i candidati, come si faceva prima: un
+       abbinamento imperfetto vale piu' di una voce vuota, e almeno il link
+       si apre. */
+    return c.candidati.map((k, posto) => ({ voce: c.voce, posto, ...k }));
   });
 
   /* PRIMA SI GUARDA IN MAGAZZINO.
@@ -382,7 +569,10 @@ export async function generatePricesCatalogo(
   const inMagazzino = await prezziGiaVisti(daAprire.map((c) => c.url));
   const daSalvare: PrezzoSalvato[] = [];
 
-  const letti = await aBrani(daAprire, INSIEME, async (c) => {
+  const letti = await aBrani(
+    daAprire,
+    INSIEME,
+    async (c) => {
     const salvato = inMagazzino.get(c.url);
     if (salvato) {
       if (salvato.verifica === "non-raggiungibile") return null;
@@ -448,7 +638,18 @@ export async function generatePricesCatalogo(
       giaVerificato: true,
     } satisfies PrezzoGrezzo;
     return { riga, posto: c.posto };
-  });
+    },
+    /* Il dominio serve al freno per negozio: due pagine per volta a testa.
+       Se l'indirizzo e' storto si usa la stringa intera — peggio che peggio
+       quel candidato aspetta un po' di piu', ma non salta il conteggio. */
+    (c) => {
+      try {
+        return new URL(c.url).hostname;
+      } catch {
+        return c.url;
+      }
+    },
+  );
 
   /* Il magazzino si riempie senza far aspettare nessuno.
      L'utente ha gia' i suoi prezzi in mano: una scrittura che non cambia cio'

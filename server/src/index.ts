@@ -69,6 +69,7 @@ import { FRESCHEZZA_MS, statoMagazzino } from "./prezzi-magazzino.js";
 import { statoCataloghi } from "./catalogo-magazzino.js";
 import { prezziDaiCataloghiIT } from "./catalogo-it.js";
 import { annota } from "./diario.js";
+import { statoVocabolario, quanteImparate } from "./vocabolario.js";
 import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./catalogo.js";
 import { paesiConCatalogo } from "./catalogo-fonti.js";
 import { negoziInCitta, statoNegozi, tuttiINegozi } from "./negozi.js";
@@ -1428,6 +1429,10 @@ app.get("/catalogo/stato", async () => ({
      essere un mistero. */
   magazzinoPrezzi: await statoMagazzino(),
   magazzinoCataloghi: await statoCataloghi(),
+  /* Il dizionario della spesa: quante parole conosce a memoria e quante ne ha
+     imparate strada facendo. Se le imparate crescono in fretta vuol dire che
+     manca qualcosa in `vocabolario.ts`, ed e' li' che bisogna guardare. */
+  vocabolario: { ...statoVocabolario(), imparate: quanteImparate() },
 }));
 
 /* ─────────────────────────── I punti vendita ─────────────────────────── */

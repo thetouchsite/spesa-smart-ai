@@ -4,3 +4,9 @@ dist
 .env.local
 diario/
 .prove/
+
+# Le copie di .env fatte a mano prima di cambiare una chiave.
+# Dentro ci sono credenziali VERE — password di Mongo, chiavi Google.
+# Non erano coperte da `.env` e bastava un `git add -A` per pubblicarle.
+.env.backup*
+.env.*.backup
