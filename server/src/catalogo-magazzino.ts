@@ -46,6 +46,7 @@
 import { gunzipSync, gzipSync } from "node:zlib";
 import { Binary } from "mongodb";
 import { cataloghi as collezioneCataloghi, isDbConfigured } from "./db.js";
+import { conInterruttore, statoInterruttore } from "./interruttore.js";
 
 /** Una voce come sta nel pacchetto: indirizzo e nome, niente altro. */
 export interface VoceSalvata {
@@ -69,15 +70,9 @@ const VALIDITA_MS = 30 * 3_600_000;
 /** Una lettura non deve tenere in ostaggio una richiesta. */
 const ATTESA_MS = 8_000;
 
-async function nonOltre<T>(lavoro: Promise<T>, ripiego: T): Promise<T> {
-  try {
-    return await Promise.race([
-      lavoro,
-      new Promise<T>((r) => setTimeout(() => r(ripiego), ATTESA_MS)),
-    ]);
-  } catch {
-    return ripiego;
-  }
+/** Come sopra: vedi `interruttore.ts` per il perche' non basta un timeout. */
+function nonOltre<T>(lavoro: () => Promise<T>, ripiego: T): Promise<T> {
+  return conInterruttore("magazzino-catalogo", ATTESA_MS, lavoro, ripiego);
 }
 
 /**
@@ -113,7 +108,7 @@ export async function catalogoSalvato(
   if (!isDbConfigured()) return null;
 
   return nonOltre(
-    (async () => {
+    async () => {
       const doc = await (await collezioneCataloghi()).findOne({
         _id: `${paese}|${insegna}`,
       });
@@ -125,7 +120,7 @@ export async function catalogoSalvato(
         // Pacchetto rovinato: meglio riscaricare che servire spazzatura.
         return null;
       }
-    })(),
+    },
     null,
   );
 }
@@ -139,7 +134,7 @@ export async function salvaCatalogo(
   if (!isDbConfigured() || voci.length === 0) return;
 
   await nonOltre(
-    (async () => {
+    async () => {
       const dati = impacchetta(voci);
       // Sedici megabyte e' il tetto di Mongo per documento: se un'insegna lo
       // sfonda si lascia stare invece di far fallire tutto il salvataggio.
@@ -165,32 +160,35 @@ export async function salvaCatalogo(
         { upsert: true },
       );
       return undefined;
-    })(),
+    },
     undefined,
   );
 }
 
 /** Cosa c'e' in magazzino, per paese: serve allo stato e alle prove. */
 export async function statoCataloghi(): Promise<{
+  /** `aperto` = il database non risponde e abbiamo smesso di chiederglielo. */
+  interruttore: "chiuso" | "aperto";
   attivo: boolean;
   insegne: number;
   prodotti: number;
   paesi: string[];
 }> {
-  if (!isDbConfigured()) return { attivo: false, insegne: 0, prodotti: 0, paesi: [] };
+  if (!isDbConfigured()) return { interruttore: "chiuso" as const, attivo: false, insegne: 0, prodotti: 0, paesi: [] };
 
   return nonOltre(
-    (async () => {
+    async () => {
       const righe = await (await collezioneCataloghi())
         .find({}, { projection: { paese: 1, prodotti: 1 } })
         .toArray();
       return {
+        interruttore: statoInterruttore("magazzino-catalogo"),
         attivo: true,
         insegne: righe.length,
         prodotti: righe.reduce((n, r) => n + (r.prodotti ?? 0), 0),
         paesi: [...new Set(righe.map((r) => r.paese))].sort(),
       };
-    })(),
-    { attivo: true, insegne: -1, prodotti: -1, paesi: [] },
+    },
+    { interruttore: "aperto" as const, attivo: true, insegne: -1, prodotti: -1, paesi: [] },
   );
 }

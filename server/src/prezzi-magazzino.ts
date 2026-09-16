@@ -53,6 +53,7 @@
  */
 
 import { isDbConfigured, prezzi as collezionePrezzi } from "./db.js";
+import { conInterruttore, statoInterruttore } from "./interruttore.js";
 import type { VerifyStatus } from "./price-page.js";
 
 /** Una scheda prodotto gia' letta. */
@@ -92,17 +93,16 @@ const CONSERVAZIONE_MS = 30 * 86_400_000;
 /** Una lettura o una scrittura non deve tenere in ostaggio una richiesta. */
 const ATTESA_MS = 4_000;
 
-/** Fa la cosa, ma non oltre il tempo dato: oltre, vale come «niente». */
-async function nonOltre<T>(lavoro: Promise<T>, ripiego: T): Promise<T> {
-  try {
-    return await Promise.race([
-      lavoro,
-      new Promise<T>((r) => setTimeout(() => r(ripiego), ATTESA_MS)),
-    ]);
-  } catch {
-    // Database spento, rete che cade, credenziali cambiate: si tira dritto.
-    return ripiego;
-  }
+/**
+ * Fa la cosa, ma non oltre il tempo dato: oltre, vale come «niente».
+ *
+ * E se va a vuoto piu' volte di fila smette di provare per qualche minuto.
+ * Senza quella parte, un database irraggiungibile rende l'app PIU' lenta di
+ * quanto sarebbe senza database: misurato in produzione, 55 secondi diventati
+ * 146 perche' ogni singola interrogazione aspettava il suo timeout a vuoto.
+ */
+function nonOltre<T>(lavoro: () => Promise<T>, ripiego: T): Promise<T> {
+  return conInterruttore("magazzino-prezzi", ATTESA_MS, lavoro, ripiego);
 }
 
 /**
@@ -116,7 +116,7 @@ export async function prezziGiaVisti(url: string[]): Promise<Map<string, PrezzoS
   if (!isDbConfigured() || url.length === 0) return vuota;
 
   return nonOltre(
-    (async () => {
+    async () => {
       const soglia = new Date(Date.now() - FRESCHEZZA_MS);
       const righe = await (await collezionePrezzi())
         .find({ _id: { $in: url }, visto: { $gte: soglia } })
@@ -135,7 +135,7 @@ export async function prezziGiaVisti(url: string[]): Promise<Map<string, PrezzoS
         });
       }
       return fuori;
-    })(),
+    },
     vuota,
   );
 }
@@ -154,7 +154,7 @@ export async function salvaPrezzi(righe: PrezzoSalvato[]): Promise<void> {
   if (!isDbConfigured() || righe.length === 0) return;
 
   await nonOltre(
-    (async () => {
+    async () => {
       const scade = new Date(Date.now() + CONSERVAZIONE_MS);
       await (await collezionePrezzi()).bulkWrite(
         righe.map((r) => ({
@@ -177,7 +177,7 @@ export async function salvaPrezzi(righe: PrezzoSalvato[]): Promise<void> {
         { ordered: false },
       );
       return undefined;
-    })(),
+    },
     undefined,
   );
 }
@@ -189,22 +189,24 @@ export function oreDa(visto: Date): number {
 
 /** Quante righe ci sono in magazzino: per l'endpoint di stato. */
 export async function statoMagazzino(): Promise<{
+  /** `aperto` = il database non risponde e abbiamo smesso di chiederglielo. */
+  interruttore: "chiuso" | "aperto";
   attivo: boolean;
   righe: number;
   fresche: number;
 }> {
-  if (!isDbConfigured()) return { attivo: false, righe: 0, fresche: 0 };
+  if (!isDbConfigured()) return { interruttore: "chiuso" as const, attivo: false, righe: 0, fresche: 0 };
 
   return nonOltre(
-    (async () => {
+    async () => {
       const c = await collezionePrezzi();
       const soglia = new Date(Date.now() - FRESCHEZZA_MS);
       const [righe, fresche] = await Promise.all([
         c.countDocuments(),
         c.countDocuments({ visto: { $gte: soglia } }),
       ]);
-      return { attivo: true, righe, fresche };
-    })(),
-    { attivo: true, righe: -1, fresche: -1 },
+      return { interruttore: statoInterruttore("magazzino-prezzi"), attivo: true, righe, fresche };
+    },
+    { interruttore: "aperto" as const, attivo: true, righe: -1, fresche: -1 },
   );
 }
