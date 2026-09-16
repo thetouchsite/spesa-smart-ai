@@ -1,7 +1,8 @@
 # Chi fa cosa
 
 **Operatore A — Antonio.** I dati: trovare insegne, sitemap, prodotti, negozi.
-**Operatore B — Alberto.** L'API: velocità, precisione, togliere l'IA dalla strada dei prezzi.
+**Operatore B — Alberto.** L'API: farne un prodotto finito, che l'app
+usa come si usa qualunque fornitore di dati.
 
 Questo file si aggiorna **a ogni push**. Chi pusha scrive due righe in fondo,
 sotto *Passaggio di consegne*, e chi tira le legge prima di ricominciare. Se il
@@ -22,8 +23,9 @@ fase prezzi                          17 s
 ```
 
 Il lavoro vero dura **due secondi e mezzo**. Il resto è aspettare una chiamata
-al modello che riordina dei nomi. È lì che sta la lentezza, ed è lì che si
-lavora.
+al modello che riordina dei nomi — che è anche il motivo per cui la stessa
+domanda può dare risposte diverse, e per cui quando il modello tace la spesa
+esce dimezzata senza un errore visibile.
 
 Nello stesso giorno, prova su Monaco di Baviera: 16 voci chieste, 7 con un
 prezzo. La causa principale non era il codice — era che delle undici fonti
@@ -89,51 +91,63 @@ server/scripts/resa-insegne.mjs       verifica-insegne.mjs, cerca-insegne.mjs
 
 ## Operatore B — Alberto · l'API
 
-**Il metro di misura:** secondi per rispondere, e quante voci prendono il
-prodotto giusto. Le due cose insieme — andare veloce sbagliando è facile.
+**Il metro di misura:** un'API che si potrebbe vendere a qualcuno che non sia
+noi. Secondi per rispondere e voci che prendono il prodotto giusto sono due
+pezzi di quello, non il traguardo.
 
 ### L'obiettivo
 
-Togliere il modello dalla strada dei prezzi, **senza peggiorare le scelte**.
-Oggi il modello legge una lista di nomi e dice quali corrispondono. Costa
-quattordici secondi e mezzo su diciassette, e ogni tanto non risponde affatto.
+**Costruire un'API finita, come la vende un fornitore di dati.** Non
+velocizzare un server: fare un prodotto. Chi la compra manda una lista e riceve
+dei dati. Cosa ci faccia poi non ci riguarda.
 
-Un'API di dati non dovrebbe chiedere a nessuno il permesso di rispondere.
+L'app di MealMint diventa **uno dei clienti**, il primo. Prende i dati e li
+disegna: niente logica di prezzi dentro, nessuna scelta di prodotti, nessuna
+chiamata a un modello. Chiede e mostra.
 
-### Come, in ordine — e il primo non si salta
+Il piano completo sta in **`server/OBIETTIVO-API.md`**. In breve, cosa manca
+per poterla chiamare finita — tutto verificato, non supposto:
 
-1. **Prima il metro, poi il lavoro.** Un elenco di duecento coppie
-   *voce → prodotto giusto*, scelte a mano su IT, GB, DE, ES, FR, e uno script
-   che dice quante ne azzecca. Senza questo non si può sapere se una modifica
-   migliora o peggiora, e si finisce a discutere di impressioni.
-   Misurato oggi: classifica e modello scelgono cose diverse **dieci volte su
-   dieci** — ma in sette casi il primo della classifica sembra migliore
-   (`petto pollo` contro `petto di pollo a fette sottili`). *Sembra*. Finché
-   non c'è l'elenco, è un'impressione.
-2. **Staccare la quantità dal nome.** Il peso oggi è una parola come le altre:
-   cercando `zucchine 500g` è tornato **chiacchiere 500g**. Va letto come
-   numero e tolto dalle parole di ricerca. Coperto: 56% dei nomi in Italia,
-   35% in Inghilterra, in quattro formati (`500 g`, `500g`, `gr500`, `4x100g`).
-3. **Le dieresi tedesche.** Il catalogo scrive `kaese`, `haehnchen`, `aepfel`;
-   la ricerca cerca `kase`, `hahnchen`, `apfel`. Misurato: **0 risultati contro
-   5**, su ogni parola provata. Riguarda DE, AT, CH. *(Tocca anche
-   `vocabolario.ts`, che contiene le forme sbagliate.)*
-4. **Pesare le parole per quanto sono rare.** `latte` da sola oggi pesca
-   *pane al latte* e *mousse di latte*. Una parola che compare ovunque non
-   distingue niente e non deve valere come una che compare di rado.
-5. **A parità di somiglianza, preferire chi pubblica i prezzi.** A Monaco hanno
-   risposto flaschenpost e Aldi Nord, resa **0** tutti e due: quattro righe con
-   il nome del negozio e un trattino al posto del prezzo.
-6. **Solo alla fine, togliere il modello** — e solo se il punto 1 dice che non
-   si peggiora. Se dice il contrario, il modello resta e si è imparato perché.
+| | oggi |
+|---|---|
+| rotte protette da una chiave | **0** — `/ai/prices`, `/catalogo/cerca` e `/negozi` sono aperte a chiunque |
+| limiti per chiamante | **nessuno** — c'è solo il tetto di spesa, ed è condiviso |
+| rotte versionate | **0** — nessun `/v1`, quindi nessun contratto |
+| risposta deterministica | **no** — la sceglie un modello, e se tace la spesa esce dimezzata |
+| errori che dicono la causa | **no** — «nessun prezzo» sono tre cose diverse |
+| documentazione | **nessuna** |
 
-### Poi, quando la scelta è solida
+E la lentezza, che era il sospetto di partenza, è confermata: dei 17 secondi
+della fase prezzi, **14,6 sono la chiamata al modello**. Ma è un sintomo di
+quel «no» nella quarta riga, non il problema.
 
-**Il prezzo al chilo.** Oggi l'app mette in colonna *zucchine 500 g a 1,39 €* e
-*zucchine 1 kg a 2,19 €* e fa sembrare la prima più conveniente. Non lo è: sono
-2,78 €/kg contro 2,19. Per un'app che promette di far risparmiare è il
-confronto sbagliato al centro della schermata. Serve il punto 2 per farlo, e
-serve una modifica anche sul lato app.
+### Dove passa la linea
+
+Serve anche a decidere cosa consegniamo al cliente e cosa resta nostro.
+
+**È l'API (nostra):** `/ai/prices`, `/catalogo/cerca`, `/negozi`,
+`/catalogo/stato`, `/health` → diventeranno `/v1/prezzi`, `/v1/prodotti`,
+`/v1/negozi`, `/v1/copertura`, `/v1/stato`.
+
+**È l'app (del cliente):** `/auth/*`, `/me`, `/plans`, `/ai/menu`,
+`/ai/lista`, `/ai/plan-full`, `/ai/recipe*`, `/ai/chef`.
+
+Il modello resta di là. Inventare un menu è un servizio, ed è giusto che usi
+l'IA. Dire quanto costa il latte a Milano è un dato, e un dato non si inventa.
+
+### I quattro tempi
+
+1. **La linea e la chiave** — rotte `/v1`, chiavi con tetto, CORS chiuso,
+   stato che non mente, errori che distinguono le cause.
+2. **Il metro di misura** — 200 coppie *voce → prodotto giusto* scritte a mano,
+   e lo script che le conta. **Prima di toccare la ricerca.** Senza, spegnere
+   il modello è una scommessa.
+3. **La ricerca brava da sola** — staccare la quantità dal nome, le dieresi
+   tedesche, pesare le parole rare, preferire chi pubblica i prezzi. E solo
+   alla fine togliere il modello, se il metro dice che non si peggiora.
+4. **Quello che la rende vendibile** — documentazione, prezzo al chilo,
+   conteggio delle chiamate per chiave, e il repo separato *quando* l'app non
+   contiene più logica di prezzi.
 
 ### File di Alberto
 
