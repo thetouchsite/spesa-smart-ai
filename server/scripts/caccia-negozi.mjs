@@ -45,8 +45,16 @@ async function prendi(url, ms = 12000, json = false) {
   }
 }
 
-/** Percorsi JSON che le insegne italiane usano per il cercanegozi. */
+/**
+ * Percorsi JSON che le insegne usano per il cercanegozi.
+ *
+ * Due vocabolari, perche' sono due lingue e non si sovrappongono: un'insegna
+ * britannica non espone mai `/api/punti-vendita`, e una italiana non espone
+ * mai `/branch-finder`. Provarli tutti costa una richiesta a vuoto per
+ * percorso, che e' il prezzo di non doversi ricordare in che paese si e'.
+ */
 const VIE_JSON = [
+  // italiano
   "/api/stores",
   "/api/store",
   "/api/negozi",
@@ -62,6 +70,22 @@ const VIE_JSON = [
   "/punti-vendita.json",
   "/wp-json/wp/v2/negozi?per_page=100",
   "/wp-json/store-locator/v1/stores",
+  // britannico
+  "/api/branches",
+  "/api/branch",
+  "/api/shops",
+  "/api/locations",
+  "/api/store-finder",
+  "/api/storefinder/stores",
+  "/api/stores/all",
+  "/api/v1/stores/all",
+  "/store-finder/api/stores",
+  "/storefinder/api/search",
+  "/branches.json",
+  "/locations.json",
+  "/stores/all.json",
+  "/bin/stores.json",
+  "/graphql?query=%7Bstores%7Bname%20postcode%7D%7D",
 ];
 
 /** Un oggetto che sembra un negozio: ha un indirizzo o delle coordinate. */
@@ -107,7 +131,7 @@ async function viaJson(base) {
 
 /** Le schede negozio dentro la sitemap. */
 const PARE_NEGOZIO =
-  /\/(negozi|negozio|punti-vendita|puntivendita|punto-vendita|store|stores|store-locator|filiali)\//i;
+  /\/(negozi|negozio|punti-vendita|puntivendita|punto-vendita|store|stores|store-locator|store-finder|storefinder|filiali|branch|branches|shops|find-a-store|our-stores|locations)\//i;
 
 async function viaSitemap(base) {
   const rb = await prendi(base + "/robots.txt", 10000);
@@ -121,7 +145,7 @@ async function viaSitemap(base) {
     const loc = [...x.testo.matchAll(/<loc>([^<]+)<\/loc>/gi)].map((m) => m[1].trim());
     if (/<sitemapindex/i.test(x.testo)) {
       // Solo le figlie che nel nome parlano di negozi: le altre sono prodotti.
-      for (const f of loc.filter((l) => PARE_NEGOZIO.test(l) || /negoz|store|pdv/i.test(l)).slice(0, 4)) {
+      for (const f of loc.filter((l) => PARE_NEGOZIO.test(l) || /negoz|store|branch|shop|pdv|location/i.test(l)).slice(0, 6)) {
         const y = await prendi(f, 25000);
         for (const m of y.testo.matchAll(/<loc>([^<]+)<\/loc>/gi)) {
           if (PARE_NEGOZIO.test(m[1])) trovati.add(m[1].trim());
