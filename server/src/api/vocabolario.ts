@@ -310,6 +310,23 @@ export function traduciVoce(
   const fuori: string[] = [];
   const sconosciute: string[] = [];
 
+  /* UNA VOCE NOMINA UN PRODOTTO SOLO. IL RESTO E' IL NOME DELLA VARIETA'.
+     «Mele Cox's Orange Pippin» usciva tradotta «apples cox's ORANGES pippin»,
+     e da li' la ricerca inglese portava arance — Sainsbury's oranges, e anche
+     la Fanta. «Orange» li' dentro non e' un'arancia: e' un pezzo del nome
+     della varieta' di mela.
+
+     La spia e' la parola che viene PRIMA. In «Mele Cox's Orange Pippin» la
+     parola prima di «Orange» e' «Cox's», che il dizionario non conosce: un
+     cibo che spunta in mezzo a parole sconosciute, quando il prodotto e' gia'
+     stato nominato, sta dentro un nome proprio, non e' un secondo ingrediente.
+
+     Sono due condizioni insieme, e servono tutte e due. In «salsa di
+     pomodoro» e «latte di mandorla» il secondo cibo viene dopo «di», che e'
+     una parola di servizio e non una sconosciuta: quelle restano intatte. */
+  let gia = false;          // il prodotto e' gia' stato nominato?
+  let primaSconosciuta = false; // la parola appena passata era sconosciuta?
+
   for (const p of parole) {
     // Articoli e preposizioni: si tolgono e basta.
     if (PAROLE_DI_SERVIZIO.has(p)) continue;
@@ -329,7 +346,16 @@ export function traduciVoce(
     }
     const i = INDICE.get(p) ?? varianti(p).map((v) => INDICE.get(v)).find((x) => x !== undefined);
     if (i !== undefined) {
+      if (gia && primaSconosciuta) {
+        /* Sta dentro un nome proprio: non si traduce e non si cerca. Tenerla
+           com'e' non basterebbe — «orange» nel catalogo inglese trova le
+           arance uguale, ed e' proprio quello che si vuole evitare. */
+        primaSconosciuta = false;
+        continue;
+      }
       fuori.push(CONCETTI[i][lingua]);
+      gia = true;
+      primaSconosciuta = false;
       continue;
     }
 
@@ -338,13 +364,20 @@ export function traduciVoce(
     const appresa = cercaImparata(p, lingua);
     if (appresa) {
       fuori.push(appresa);
+      gia = true;
+      primaSconosciuta = false;
       continue;
     }
 
     fuori.push(p);
     // Le parole corte sono articoli e preposizioni: «di», «da», «the», «of».
     // Non vale la pena spendere una chiamata per tradurle.
-    if (p.length > 3) sconosciute.push(p);
+    if (p.length > 3) {
+      sconosciute.push(p);
+      primaSconosciuta = true;
+    } else {
+      primaSconosciuta = false;
+    }
   }
 
   /* «Pomodori pelati» traduce «pomodori»→tomatoes e «pelati»→chopped tomatoes,

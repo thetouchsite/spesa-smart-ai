@@ -618,12 +618,15 @@ export function paPreparazione(nome: string): boolean {
  */
 export function paScheda(u: string): boolean {
   if (NON_E_UNA_PAGINA.test(u)) return false;
+  /* UN SEGMENTO CHE DICE «PRODOTTO» VALE PIU' DI TUTTO IL RESTO.
+     Si guarda per primo perche' parecchi negozi annidano la scheda dentro il
+     percorso del reparto — `/collections/frutta/products/mele` su Shopify — e
+     buttare via quell'indirizzo perche' contiene il nome di una categoria
+     farebbe sparire insegne intere. */
+  const dichiaraProdotto =
+    /\/(p|product|products|producto|productos|produkt|produkte|prodotto|prodotti|produit|produits|artikel|item|items|urun|proizvod|pdp|dp)\//i.test(u);
+  if (dichiaraProdotto) return true;
   if (E_UNA_VETRINA.test(u)) return false;
-  if (
-    /\/(p|product|products|producto|productos|produkt|produkte|prodotto|prodotti|produit|produits|artikel|item|items|urun|proizvod|pdp|dp)\//i.test(u)
-  ) {
-    return true;
-  }
   /* LA STESSA FORMA, SCRITTA IN TRE MODI DIVERSI.
      Un nome lungo accanto a un codice: e' come quasi tutti i negozi scrivono
      l'indirizzo di una scheda. Ma ognuno lo compone a modo suo, e chiedere una
@@ -681,7 +684,25 @@ const NON_E_UNA_PAGINA = /\/medias\/|\.(xml|jpe?g|png|gif|pdf|webp|svg|css|js|zi
  * Alcampo e Bonpreu Esclat girano sulla stessa piattaforma e hanno la stessa
  * cartella; da soli valevano 108.047 voci dichiarate.
  */
-const E_UNA_VETRINA = /\/(offers|ofertas|offerte|promociones|promozioni|folleto|volantino|angebote|promotions)\//i;
+/* SCAFFALI, NON SCHEDE.
+   Alle offerte e ai volantini si sono aggiunte le CATEGORIE, e ci e' voluto un
+   utente per accorgersene. Morrisons pubblica in sitemap sia i prodotti sia i
+   reparti, e i reparti vincevano quasi sempre: il loro indirizzo finisce per
+   `/categories/fruit-veg/salads/tomatoes/cherry-plum-tomatoes/183963`, cioe'
+   nome lungo piu' codice — la forma con cui qui sotto si riconosce una scheda.
+
+   Passavano in 995 su 32.873 voci, il 3%, e comparivano nei risultati molto
+   piu' spesso, perche' un reparto si chiama con le parole generiche che la
+   gente cerca — «cherry plum tomatoes» — mentre la scheda vera si chiama
+   «Morrisons The Best British Baby Plum Tomatoes 360g».
+
+   E rubavano il posto senza aggiungere niente: quella pagina di Morrisons
+   contiene quattro prodotti con quattro pesi e quattro prezzi (250 g a 0,77,
+   360 g a 2,15, 420 g a 1,40, 200 g a 2,00), e tutti e quattro il catalogo li
+   ha gia' come schede con il loro indirizzo. Tenere il reparto voleva dire
+   mostrarne uno solo, con un prezzo preso a caso fra i quattro. */
+const E_UNA_VETRINA =
+  /\/(offers|ofertas|offerte|promociones|promozioni|folleto|volantino|angebote|promotions|categories|category|categoria|categorias|categorie|kategorie|kategorien|catalogue|catalog)\//i;
 
 /**
  * Le voci di UNA sola insegna.
@@ -835,6 +856,16 @@ async function costruisci(paese: string): Promise<CatalogoPaese | null> {
       let presi = 0;
       for (const s of salvate) {
         if (presi >= MAX_PER_INSEGNA || voci.length >= MAX_PER_PAESE) break;
+        /* SI RICONTROLLA CHE SIA UNA SCHEDA, ANCHE SE ARRIVA DAL MAGAZZINO.
+           Il controllo c'era solo quando si legge la sitemap, di notte. Ma il
+           magazzino conserva quello che era buono ALLORA, e quando la regola
+           cambia le righe vecchie restano dentro finche' qualcuno non ripassa
+           dai negozi — cioe' fino al prossimo giro notturno.
+
+           Le categorie di Morrisons sono entrate cosi', e ci sarebbero rimaste
+           un giorno intero dopo essere state escluse. Ricontrollare qui costa
+           una espressione regolare per riga e rende la regola valida subito. */
+        if (!paScheda(s.url)) continue;
         const p = parole(s.nome);
         if (p.length === 0) continue;
         voci.push({
