@@ -253,7 +253,35 @@ async function facciScegliere(
      La seconda e' il criterio 3 del goal: staccare l'IA, rifare la stessa
      spesa, e vedere se viene identica. Finche' questa riga non c'era, quella
      prova si poteva fare solo rompendo la chiave. */
-  if (process.env.SCELTA_MODELLO === "no") return new Map();
+  /* SPENTA, PERCHE' IL METRO HA DETTO DI SPEGNERLA.
+     Il piano prevedeva di togliere il modello solo se le misure avessero detto
+     che non si peggiora. L'hanno detto, e hanno detto anche di piu': con il
+     modello si azzecca MENO.
+
+       200 prove, cinque paesi, stessa strada, una variabile sola
+         senza il modello   157 su 200   79%
+         con il modello     151 su 200   76%
+
+     Due misure indipendenti, stessa direzione: la prima dava sei voci di
+     scarto, la seconda tredici. Il numero balla — la strada apre pagine vere e
+     i negozi rispondono come vogliono — ma il verso no.
+
+     Sceglie peggio perche' fa la cosa che gli si chiede: guarda dei nomi e
+     decide. Su venti nomi che si somigliano, un pareggio lo rompe a caso,
+     mentre la classifica lo rompe sempre allo stesso modo — e allo stesso modo
+     vuol dire anche che si puo' correggere.
+
+     Cosa si guadagna a spegnerla, oltre alle sei voci:
+
+       · LA STESSA DOMANDA DA' LA STESSA RISPOSTA. Sempre, anche domani.
+       · STACCANDO LA CHIAVE non cambia niente. Non «quasi niente»: niente.
+       · La fase prezzi scende da 17 secondi a poco piu' di uno.
+       · Non si paga piu' nessuno per rispondere sui prezzi.
+
+     Si riaccende con `SCELTA_MODELLO=si`, e serve a una cosa sola: rifare
+     questo confronto quando la ricerca sara' cambiata. Il giorno che il metro
+     dicesse il contrario, si riaccende per davvero — e si scrive perche'. */
+  if (process.env.SCELTA_MODELLO !== "si") return new Map();
 
   const utili = candidature
     .map((c, i) => ({ ...c, i }))

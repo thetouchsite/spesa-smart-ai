@@ -89,6 +89,9 @@ function perche(nome, prova) {
  * fra gli approvati dal modello. Differivano per DUE cose, e il risultato non
  * diceva quale delle due contasse.
  */
+/* Il servizio «con il modello» va acceso apposta: da quando il metro ha detto
+   che peggiora, la scelta e' spenta di predefinito. Si avvia con
+   `SCELTA_MODELLO=si`. */
 const API = process.env.API ?? "http://localhost:3100";
 const API_SENZA = process.env.API_SENZA ?? "http://localhost:3101";
 
@@ -284,17 +287,17 @@ if (!senzaModello && modelloVivo === false) {
     console.log(
       `  Con il modello se ne azzeccano ${differenza} in piu' su ${totali.prove}.
 ` +
-        `  Costa 14,6 secondi su 17: ${(14.6 / differenza).toFixed(1)} secondi per ogni voce in piu'.`,
+        `  E costa: una chiamata e un paio di secondi a ogni lista.`,
     );
   } else if (differenza < 0) {
     console.log(
       `  SENZA il modello se ne azzeccano ${-differenza} in piu' su ${totali.prove}, e gratis.
 ` +
-        `  Non sta aiutando: sta scegliendo peggio, e ci mette 14,6 secondi su 17.`,
+        `  Non sta aiutando: sta scegliendo peggio, e per giunta si fa pagare.`,
     );
   } else {
     console.log(
-      "  Stesso punteggio esatto. Una delle due colonne costa 14,6 secondi" +
+      "  Stesso punteggio esatto. Una delle due colonne si fa pagare" +
         "\n  su 17 e l'altra costa zero.",
     );
   }

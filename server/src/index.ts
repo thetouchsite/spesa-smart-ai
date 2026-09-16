@@ -1225,23 +1225,50 @@ async function prezziDiLista(data: z.infer<typeof PricesInput>) {
 
   const esito = await prezzaLista(data.items, data.city, data.country, data.currency, fonte);
 
-  /* Scade insieme ai prezzi che contiene — ventiquattro ore, la stessa soglia
-     del magazzino. Erano sette giorni, ed erano sette giorni di troppo: la
-     risposta salvata si serve PRIMA del magazzino, quindi quella durata piu'
-     lunga non aggiungeva velocita', copriva soltanto la regola di freschezza. */
-  memorySet(key, esito, FRESCHEZZA_MS);
-  if (isDbConfigured()) {
-    try {
-      await (await cache(key)).insertOne({
-        _id: key,
-        value: esito,
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + FRESCHEZZA_MS),
-      });
-    } catch {
-      /* gia' presente */
+  /* UNA RISPOSTA VUOTA NON SI SALVA.
+     Il catalogo di un paese sono duecentomila prodotti che si caricano dal
+     database, e nei primi secondi dopo un riavvio non c'e' ancora. Chi chiede
+     in quel momento riceve una risposta ben formata e vuota — e' voluto, si
+     preferisce rispondere magri che far aspettare un minuto.
+     Quello che NON era voluto e' che quella risposta finisse in cache per
+     ventiquattro ore: un attimo di freddo avvelenava un giorno intero, e
+     ogni richiesta successiva per quella lista continuava a dire «nessun
+     negozio ha questo prodotto» mentre il catalogo era li', pieno.
+
+     Misurato: lanciando una misura diciotto secondi dopo un riavvio, Italia,
+     Regno Unito e Germania davano zero su quaranta. Non era la ricerca, non
+     era il modello: era la cache che ripeteva un vuoto di diciotto secondi
+     prima.
+
+     Su Render conta il doppio, perche' il piano gratuito si spegne e riparte
+     di continuo: e' esattamente la condizione in cui questo succede. */
+  const utile = (esito.prezzi?.length ?? 0) > 0;
+
+  if (utile) {
+    /* Scade insieme ai prezzi che contiene — ventiquattro ore, la stessa
+       soglia del magazzino. Erano sette giorni, ed erano sette di troppo: la
+       risposta salvata si serve PRIMA del magazzino, quindi quella durata piu'
+       lunga non aggiungeva velocita', copriva soltanto la freschezza. */
+    memorySet(key, esito, FRESCHEZZA_MS);
+    if (isDbConfigured()) {
+      try {
+        await (await cache(key)).insertOne({
+          _id: key,
+          value: esito,
+          createdAt: new Date(),
+          expiresAt: new Date(Date.now() + FRESCHEZZA_MS),
+        });
+      } catch {
+        /* gia' presente */
+      }
     }
+  } else {
+    console.warn(
+      `[cache] risposta vuota per ${data.items.length} voci in ${data.country}: ` +
+        `NON la salvo, cosi' la prossima richiesta riprova invece di ripetere il vuoto`,
+    );
   }
+
   return esito;
 }
 
