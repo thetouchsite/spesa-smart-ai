@@ -61,6 +61,18 @@ export interface PrezzoGrezzo {
   negozio: string;
   link: string;
   /**
+   * Quando questa pagina e' stata guardata l'ultima volta, in ISO.
+   *
+   * Un prezzo senza data e' una diceria: chi costruisce sopra la nostra API
+   * deve poter dire all'utente «letto stamattina» o «letto tre giorni fa», e
+   * deve poter scartare da solo quello che per lui e' troppo vecchio. Noi
+   * dichiariamo quando abbiamo guardato; la soglia la sceglie lui.
+   *
+   * Per le schede che arrivano dal magazzino e' la data del magazzino, non
+   * adesso — se no la risposta direbbe «fresco» di una cosa letta ieri.
+   */
+  letto?: string;
+  /**
    * Questa pagina l'abbiamo GIA' aperta per leggerne il prezzo.
    *
    * Senza questo segno il verificatore la riapriva una seconda volta, per
@@ -584,6 +596,8 @@ export async function generatePricesCatalogo(
           valuta: salvato.valuta || valuta,
           negozio: c.insegna,
           link: c.url,
+          // La data del MAGAZZINO: e' quando quel prezzo e' stato letto.
+          letto: salvato.visto?.toISOString(),
           giaVerificato: true,
         } satisfies PrezzoGrezzo,
         posto: c.posto,
@@ -635,6 +649,8 @@ export async function generatePricesCatalogo(
       valuta: v.page?.currency ?? valuta,
       negozio: c.insegna,
       link: c.url,
+      // Letta adesso, in questa richiesta.
+      letto: new Date().toISOString(),
       giaVerificato: true,
     } satisfies PrezzoGrezzo;
     return { riga, posto: c.posto };

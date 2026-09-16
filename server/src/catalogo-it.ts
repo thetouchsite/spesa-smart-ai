@@ -564,6 +564,12 @@ export interface RigaCatalogo {
   link: string;
   /** Confidenza della corrispondenza, 0-1. Serve ai log, non all'utente. */
   confidenza: number;
+  /**
+   * Quando questa pagina e' stata guardata l'ultima volta, in ISO.
+   * Stessa cosa di `PrezzoGrezzo.letto` sull'altra strada: un prezzo senza
+   * data e' una diceria, e le due strade devono dire le stesse cose.
+   */
+  letto?: string;
   /** Il listino barrato, quando il prodotto e' in promozione. */
   prezzoListino?: number;
   /** Di quanto si risparmia, in percentuale. */
@@ -963,6 +969,7 @@ async function cercaNeiVolantini(items: string[], valuta: string): Promise<RigaC
         negozio: ins.nome,
         link: v.link,
         confidenza: 1,
+        letto: new Date().toISOString(),
       });
     }
   }
@@ -1093,6 +1100,7 @@ async function cercaSuEbsn(
           negozio: ins.nome,
           link: p.itemUrl.startsWith("http") ? p.itemUrl : ins.base + p.itemUrl,
           confidenza: 1,
+          letto: new Date().toISOString(),
           ...(listino != null ? { prezzoListino: listino } : {}),
           ...(scontoPercento != null ? { scontoPercento } : {}),
           ...(negozioDi.get(ins.id)
@@ -1174,6 +1182,7 @@ export async function prezziDaiCataloghiIT(
     negozio: c.idx.catalogo.nome,
     link: c.voce.url,
     confidenza: Number(c.score.toFixed(2)),
+    letto: new Date().toISOString(),
   }));
 
   const [ebsn, promo] = await Promise.all([daEbsn, daVolantini]);

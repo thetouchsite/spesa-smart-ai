@@ -93,6 +93,10 @@ const PADRONI = {
   negozi: "api",
   "insegne-online": "api",
   vocabolario: "api",
+  /* La forma che l'API promette: una funzione pura, senza un solo import.
+     E' proprio cio' che le permette di stare di qua senza trascinarsi dietro
+     mezzo server — ed e' il file che NON si tocca senza passare a /v2. */
+  "contratto-v1": "api",
   sinonimi: "api",
 
   // ── app ────────────────────────────────────────────────────────────

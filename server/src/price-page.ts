@@ -475,6 +475,16 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
 
 /** Una riga di prezzo dopo il controllo, pronta per il client. */
 export interface CheckedRow {
+  /**
+   * Quando quella pagina e' stata guardata, in ISO.
+   *
+   * Viaggia dal magazzino o dalla lettura fino alla risposta senza che nessuno
+   * la ricalcoli: se la si rigenerasse qui direbbe «adesso» anche di un prezzo
+   * preso dal magazzino ieri, che e' il genere di bugia invisibile che
+   * un'API di prezzi non si puo' permettere.
+   */
+  letto?: string;
+
   /** Ricerca di ripiego, quando la pagina del prodotto non si è aperta. */
   linkRicerca?: string;
   ricercaSu?: string;
@@ -754,6 +764,15 @@ export interface Offer {
   valuta: string;
   link: string;
   verifica: VerifyStatus;
+  /**
+   * Quando quella pagina e' stata guardata, in ISO.
+   *
+   * Viaggia dal magazzino o dalla lettura fino alla risposta senza che nessuno
+   * la ricalcoli: se la si rigenerasse qui direbbe «adesso» anche di un prezzo
+   * preso dal magazzino ieri, che e' il genere di bugia invisibile che
+   * un'API di prezzi non si puo' permettere.
+   */
+  letto?: string;
   /** Il negozio dell'insegna piu' vicino a chi chiede. NON e' la fonte del prezzo. */
   negozioPiuVicino?: string;
   /** Presenti solo se il prodotto è in promozione in quel negozio. */
@@ -819,6 +838,7 @@ export function groupByProduct(rows: CheckedRow[]): ProductOffers[] {
       // l'utente potrebbe toccare, e porterebbe a una pagina inesistente.
       link: r.verifica === "non-raggiungibile" ? "" : r.link,
       verifica: r.verifica,
+      letto: r.letto,
       prezzoListino: r.prezzoListino,
       risparmio: r.risparmio,
       scontoPercento: r.scontoPercento,

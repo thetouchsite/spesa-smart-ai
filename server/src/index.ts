@@ -79,6 +79,7 @@ import { prezziDaiCataloghiIT } from "./catalogo-it.js";
 import { annota } from "./diario.js";
 import { statoVocabolario, quanteImparate } from "./vocabolario.js";
 import { saluteIA } from "./salute-ia.js";
+import { rispostaPrezziV1 } from "./contratto-v1.js";
 import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./catalogo.js";
 import { paesiConCatalogo } from "./catalogo-fonti.js";
 import { negoziInCitta, statoNegozi, tuttiINegozi } from "./negozi.js";
@@ -1136,8 +1137,19 @@ const PricesInput = z.object({
  * Riceve la lista della spesa gia' fatta e restituisce le offerte raggruppate
  * per prodotto, con la piu' economica in testa. E' l'unica fase che si paga.
  */
-app.post("/ai/prices", async (body) => {
-  const data = parse(PricesInput, body);
+/**
+ * I prezzi di una lista, con la cache.
+ *
+ * Stava dentro `/ai/prices`. E' uscita perche' adesso la chiamano in due —
+ * `/ai/prices`, che risponde come ha sempre risposto, e `/v1/prezzi`, che
+ * risponde nella forma del contratto. Sono gli stessi dati: duplicarli
+ * vorrebbe dire pagarli due volte e, peggio, vederli divergere il giorno che
+ * qualcuno sistema una sola delle due copie.
+ *
+ * La chiave della cache NON include la forma: chi chiede la stessa lista su
+ * `/v1/prezzi` riusa quel che ha gia' pagato `/ai/prices`, e viceversa.
+ */
+async function prezziDiLista(data: z.infer<typeof PricesInput>) {
   const fonte = data.priceSource ?? PRICE_SOURCE_DEFAULT;
 
   /* LA RISPOSTA NON PUO' VIVERE PIU' A LUNGO DEL PREZZO CHE CONTIENE.
@@ -1189,7 +1201,9 @@ app.post("/ai/prices", async (body) => {
     }
   }
   return esito;
-});
+}
+
+app.post("/ai/prices", async (body) => prezziDiLista(parse(PricesInput, body)));
 
 /**
  * Piano completo in una richiesta sola: menu' + prezzi.
@@ -1464,6 +1478,104 @@ app.get("/catalogo/stato", async () => ({
      imparate strada facendo. Se le imparate crescono in fretta vuol dire che
      manca qualcosa in `vocabolario.ts`, ed e' li' che bisogna guardare. */
   vocabolario: { ...statoVocabolario(), imparate: quanteImparate() },
+}));
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   /v1 — L'API, con un contratto
+
+   PERCHE' UN NUMERO DI VERSIONE
+   -----------------------------
+   Senza, il giorno che cambiamo la forma di una risposta si rompe chi ci sta
+   sopra, e non ha modo di restare indietro mentre si adegua. Con, ha due
+   scelte: adeguarsi quando vuole, o restare su `/v1` finche' gli pare. E noi
+   possiamo riordinare tutto quel che c'e' dentro senza chiedere permesso a
+   nessuno — che e' esattamente cio' che stiamo per fare.
+
+   E I NOMI DICONO COSA DANNO, NON COME SONO FATTI DENTRO
+   ------------------------------------------------------
+   `/ai/prices` raccontava l'implementazione: che ci fosse un modello sotto era
+   un dettaglio nostro, e infatti sta per non essere piu' vero. `/v1/prezzi`
+   dice cosa serve a chi chiama.
+
+   LE VECCHIE RESTANO
+   ------------------
+   Ogni rotta di prima continua a rispondere esattamente come prima. L'app in
+   preview non si accorge di niente, e si sposta quando le conviene. Il giorno
+   che non le chiama piu' nessuno — lo dira' il conteggio per chiave — si
+   tolgono.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+app.post("/v1/prezzi", async (body) => {
+  const data = parse(PricesInput, body);
+  const iso = paeseIso(data.country).toUpperCase();
+
+  /* Si riusa la stessa strada di `/ai/prices`, cache compresa: sono gli stessi
+     dati, e farne due copie vorrebbe dire pagarli due volte e vederli
+     divergere. Cambia solo la forma in cui escono. */
+  const dentro = (await prezziDiLista(data)) as Parameters<typeof rispostaPrezziV1>[0];
+
+  return rispostaPrezziV1(
+    dentro,
+    data.items,
+    iso,
+    data.currency,
+    paesiConCatalogo().includes(iso),
+  );
+});
+
+app.post("/v1/prodotti", async (body) => {
+  const data = parse(CercaCatalogo, body);
+  const iso = paeseIso(data.paese).toUpperCase();
+  const trovati = await cercaNelCatalogo(iso, data.q, data.quanti);
+  return {
+    richiesta: data.q,
+    paese: iso,
+    coperto: paesiConCatalogo().includes(iso),
+    prodotti: trovati.map((t) => ({
+      insegna: t.insegna,
+      nome: t.nome,
+      link: t.url,
+    })),
+  };
+});
+
+app.post("/v1/negozi", async (body) => {
+  const data = parse(NegoziInput, body);
+  const iso = paeseIso(data.paese).toUpperCase();
+  const negozi = data.citta ? await negoziInCitta(iso, data.citta) : await tuttiINegozi(iso);
+  return {
+    paese: iso,
+    citta: data.citta || null,
+    negozi,
+  };
+});
+
+/**
+ * Cosa copriamo, detto per intero — anche quando e' brutto.
+ *
+ * Chi valuta se comprare l'API deve poterlo sapere prima, non scoprirlo con
+ * una lista della spesa che torna mezza vuota. La Germania oggi ha sei fonti
+ * su undici che non sono supermercati, e sta scritto qui.
+ */
+app.get("/v1/copertura", async () => ({
+  paesi: paesiConCatalogo(),
+  quantiPaesi: paesiConCatalogo().length,
+  catalogo: statoCatalogo(),
+  magazzinoPrezzi: await statoMagazzino(),
+  magazzinoCataloghi: await statoCataloghi(),
+  vocabolario: { ...statoVocabolario(), imparate: quanteImparate() },
+}));
+
+app.get("/v1/stato", async () => ({
+  ok: true,
+  /* La verita' sul modello, non «c'e' una chiave scritta». Resta qui anche
+     quando l'IA sara' uscita dalla strada dei prezzi: serve a sapere se il
+     servizio accanto e' vivo. */
+  ia: saluteIA(),
+  database: isDbConfigured(),
+  spesa: spendStatus(),
+  quota: quotaStatus(),
 }));
 
 /* ─────────────────────────── I punti vendita ─────────────────────────── */
