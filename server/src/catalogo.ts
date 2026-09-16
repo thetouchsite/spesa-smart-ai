@@ -249,10 +249,47 @@ export function parole(testo: string): string[] {
  * Misurato: vincevano pure, perche' costano meno.
  */
 const NON_ALIMENTARI = [
-  /(crocchett|croccantin|gatt[oi]?|cane|cani|cucciol|cuccioli|mangim)/i,
-  /(detersiv|detergent|ammorbid|candeggi|sgrassat|anticalcar|shampoo|balsamo|bagnoschiuma|sapone|dentifric|deodorant|assorbent|pannolin|salviett|tovagliol|carta igienic|polish|insettic)/i,
-  /(haribo|caramell|gommos|liquiriz|chewing|lecca lecca)/i,
-  /(quaderno|portamine|matite|penna a sfera|astuccio|pila|batteri)/i,
+  // ── animali ──────────────────────────────────────────────────────
+  /\b(crocchett|croccantin|gatt[oi]?|cane|cani|cucciol|cuccioli|mangim|croquett|katzen|hunde|tierfutter|pienso|racao|kattenvoer|hondenvoer)/i,
+
+  // ── pulizia e igiene ─────────────────────────────────────────────
+  /\b(detersiv|detergent|ammorbid|candeggi|sgrassat|anticalcar|shampoo|shampooing|champu|champo|balsamo|bagnoschiuma|sapone|savon|jabon|seife|dentifric|toothpaste|zahnpasta|deodorant|assorbent|pannolin|couches|windeln|salviett|tovagliol|carta igienic|papier toilette|toilettenpapier|polish|insettic|lessive|waschmittel|limpiador)/i,
+
+  /* ── COSMETICA ───────────────────────────────────────────────────
+     Si traveste da cibo piu' di ogni altra categoria, perche' usa le stesse
+     parole: «lait corporel» e «lait demaquillant» finivano fra i candidati
+     per il latte, e in profumeria ci sono creme, burri e oli come in cucina. */
+  /\b(corporel|demaq|maquillage|mascara|parfum|eau de toilette|cosmetic|haarfarbe|hidratante corporal|body lotion|body milk|creme solaire|protector solar|zonnebrand|nagellack|smalto)/i,
+
+  // ── dolciumi che non sono un ingrediente ─────────────────────────
+  /\b(haribo|caramell|gommos|liquiriz|chewing|lecca lecca|bonbon|gummibar|chicle)/i,
+
+  // ── cartoleria ───────────────────────────────────────────────────
+  /\b(quaderno|portamine|matite|penna a sfera|astuccio|pila|batteri|cahier|notizbuch)/i,
+
+  /* ── UTENSILI E ELETTRODOMESTICI ─────────────────────────────────
+     Il caso peggiore, perche' l'attrezzo porta il nome di cio' che cucina:
+     «cuiseur a riz» per il riso, «grille-pain» per il pane, «eplucheur a
+     pommes de terre» per le patate, «emulsionneur a lait» per il latte.
+     Cercando l'ingrediente arrivava l'elettrodomestico — e vinceva, perche'
+     costa di piu' e sembrava il prodotto di pregio.
+
+     Solo parole che non possono essere cibo in nessuna delle lingue in
+     catalogo: niente «pan», che in spagnolo e' il pane; niente «piatto» o
+     «prato», che stanno dentro «piatto pronto». */
+  /\b(tostapane|toaster|tostadora|torradeira|broodrooster|grille.?pain)/i,
+  /\b(bollitore|bouilloire|wasserkocher|waterkoker|hervidor|chaleira|kettle)/i,
+  /\b(pelapatate|eplucheur|peeler|pelador|descascador|schaler)/i,
+  /\b(emulsionneur|montalatte|milchaufschaumer|frother)/i,
+  /\b(cuociriso|cuiseur|rice cooker|arrocera|reiskocher)/i,
+  /\b(frullator|mixeur|blender|batidora|liquidificador|standmixer|robot menager|robot de cocina)/i,
+  /\b(padella|poele|sarten|frigideira|pfanne|koekenpan|frying pan)/i,
+  /\b(pentola|kochtopf|olla a presion|panela de pressao|pressure cooker)/i,
+  /\b(affettatric|trancheuse|aufschnittmaschine|slicer)/i,
+  /\b(macchina da caffe|cafetiere|coffee maker|kaffeemaschine|cafeteira|cafetera)/i,
+  /\b(apriscatole|tire.?bouchon|corkscrew|cavatapp|sacacorchos|korkenzieher)/i,
+  /\b(huche a pain|boite a pain|portapane|bread bin|brotkasten|stoviglie|cookware|kitchenware|geschirr|vaisselle|utensil)/i,
+  /\b(microonde|micro.?ondes|mikrowelle|microwave|frigorifer|refrigerateur|kuhlschrank|congelatore|congelador)/i,
 ];
 
 function alimentarePlausibile(nome: string): boolean {
@@ -269,7 +306,7 @@ function alimentarePlausibile(nome: string): boolean {
  * serve per cucinare.
  */
 const PREPARAZIONI =
-  /(frollin|biscott|merendin|brioche|briochin|croissant|cornett|snack|gelat[oi]|budin|torta|tortin|crostat|wafer|crackers|grissin|pandoro|panettone|colomba|ripien[oi]|farcit|arrost|affettat|precott|impanat|affumicat|stagionat|al forno)/i;
+  /\b(frollin|biscott|merendin|brioche|briochin|croissant|cornett|snack|gelat[oi]|budin|torta|tortin|crostat|wafer|crackers|grissin|pandoro|panettone|colomba|ripien[oi]|farcit|arrost|affettat|precott|impanat|affumicat|stagionat|al forno)/i;
 
 /* ──────────────────────── Costruire un paese ───────────────────── */
 
