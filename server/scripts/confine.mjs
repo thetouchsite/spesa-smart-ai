@@ -97,6 +97,9 @@ const PADRONI = {
      E' proprio cio' che le permette di stare di qua senza trascinarsi dietro
      mezzo server — ed e' il file che NON si tocca senza passare a /v2. */
   "contratto-v1": "api",
+  /* Chi puo' chiamare l'API e quanto. E' il prodotto che decide a chi apre la
+     porta, non il servizio accanto. */
+  chiavi: "api",
   sinonimi: "api",
 
   // ── app ────────────────────────────────────────────────────────────

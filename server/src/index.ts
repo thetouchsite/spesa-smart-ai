@@ -80,6 +80,7 @@ import { annota } from "./diario.js";
 import { statoVocabolario, quanteImparate } from "./vocabolario.js";
 import { saluteIA } from "./salute-ia.js";
 import { rispostaPrezziV1 } from "./contratto-v1.js";
+import { consumoDiOggi, controllaChiave } from "./chiavi.js";
 import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./catalogo.js";
 import { paesiConCatalogo } from "./catalogo-fonti.js";
 import { negoziInCitta, statoNegozi, tuttiINegozi } from "./negozi.js";
@@ -1506,7 +1507,36 @@ app.get("/catalogo/stato", async () => ({
    tolgono.
    ══════════════════════════════════════════════════════════════════════════ */
 
-app.post("/v1/prezzi", async (body) => {
+/**
+ * La porta dell'API.
+ *
+ * Si chiama in cima a ogni rotta `/v1`. Le rotte VECCHIE restano aperte: e'
+ * l'unico modo perche' la preview e l'app che gira adesso non si accorgano di
+ * niente. Si chiuderanno quando l'app sara' passata a `/v1`, e a dire che e'
+ * passata sara' il conteggio per chiave, non un'impressione.
+ *
+ * `costa` distingue le rotte che consumano — i prezzi, che aprono pagine e
+ * pagano il modello — da quelle che leggono e basta. Solo le prime pretendono
+ * una chiave segreta: una chiave dentro un'app non e' segreta, e i prezzi sono
+ * la cosa che vendiamo.
+ */
+async function apriLaPorta(
+  req: unknown,
+  costa: boolean,
+  /** Lo stato non pesa sul tetto: serve proprio a chi il tetto l'ha finito. */
+  pesaSulTetto = true,
+): Promise<void> {
+  const intestazione = (req as { headers?: Record<string, unknown> })?.headers?.authorization;
+  const esito = await controllaChiave(
+    typeof intestazione === "string" ? intestazione : undefined,
+    costa,
+    pesaSulTetto,
+  );
+  if (!esito.ok) throw new HttpError(esito.stato ?? 401, esito.motivo ?? "Chiave richiesta");
+}
+
+app.post("/v1/prezzi", async (body, req) => {
+  await apriLaPorta(req, true);
   const data = parse(PricesInput, body);
   const iso = paeseIso(data.country).toUpperCase();
 
@@ -1524,7 +1554,8 @@ app.post("/v1/prezzi", async (body) => {
   );
 });
 
-app.post("/v1/prodotti", async (body) => {
+app.post("/v1/prodotti", async (body, req) => {
+  await apriLaPorta(req, false);
   const data = parse(CercaCatalogo, body);
   const iso = paeseIso(data.paese).toUpperCase();
   const trovati = await cercaNelCatalogo(iso, data.q, data.quanti);
@@ -1540,7 +1571,8 @@ app.post("/v1/prodotti", async (body) => {
   };
 });
 
-app.post("/v1/negozi", async (body) => {
+app.post("/v1/negozi", async (body, req) => {
+  await apriLaPorta(req, false);
   const data = parse(NegoziInput, body);
   const iso = paeseIso(data.paese).toUpperCase();
   const negozi = data.citta ? await negoziInCitta(iso, data.citta) : await tuttiINegozi(iso);
@@ -1558,16 +1590,21 @@ app.post("/v1/negozi", async (body) => {
  * una lista della spesa che torna mezza vuota. La Germania oggi ha sei fonti
  * su undici che non sono supermercati, e sta scritto qui.
  */
-app.get("/v1/copertura", async () => ({
+app.get("/v1/copertura", async (_body, req) => {
+  await apriLaPorta(req, false);
+  return ({
   paesi: paesiConCatalogo(),
   quantiPaesi: paesiConCatalogo().length,
   catalogo: statoCatalogo(),
   magazzinoPrezzi: await statoMagazzino(),
   magazzinoCataloghi: await statoCataloghi(),
   vocabolario: { ...statoVocabolario(), imparate: quanteImparate() },
-}));
+  });
+});
 
-app.get("/v1/stato", async () => ({
+app.get("/v1/stato", async (_body, req) => {
+  await apriLaPorta(req, false, false);
+  return ({
   ok: true,
   /* La verita' sul modello, non «c'e' una chiave scritta». Resta qui anche
      quando l'IA sara' uscita dalla strada dei prezzi: serve a sapere se il
@@ -1576,7 +1613,10 @@ app.get("/v1/stato", async () => ({
   database: isDbConfigured(),
   spesa: spendStatus(),
   quota: quotaStatus(),
-}));
+  // Quante chiamate ha fatto oggi ogni chiave: e' quel che serve a fatturare.
+  consumo: consumoDiOggi(),
+  });
+});
 
 /* ─────────────────────────── I punti vendita ─────────────────────────── */
 

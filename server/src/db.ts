@@ -72,6 +72,15 @@ export interface PrezzoDoc {
  * gli indici, e il piano gratuito ne da' 512. Gli stessi dati compressi, uno
  * per insegna, sono 55 MB. Vedi `catalogo-magazzino.ts`.
  */
+export interface ChiaveDoc {
+  _id: string;
+  nome: string;
+  specie: "segreta" | "pubblicabile";
+  tettoGiornaliero: number;
+  attiva: boolean;
+  creata: Date;
+}
+
 export interface CatalogoDoc {
   _id: string; // "PAESE|Insegna"
   paese: string;
@@ -154,6 +163,17 @@ export async function prezzi(): Promise<Collection<PrezzoDoc>> {
 
 export async function cataloghi(): Promise<Collection<CatalogoDoc>> {
   return (await getDb()).collection<CatalogoDoc>("cataloghi");
+}
+
+/**
+ * Le chiavi dell'API.
+ *
+ * Dentro c'e' l'IMPRONTA della chiave, non la chiave: se qualcuno legge il
+ * database non ci trova niente di riutilizzabile. Il documento sta in
+ * `chiavi.ts`, che e' anche l'unico posto che lo scrive.
+ */
+export async function chiavi(): Promise<Collection<ChiaveDoc>> {
+  return (await getDb()).collection<ChiaveDoc>("chiavi");
 }
 
 export async function closeDb(): Promise<void> {
