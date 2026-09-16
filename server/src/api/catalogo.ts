@@ -1252,6 +1252,23 @@ export function statoCatalogo() {
 }
 
 /** Butta via quel che c'e' in memoria: il prossimo uso riscarica. */
+/**
+ * Toglie dalla memoria il catalogo di un paese.
+ *
+ * Serve al lavoro notturno: finito di prezzare un paese, quel catalogo non
+ * serve piu' a nessuno. Tenerlo costa sessanta megabyte per duecentomila voci,
+ * e con trentun paesi da visitare in fila il ricambio automatico — tre dentro,
+ * il piu' vecchio fuori — lascia comunque centottanta megabyte occupati da roba
+ * gia' usata.
+ *
+ * Misurato il 16 settembre 2026: Render ha superato il limite di memoria e si e'
+ * riavviato da solo. Il conto era 180 MB di paesi + 57 di coda + 46 di
+ * cataloghi + 80 di Node, su 512 disponibili.
+ */
+export function dimenticaPaese(paese: string): void {
+  caricati.delete((paese || "").toUpperCase().slice(0, 2));
+}
+
 export function svuotaCatalogo(): void {
   caricati.clear();
 }

@@ -48,7 +48,7 @@
  * CATALOGO_PAESI, e gli altri si caricano da soli quando qualcuno li chiede.
  */
 
-import { catalogoDi, statoCatalogo } from "./catalogo.js";
+import { catalogoDi, dimenticaPaese, statoCatalogo } from "./catalogo.js";
 import { caricaFontiDalDb, paesiConCatalogo, statoFonti } from "./catalogo-fonti.js";
 import { riempiPrezzi } from "./prezzi-notturni.js";
 import { giroContinuo } from "./prezzi-continuo.js";
@@ -178,6 +178,14 @@ export async function aggiornaCatalogo(motivo: string): Promise<void> {
           await riempiPrezzi(p, VOCI_PER_PAESE);
         } catch (err) {
           console.warn(`[prezzi] ${p} fallito (il catalogo resta buono):`, err);
+        } finally {
+          /* FINITO CON QUESTO PAESE, LO SI LASCIA ANDARE.
+             Il catalogo resta salvato su Mongo: quel che si butta e' la copia
+             in memoria, che costa sessanta megabyte ogni duecentomila voci.
+             Il ricambio automatico ne tiene tre, ma con trentun paesi in fila
+             sono comunque centottanta megabyte di roba gia' usata — ed e' cio'
+             che ha fatto superare il limite a Render. */
+          dimenticaPaese(p);
         }
       } catch (err) {
         // Un paese che fallisce non deve fermare gli altri.

@@ -80,7 +80,19 @@ const BLOCCO = 200;
  * per tornare presto. Chi ne ha di piu' li fa nella passata successiva: il
  * giro riprende sempre da quel che manca.
  */
-const MAX_PER_INSEGNA_A_GIRO = Number(process.env.GIRO_PER_INSEGNA ?? 2_000);
+/**
+ * Quante schede per insegna in UN GIRO della rotazione.
+ *
+ * Era duemila, e con novantatre insegne faceva una coda da 186.000 voci
+ * costruita tutta in anticipo: cinquantasette megabyte, su una macchina che ne
+ * ha 512 in tutto. Render ha superato il limite e si e' riavviato da solo.
+ *
+ * Duecento tiene la coda sotto i sei megabyte e non cambia niente al risultato:
+ * la rotazione fa piu' giri, e ogni giro riprende da cio' che manca. Il tempo
+ * concesso e' lo stesso, le pagine aperte sono le stesse — cambia solo quanta
+ * roba sta in memoria mentre si aprono.
+ */
+const MAX_PER_INSEGNA_A_GIRO = Number(process.env.GIRO_PER_INSEGNA ?? 200);
 
 const attendi = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -114,7 +126,7 @@ const cataloghiLetti = new Map<string, Array<{ url: string; nome: string }>>();
  * stanno. Quando si supera il tetto si butta via il catalogo letto per primo:
  * alla prossima passata si rilegge, e costa un gunzip invece di un 502.
  */
-const MAX_VOCI_IN_MEMORIA = Number(process.env.GIRO_MAX_VOCI ?? 400_000);
+const MAX_VOCI_IN_MEMORIA = Number(process.env.GIRO_MAX_VOCI ?? 60_000);
 let vociInMemoria = 0;
 
 function faiPosto(quante: number): void {
@@ -224,6 +236,19 @@ export async function giroContinuo(
     if (!aggiunta) break;
   }
 
+  /* PIU' TORNATE, NON UNA CODA SOLA.
+     Con duecento schede per insegna la coda e' da diciottomila voci e si
+     esaurisce in un quarto d'ora: senza questo ciclo il giro finirebbe molto
+     prima del tempo concesso.
+
+     Costruirla e consumarla piu' volte costa qualche secondo in piu' e tiene
+     la memoria a sei megabyte invece di cinquantasette. E' il compromesso che
+     e' costato un riavvio a Render: la prima versione la costruiva tutta in
+     anticipo per risparmiare quei secondi. */
+  let finito = false;
+  let raccolte: PrezzoSalvato[] = [];
+
+  while (Date.now() < scadenza && !finito) {
   /* Si costruisce la coda: da ogni insegna la sua quota, poi si mescola
      alternando le insegne fra loro. */
   const mazzi: Array<Array<{ url: string; nome: string; insegna: string }>> = [];
@@ -267,32 +292,39 @@ export async function giroContinuo(
     if (!aggiunta) break;
   }
 
-  const finito = coda.length === 0;
-  const raccolte: PrezzoSalvato[] = [];
-  let prossima = 0;
-
-  const lavoratore = async () => {
-    while (prossima < coda.length && Date.now() < scadenza) {
-      const c = coda[prossima++];
-      const v = await verifyProductPage(c.url);
-      aperte++;
-      raccolte.push({
-        url: c.url,
-        prezzo: v.page?.current ?? null,
-        valuta: v.page?.currency ?? "",
-        nome: c.nome.charAt(0).toUpperCase() + c.nome.slice(1),
-        insegna: c.insegna,
-        verifica: v.status,
-        visto: new Date(),
-      });
-      if (v.page?.current != null) conPrezzo++;
-      if (raccolte.length >= BLOCCO) await salvaPrezzi(raccolte.splice(0, raccolte.length));
-      if (aperte % 50 === 0) onAvanzamento?.(aperte, conPrezzo);
-      await attendi(PAUSA_MS);
+    /* Coda vuota vuol dire che non c'e' piu' niente da aprire in nessuna
+       insegna: tutto il catalogo e' fresco. E' il solo modo onesto di dire
+       «finito». */
+    if (coda.length === 0) {
+      finito = true;
+      break;
     }
-  };
 
-  await Promise.all(Array.from({ length: Math.min(INSIEME, coda.length) }, lavoratore));
+    let prossima = 0;
+    const lavoratore = async () => {
+      while (prossima < coda.length && Date.now() < scadenza) {
+        const c = coda[prossima++];
+        const v = await verifyProductPage(c.url);
+        aperte++;
+        raccolte.push({
+          url: c.url,
+          prezzo: v.page?.current ?? null,
+          valuta: v.page?.currency ?? "",
+          nome: c.nome.charAt(0).toUpperCase() + c.nome.slice(1),
+          insegna: c.insegna,
+          verifica: v.status,
+          visto: new Date(),
+        });
+        if (v.page?.current != null) conPrezzo++;
+        if (raccolte.length >= BLOCCO) await salvaPrezzi(raccolte.splice(0, raccolte.length));
+        if (aperte % 50 === 0) onAvanzamento?.(aperte, conPrezzo);
+        await attendi(PAUSA_MS);
+      }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(INSIEME, coda.length) }, lavoratore));
+    if (raccolte.length > 0) await salvaPrezzi(raccolte.splice(0, raccolte.length));
+  }
 
   if (raccolte.length > 0) await salvaPrezzi(raccolte);
 
@@ -301,6 +333,6 @@ export async function giroContinuo(
     conPrezzo,
     saltate,
     secondi: (Date.now() - inizio) / 1000,
-    finito: finito || prossima >= coda.length,
+    finito,
   };
 }
