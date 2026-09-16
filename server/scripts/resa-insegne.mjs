@@ -81,15 +81,33 @@ async function main() {
         campione.push(voci[i]);
       }
 
+      /* UNA PAGINA ALLA VOLTA, CON UNA PAUSA — E LA MISURA CAMBIA.
+         Con `Promise.all` si aprivano tutte e dodici le schede DELLO STESSO
+         negozio nello stesso istante, e parecchi rispondono 429: troppe
+         richieste. Il campione tornava con zero prezzi e l'insegna finiva fra
+         le mute.
+
+         Misurato sul Regno Unito: Poundland e MuscleFood davano 0 su 12 —
+         entrambe pagine aperte, nessun prezzo. Riprovate una alla volta,
+         rispondono. Erano due zeri inventati dalla fretta.
+
+         E' lo stesso errore che aveva tenuto fuori dal catalogo Aldi UK e
+         Sainsbury's: i loro 403 sembravano divieti ed erano limiti di
+         frequenza. Qui il rischio e' peggiore, perche' un 429 non si vede —
+         diventa una `resa: 0` scritta in `catalogo-fonti.ts`, e da li' in poi
+         quell'insegna viene provata per ultima per sempre.
+
+         Un secondo e mezzo per pagina: dodici schede diventano venti secondi
+         per insegna, e questo script gira a mano, non a ogni richiesta. */
+      const PAUSA_MS = 1500;
       let aperte = 0;
       let conPrezzo = 0;
-      await Promise.all(
-        campione.map(async (v) => {
-          const r = await verifyProductPage(v.url);
-          if (r.status !== "non-raggiungibile") aperte++;
-          if (r.page?.current) conPrezzo++;
-        }),
-      );
+      for (const v of campione) {
+        const r = await verifyProductPage(v.url);
+        if (r.status !== "non-raggiungibile") aperte++;
+        if (r.page?.current) conPrezzo++;
+        await new Promise((s) => setTimeout(s, PAUSA_MS));
+      }
 
       const resa = campione.length ? conPrezzo / campione.length : 0;
       esiti.push({ paese, insegna, campione: campione.length, aperte, conPrezzo, resa });
