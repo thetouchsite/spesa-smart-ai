@@ -68,16 +68,24 @@ async function main() {
   const fuori = await fontiEscluse();
 
   const inElenco = new Map(FONTI.map((f) => [`${f.paese}|${f.insegna}`, f]));
-  const paeseDi = new Map(FONTI.map((f) => [f.insegna, f.paese]));
   const escluse = new Set(fuori.map((f) => `${f.paese}|${f.insegna}`));
 
   const docCat = (await (await cataloghi())
     .find({}, { projection: { _id: 1, paese: 1, insegna: 1, prodotti: 1, aggiornato: 1 } })
     .toArray()) as Array<{ paese: string; insegna: string; prodotti?: number; aggiornato?: Date }>;
 
+  /* Nella forma stretta la riga porta il NUMERO dell'insegna, non il nome:
+     `c` invece di `insegna`, `p` invece di `prezzo`, `t` invece di `visto`.
+     Ottanta megabyte di differenza su cinque milioni di righe. */
   const docPrezzi = (await (await prezzi())
-    .find({}, { projection: { _id: 1, prezzo: 1, insegna: 1, visto: 1 } })
-    .toArray()) as Array<{ prezzo: number | null; insegna: string; visto?: Date }>;
+    .find({}, { projection: { _id: 1, p: 1, c: 1, t: 1 } })
+    .toArray()) as Array<{ p: number | null; c: number; t?: Date }>;
+
+  const { fonti: collezioneFonti } = await import("../src/base/db.js");
+  const paeseDelNumero = new Map<number, string>();
+  for (const r of await (await collezioneFonti()).find({}, { projection: { id: 1, paese: 1 } }).toArray()) {
+    if (typeof r.id === "number") paeseDelNumero.set(r.id, r.paese);
+  }
 
   const ora = Date.now();
   const perPaese = new Map<string, RigaPaese>();
@@ -116,13 +124,13 @@ async function main() {
   }
 
   for (const d of docPrezzi) {
-    const p = paeseDi.get(d.insegna);
+    const p = paeseDelNumero.get(d.c);
     if (!p) continue;
-    const fresco = d.visto && ora - new Date(d.visto).getTime() < FRESCHEZZA_MS;
+    const fresco = d.t && ora - new Date(d.t).getTime() < FRESCHEZZA_MS;
     if (!fresco) continue;
     const r = riga(p);
     r.prezzi++;
-    if (d.prezzo != null) r.prezziConCifra++;
+    if (d.p != null) r.prezziConCifra++;
   }
 
   const righe = [...perPaese.values()].filter((r) => r.link > 0 || r.prezzi > 0);

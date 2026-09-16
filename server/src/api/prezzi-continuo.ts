@@ -44,7 +44,13 @@
 import { cataloghi } from "../base/db.js";
 import { prezzi as collezionePrezzi } from "../base/db.js";
 import { verifyProductPage } from "./price-page.js";
-import { FRESCHEZZA_MS, salvaPrezzi, type PrezzoSalvato } from "./prezzi-magazzino.js";
+import {
+  FRESCHEZZA_MS,
+  improntaUrl,
+  numeroInsegnaPubblico as numeroInsegna,
+  salvaPrezzi,
+  type PrezzoSalvato,
+} from "./prezzi-magazzino.js";
 import { tutteLeFonti } from "./catalogo-fonti.js";
 import { gunzipSync } from "node:zlib";
 
@@ -131,15 +137,17 @@ export async function giroContinuo(
        E' il punto di tutto: la seconda notte si aprono solo le schede che la
        prima non ha fatto in tempo a fare, piu' quelle nel frattempo scadute. */
     const soglia = new Date(Date.now() - FRESCHEZZA_MS);
+    /* Si chiede per NUMERO dell'insegna e si confrontano IMPRONTE: nella forma
+       stretta la riga non porta piu' ne' il nome ne' l'indirizzo. */
     const gia = new Set(
       (
         await (await collezionePrezzi())
-          .find({ insegna: f.insegna, visto: { $gte: soglia } }, { projection: { _id: 1 } })
+          .find({ c: numeroInsegna(f.insegna), t: { $gte: soglia } }, { projection: { _id: 1 } })
           .toArray()
       ).map((r) => r._id),
     );
 
-    const daFare = tutti.filter((x) => !gia.has(x.url));
+    const daFare = tutti.filter((x) => !gia.has(improntaUrl(x.url)));
     saltate += tutti.length - daFare.length;
     if (daFare.length === 0) continue;
 

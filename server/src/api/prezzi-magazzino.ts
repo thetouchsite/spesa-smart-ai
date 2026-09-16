@@ -52,6 +52,7 @@
  * risponde non deve far fallire un piano.
  */
 
+import { createHash } from "node:crypto";
 import { isDbConfigured, prezzi as collezionePrezzi } from "../base/db.js";
 import { conInterruttore, statoInterruttore } from "../base/interruttore.js";
 import type { VerifyStatus } from "./price-page.js";
@@ -98,16 +99,91 @@ export interface PrezzoSalvato {
 export const FRESCHEZZA_MS = Number(process.env.PREZZI_FRESCHI_ORE ?? 72) * 3_600_000;
 
 /**
- * Per quanto si tiene una riga prima di buttarla.
+ * Per quanto si tiene una riga prima di buttarla: trenta giorni.
  *
- * Trenta giorni. Non serve a mostrarla — dopo un giorno e' gia' vecchia — ma
- * a non rileggere da capo il catalogo di una citta' visitata di rado, e a
- * sapere che quell'indirizzo esisteva. Mongo cancella da solo alla scadenza.
+ * NON E' PIU' UN CAMPO. Prima ogni riga portava la sua data di scadenza —
+ * trentacinque byte piu' il suo indice, moltiplicati per cinque milioni. Ora
+ * la scadenza la calcola Mongo dall'indice TTL su `t`, che e' la data di
+ * lettura e serviva comunque: un campo solo fa due mestieri.
+ *
+ * Trenta giorni non servono a mostrare la riga — dopo tre giorni e' gia'
+ * vecchia — ma a sapere che quell'indirizzo esisteva, e a non rileggere da
+ * capo il catalogo di una citta' visitata di rado. Il valore sta in
+ * `base/db.ts`, dove si dichiara l'indice.
  */
-const CONSERVAZIONE_MS = 30 * 86_400_000;
 
 /** Una lettura o una scrittura non deve tenere in ostaggio una richiesta. */
 const ATTESA_MS = 4_000;
+
+/* ══════════════════════════════════════════════════════════════════
+   LA FORMA STRETTA: impronte al posto degli indirizzi
+   ══════════════════════════════════════════════════════════════════ */
+
+/**
+ * L'impronta di un indirizzo: sedici caratteri al posto di sessanta byte.
+ *
+ * Novantasei bit di SHA-1, in base64url. Con cinque milioni di righe la
+ * probabilita' di due indirizzi diversi con la stessa impronta e' di circa
+ * uno su cento milioni di miliardi — mentre a sessantaquattro bit sarebbe
+ * successo, e una collisione qui vuol dire mostrare il prezzo di un prodotto
+ * sotto il nome di un altro.
+ *
+ * NON E' REVERSIBILE, ED E' IL PUNTO. Da una riga non si risale all'indirizzo:
+ * chi cerca un prezzo ha gia' l'URL in mano — arriva sempre da un candidato
+ * del catalogo — e ne calcola l'impronta. Quel che non si puo' piu' fare e'
+ * «elencare i prezzi» senza passare dal catalogo, ed e' un prezzo che vale
+ * quattrocento megabyte.
+ */
+export function improntaUrl(url: string): string {
+  return createHash("sha1").update(url).digest("base64url").slice(0, 16);
+}
+
+/**
+ * Com'e' andata la lettura, in un numero.
+ *
+ * La parola «verificato» scritta cinque milioni di volte sono centodieci
+ * megabyte. Il numero ne costa sei.
+ */
+const STATO: Record<VerifyStatus, number> = {
+  verificato: 0,
+  "pagina-ok": 1,
+  "non-raggiungibile": 2,
+  bloccato: 3,
+};
+const STATO_INVERSO: VerifyStatus[] = ["verificato", "pagina-ok", "non-raggiungibile", "bloccato"];
+
+/**
+ * Il numero di un'insegna dal suo nome.
+ *
+ * Scrivere «Carrefour Italia» in cinque milioni di righe costa ottanta
+ * megabyte; il suo numero ne costa otto. I numeri li assegna il database
+ * quando la fonte entra, e non cambiano piu': se cambiassero, tutti i prezzi
+ * gia' salvati punterebbero all'insegna sbagliata.
+ *
+ * Zero vuol dire «non lo so»: capita se un prezzo arriva da un'insegna che
+ * nell'elenco non c'e' piu'. La riga si salva lo stesso — il prezzo e' vero —
+ * ma non si potra' raggrupparla per paese.
+ */
+export function numeroInsegnaPubblico(insegna: string): number {
+  return numeroInsegna(insegna);
+}
+
+function numeroInsegna(insegna: string): number {
+  return numeriDelleInsegne.get(insegna) ?? 0;
+}
+
+let numeriDelleInsegne = new Map<string, number>();
+
+/** Chi carica le fonti passa di qui, cosi' i numeri sono quelli veri. */
+export function ricordaNumeriInsegne(coppie: Array<[string, number]>): void {
+  numeriDelleInsegne = new Map(coppie);
+}
+
+/** Il nome dell'insegna dal suo numero: serve al cruscotto e al giro continuo. */
+export function insegnaDalNumero(n: number): string | undefined {
+  for (const [nome, num] of numeriDelleInsegne) if (num === n) return nome;
+  return undefined;
+}
 
 /**
  * Fa la cosa, ma non oltre il tempo dato: oltre, vale come «niente».
@@ -134,20 +210,31 @@ export async function prezziGiaVisti(url: string[]): Promise<Map<string, PrezzoS
   return nonOltre(
     async () => {
       const soglia = new Date(Date.now() - FRESCHEZZA_MS);
+
+      /* Si cercano le IMPRONTE, e si tiene da parte quale indirizzo le ha
+         generate: dalla riga non si torna indietro, quindi la corrispondenza
+         la deve ricordare chi chiede. */
+      const perImpronta = new Map<string, string>();
+      for (const u of url) perImpronta.set(improntaUrl(u), u);
+
       const righe = await (await collezionePrezzi())
-        .find({ _id: { $in: url }, visto: { $gte: soglia } })
+        .find({ _id: { $in: [...perImpronta.keys()] }, t: { $gte: soglia } })
         .toArray();
 
       const fuori = new Map<string, PrezzoSalvato>();
       for (const r of righe) {
-        fuori.set(r._id, {
-          url: r._id,
-          prezzo: r.prezzo,
-          valuta: r.valuta,
-          nome: r.nome,
-          insegna: r.insegna,
-          verifica: r.verifica,
-          visto: r.visto,
+        const suo = perImpronta.get(r._id);
+        if (!suo) continue;
+        fuori.set(suo, {
+          url: suo,
+          prezzo: r.p,
+          valuta: r.v,
+          /* Nome e insegna non stanno piu' qui: chi chiama li ha gia' dal
+             catalogo, ed erano quarantadue byte per riga scritti due volte. */
+          nome: "",
+          insegna: "",
+          verifica: STATO_INVERSO[r.s] ?? "pagina-ok",
+          visto: r.t,
         });
       }
       return fuori;
@@ -171,20 +258,17 @@ export async function salvaPrezzi(righe: PrezzoSalvato[]): Promise<void> {
 
   await nonOltre(
     async () => {
-      const scade = new Date(Date.now() + CONSERVAZIONE_MS);
       await (await collezionePrezzi()).bulkWrite(
         righe.map((r) => ({
           updateOne: {
-            filter: { _id: r.url },
+            filter: { _id: improntaUrl(r.url) },
             update: {
               $set: {
-                prezzo: r.prezzo,
-                valuta: r.valuta,
-                nome: r.nome,
-                insegna: r.insegna,
-                verifica: r.verifica,
-                visto: r.visto,
-                scadeIl: scade,
+                p: r.prezzo,
+                v: r.valuta,
+                s: STATO[r.verifica] ?? 1,
+                t: r.visto,
+                c: numeroInsegna(r.insegna),
               },
             },
             upsert: true,

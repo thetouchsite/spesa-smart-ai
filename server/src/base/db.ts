@@ -51,18 +51,54 @@ export interface PlanDoc {
  * persone che generano un piano a Madrid erano seimila richieste ai negozi
  * spagnoli invece di sessanta. Vedi `prezzi-magazzino.ts`.
  */
+/**
+ * Un prezzo in magazzino, nella forma stretta.
+ *
+ * PERCHE' I NOMI SONO DI UNA LETTERA
+ * ----------------------------------
+ * Perche' il nome del campo sta dentro OGNI documento. Con cinque milioni di
+ * righe, chiamare `prezzo` una cosa che si potrebbe chiamare `p` costa
+ * trenta megabyte di sole etichette.
+ *
+ * La forma di prima pesava 443 byte per riga, indici compresi, e il prezzo ne
+ * occupava dodici. Tutto il resto era roba gia' scritta altrove:
+ *
+ *   _id       60 byte   l'indirizzo per esteso, ripetuto per ogni riga
+ *   nome      25 byte   sta gia' nel catalogo
+ *   insegna   17 byte   sta gia' nel catalogo
+ *   verifica  22 byte   la parola «verificato», scritta cinque milioni di volte
+ *   scadeIl   35 byte   ricavabile da `visto`
+ *
+ * A 443 byte in 440 MB liberi ci stanno un milione di prezzi. Bastava quello a
+ * fermare il progetto: il magazzino si riempiva in tre notti e poi non poteva
+ * piu' crescere.
+ *
+ * L'INDIRIZZO DIVENTA UN'IMPRONTA, E VA CAPITO COSA SI PERDE
+ * ----------------------------------------------------------
+ * `_id` non e' piu' l'indirizzo ma la sua impronta a 96 bit, sedici caratteri.
+ * Quindi da una riga NON si risale piu' all'indirizzo: chi legge deve gia'
+ * avere in mano l'URL e cercarne l'impronta. E' come funziona davvero — si
+ * parte sempre da un candidato del catalogo — ma va saputo, perche' rende
+ * impossibile «elencare i prezzi» senza passare dal catalogo.
+ *
+ * Perche' 96 bit e non 64: con cinque milioni di righe un'impronta a 64 bit
+ * darebbe una collisione ogni tanto, e una collisione qui significa mostrare
+ * il prezzo di un prodotto sotto il nome di un altro. E' esattamente il
+ * difetto che abbiamo passato la serata a togliere.
+ */
 export interface PrezzoDoc {
-  _id: string; // l'indirizzo della scheda
-  /** Null quando la pagina si apre ma il prezzo non e' nell'HTML. */
-  prezzo: number | null;
-  valuta: string;
-  nome: string;
-  insegna: string;
-  verifica: VerifyStatus;
-  /** Quando l'abbiamo letta: decide se vale ancora. */
-  visto: Date;
-  /** TTL: Mongo la cancella da sola a questa data. */
-  scadeIl: Date;
+  /** Impronta a 96 bit dell'indirizzo, in base64url: sedici caratteri. */
+  _id: string;
+  /** Il prezzo. Null quando la pagina si apre ma il prezzo non c'e'. */
+  p: number | null;
+  /** La valuta. */
+  v: string;
+  /** Com'e' andata la lettura, in un numero: vedi `STATO` in prezzi-magazzino. */
+  s: number;
+  /** Quando l'abbiamo letta. Fa da freschezza E da scadenza: il TTL e' su questa. */
+  t: Date;
+  /** Il numero dell'insegna, non il nome: serve al giro continuo e al cruscotto. */
+  c: number;
 }
 
 /**
@@ -135,6 +171,15 @@ export interface FonteDoc {
    * scheda, il divieto di Pingo Doce che non c'era mai stato.
    */
   nota?: string;
+  /**
+   * Un numero stabile per questa insegna.
+   *
+   * Serve alle righe di prezzo: scriverci «Carrefour Italia» cinque milioni di
+   * volte costa ottanta megabyte, un numero ne costa otto. Si assegna una
+   * volta e non cambia — se cambiasse, tutti i prezzi salvati punterebbero
+   * all'insegna sbagliata.
+   */
+  id?: number;
   /** Quando l'ha toccata l'ultima misura. */
   aggiornato: Date;
 }
@@ -182,10 +227,15 @@ export async function getDb(): Promise<Db> {
     db.collection<CacheDoc>("cache").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection<CacheDoc>("cache_api").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection<CacheDoc>("cache_app").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
-    db.collection<PrezzoDoc>("prezzi").createIndex({ scadeIl: 1 }, { expireAfterSeconds: 0 }),
+    /* Il TTL sta su `t`, che e' anche la data di lettura: un campo solo fa due
+       mestieri, e si risparmiano trentacinque byte per riga piu' il suo indice.
+       Trenta giorni, non ventiquattro ore: una riga vecchia non si mostra ma
+       evita di riaprire la pagina di una citta' visitata di rado. */
+    db.collection<PrezzoDoc>("prezzi").createIndex({ t: 1 }, { expireAfterSeconds: 30 * 86_400 }),
     // Si cercano sempre per indirizzo E per freschezza insieme: un indice solo
     // su `visto` farebbe scorrere tutte le righe recenti per trovarne dodici.
-    db.collection<PrezzoDoc>("prezzi").createIndex({ visto: -1 }),
+    // Il giro continuo chiede «di questa insegna, cosa e' ancora fresco».
+    db.collection<PrezzoDoc>("prezzi").createIndex({ c: 1, t: -1 }),
     // Nessun indice sul contenuto: qui dentro non si cerca, si legge il
     // pacchetto della propria insegna e lo si scompatta.
     db.collection<CatalogoDoc>("cataloghi").createIndex({ paese: 1 }),

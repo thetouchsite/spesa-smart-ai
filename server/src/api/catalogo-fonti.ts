@@ -147,6 +147,15 @@ export async function caricaFontiDalDb(): Promise<number> {
           ...(r.nota ? { nota: r.nota } : {}),
         }));
         caricate = true;
+
+        /* I prezzi salvano il NUMERO dell'insegna, non il nome: ottanta
+           megabyte di differenza su cinque milioni di righe. La corrispondenza
+           la tiene il magazzino, e gliela si passa qui perche' e' l'unico
+           punto in cui le fonti entrano in memoria. */
+        const { ricordaNumeriInsegne } = await import("./prezzi-magazzino.js");
+        ricordaNumeriInsegne(
+          righe.filter((r) => typeof r.id === "number").map((r) => [r.insegna, r.id as number]),
+        );
       }
       return vive.length;
     } catch {
