@@ -126,12 +126,21 @@ async function main() {
      il terminale. Le insegne gia' misurate stanno nel file: si saltano, e
      rilanciare costa solo quel che manca. */
   let esiti: Esito[] = [];
-  if (existsSync(DOVE) && !process.argv.includes("--riparti")) {
+  if (existsSync(DOVE)) {
     try {
       esiti = (JSON.parse(readFileSync(DOVE, "utf8")).perInsegna ?? []) as Esito[];
     } catch {
       esiti = [];
     }
+  }
+
+  /* `--riparti` rimisura, ma solo cio' che si sta guardando.
+     Prima azzerava tutto: un giro su due paesi per controllare una correzione
+     ha cancellato le misure delle altre centoventotto insegne, mezz'ora di
+     lavoro buttata per un controllo da cinque minuti. Se si limita il giro con
+     `--solo`, si rimisura solo quello. */
+  if (process.argv.includes("--riparti")) {
+    esiti = filtro ? esiti.filter((e) => !filtro.has(e.paese)) : [];
   }
   const gia = new Set(esiti.map((e) => `${e.paese}|${e.insegna}`));
   if (gia.size > 0) console.log(`${gia.size} insegne gia' misurate: le salto

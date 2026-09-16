@@ -76,6 +76,8 @@ export interface VerifiedPrice {
   reason?: string;
 }
 
+import { haLettoreApi, prezzoDaApi } from "./prezzi-api.js";
+
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
 
@@ -388,7 +390,26 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
   }
 
   const page = readPrices(html);
-  return page ? { status: "verificato", page } : { status: "pagina-ok" };
+  if (page) return { status: "verificato", page };
+
+  /* LA PAGINA C'E' MA IL PREZZO NON E' SCRITTO DENTRO.
+     Per quarantadue insegne del catalogo e' la norma, non l'eccezione: 1,28
+     milioni di prodotti con le schede vive e nessun prezzo leggibile. Non lo
+     nascondono — lo servono da un'API e la pagina lo disegna dopo.
+
+     Si chiede a quella, ma solo se sappiamo come parlarle: chi non ha un
+     lettore non paga nessuna richiesta in piu'. Vedi `prezzi-api.ts`. */
+  if (haLettoreApi(url)) {
+    const daApi = await prezzoDaApi(url);
+    if (daApi) {
+      return {
+        status: "verificato",
+        page: { current: daApi.prezzo, currency: daApi.valuta },
+      };
+    }
+  }
+
+  return { status: "pagina-ok" };
 }
 
 /** Una riga di prezzo dopo il controllo, pronta per il client. */
