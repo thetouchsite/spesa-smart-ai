@@ -44,7 +44,7 @@
 import { cercaNelCatalogo } from "./catalogo.js";
 import { paesiConCatalogo } from "./catalogo-fonti.js";
 import { verifyProductPage } from "./price-page.js";
-import { chiamaMenu, MENU_MODEL, parseJson } from "../app/plan-grounded.js";
+import { ilSelettore, ilTraduttore } from "./aiuti-esterni.js";
 import {
   traduciVoce,
   impara,
@@ -60,6 +60,15 @@ export interface PrezzoGrezzo {
   valuta: string;
   negozio: string;
   link: string;
+  /**
+   * Quanto era pertinente questo candidato: 0 e' il primo della classifica.
+   *
+   * Serve a impedire che un prodotto che c'entra poco prenda il posto d'onore
+   * solo perche' costa meno. `Biona butter beans` costa meno di `Anchor salted
+   * butter`, ma per chi ha scritto «butter» non e' un'alternativa piu'
+   * conveniente: e' un'altra cosa.
+   */
+  posto?: number;
   /**
    * Quando questa pagina e' stata guardata l'ultima volta, in ISO.
    *
@@ -320,31 +329,29 @@ Solo JSON:
     // Nessuna ricerca: e' la differenza fra qualche millesimo e cinque
     // centesimi. E il modello qui non deve sapere niente del mondo, solo
     // leggere dei nomi.
+    const scegli = ilSelettore();
+    if (!scegli) return new Map();
+
     const t0 = Date.now();
-    const r = await chiamaMenu(MENU_MODEL, prompt, 60_000);
+    const risposta = await scegli(utili.map((c) => ({ voce: c.voce, candidati: c.candidati })));
+    if (!risposta) return new Map();
     console.info(
-      `[catalogo] la scelta del modello: ${((Date.now() - t0) / 1000).toFixed(1)}s ` +
-        `per ${utili.length} voci, ${prompt.length} caratteri di prompt`,
+      `[catalogo] la scelta: ${((Date.now() - t0) / 1000).toFixed(1)}s ` +
+        `per ${utili.length} voci`,
     );
-    const dati = parseJson(r.text) as { scelte?: Scelta[] };
+    const dati = { scelte: [...risposta.entries()].map(([voce, scelti]) => ({ voce, scelti })) };
     const mappa = new Map<number, number[]>();
     for (const s of dati.scelte ?? []) {
       if (typeof s?.voce !== "number") continue;
-      /* Si accettano tutte e due le forme. Il modello a volte risponde con la
-         vecchia — un numero solo invece di un elenco — e rifiutarla
-         significherebbe buttare una risposta giusta per un dettaglio di
-         formato. */
+      /* Chi risponde consegna gia' una mappa: le forme strane del modello —
+         un numero solo invece di un elenco — le raddrizza chi lo interroga,
+         che e' il posto giusto perche' e' l'unico che sa com'e' fatto. */
       const elenco = Array.isArray(s.scelti)
         ? s.scelti.filter((x): x is number => typeof x === "number")
-        : typeof s.scelto === "number"
-          ? [s.scelto]
-          : [];
+        : [];
       mappa.set(s.voce, elenco);
     }
-    console.info(
-      `[catalogo] il modello ha scelto per ${mappa.size} voci ` +
-        `($${r.cost.toFixed(4)}, nessuna ricerca)`,
-    );
+    console.info(`[catalogo] scelte ricevute per ${mappa.size} voci`);
     return mappa;
   } catch (err) {
     console.warn("[catalogo] scelta non riuscita, tengo l'ordine del catalogo:", err);
@@ -443,22 +450,24 @@ async function nelleParoleDelPaese(items: string[], paeseIso: string): Promise<s
   /* Restano parole ignote. Si chiedono UNA A UNA — cioe' un elenco di parole,
      non di frasi — perche' solo una parola singola si puo' rimettere nel
      dizionario e riusare domani. Una frase tradotta in blocco serve una volta
-     sola e poi non torna mai piu' identica. */
+     sola e poi non torna mai piu' identica.
+
+     E si chiedono a CHIUNQUE sia stato collegato, senza sapere chi sia: se non
+     c'e' nessuno — perche' l'API gira per conto suo — si tengono le parole
+     conosciute e le altre restano nella lingua di partenza. E' il caso normale
+     di un'API staccata, non un guasto. */
+  const traduci = ilTraduttore();
+  if (!traduci) {
+    const parziali = rese.map((r, i) => r.tradotta || items[i]);
+    console.info(
+      `[vocabolario] ${paese}: nessun traduttore collegato, uso il dizionario da solo ` +
+        `(${sconosciute.length} parole restano in lingua originale)`,
+    );
+    return parziali;
+  }
+
   try {
-    const prompt =
-      `Come si chiamano queste cose al supermercato in ${lingua}? Il nome ` +
-      `commerciale, quello scritto sullo scaffale, non la traduzione letterale: ` +
-      `«funghi» in inglese e' "mushrooms", non "fungi".
-` +
-      `Una parola o due per voce, minuscolo, stesso ordine, stessa lunghezza. Solo JSON:
-` +
-      `{"tradotte":["...","..."]}
-
-${JSON.stringify(sconosciute)}`;
-
-    const r = await chiamaMenu(MENU_MODEL, prompt, 45_000);
-    const dati = parseJson(r.text) as { tradotte?: unknown };
-    const fuori = dati.tradotte;
+    const fuori = await traduci(sconosciute, lingua);
     if (!Array.isArray(fuori) || fuori.length !== sconosciute.length) {
       throw new Error("forma inattesa");
     }
@@ -476,7 +485,7 @@ ${JSON.stringify(sconosciute)}`;
     const pulite = items.map((voce, i) => traduciVoce(voce, codice).tradotta || items[i]);
     tradotte.set(chiave, pulite);
     console.info(
-      `[vocabolario] ${paese}: ${apprese} parole nuove imparate ($${r.cost.toFixed(4)}) — ` +
+      `[vocabolario] ${paese}: ${apprese} parole nuove imparate — ` +
         sconosciute.slice(0, 5).join(", "),
     );
     return pulite;
@@ -501,24 +510,14 @@ async function tuttoAlModello(
   chiave: string,
   lingua: string,
 ): Promise<string[]> {
+  const traduci = ilTraduttore();
+  if (!traduci) {
+    console.info(`[catalogo] nessun traduttore collegato: tengo le parole originali`);
+    return items;
+  }
+
   try {
-    /* Un oggetto e non un array nudo, perche' `parseJson` cerca la prima
-       graffa: a un array risponderebbe «nessun JSON nella risposta». */
-    const prompt =
-      `Traduci in ${lingua} questa lista della spesa, usando le parole con cui il ` +
-      `prodotto e' scritto sugli scaffali dei supermercati di quel paese — il nome ` +
-      `commerciale, non la traduzione letterale. «Funghi» in inglese e' ` +
-      `"mushrooms", non "fungi".
-` +
-      `Stesso ordine, stessa lunghezza. Solo JSON:
-` +
-      `{"tradotte":["...","..."]}
-
-${JSON.stringify(items)}`;
-
-    const r = await chiamaMenu(MENU_MODEL, prompt, 45_000);
-    const dati = parseJson(r.text) as { tradotte?: unknown };
-    const fuori = dati.tradotte;
+    const fuori = await traduci(items, lingua);
     if (!Array.isArray(fuori) || fuori.length !== items.length) throw new Error("forma inattesa");
 
     // Una voce vuota o non tradotta torna com'era: meglio la parola originale
@@ -526,7 +525,7 @@ ${JSON.stringify(items)}`;
     const pulite = fuori.map((x, i) => (typeof x === "string" && x.trim() ? x.trim() : items[i]));
     tradotte.set(chiave, pulite);
     console.info(
-      `[catalogo] lista tradotta in ${lingua} ($${r.cost.toFixed(4)}): ` +
+      `[catalogo] lista tradotta in ${lingua}: ` +
         pulite.slice(0, 4).map((x, i) => `${items[i]}->${x}`).join(", "),
     );
     return pulite;
@@ -778,7 +777,9 @@ export async function generatePricesCatalogo(
     const tenute = conPrezzo.length ? conPrezzo : lista.slice(0, 1);
     // Dal piu' economico: e' l'ordine in cui l'app le mostra.
     tenute.sort((a, b) => (a.riga.prezzo ?? Infinity) - (b.riga.prezzo ?? Infinity));
-    prezzi.push(...tenute.slice(0, ALTERNATIVE_MAX).map((x) => x.riga));
+    prezzi.push(
+      ...tenute.slice(0, ALTERNATIVE_MAX).map((x) => ({ ...x.riga, posto: x.posto })),
+    );
   }
   const secondi = (Date.now() - t0) / 1000;
 

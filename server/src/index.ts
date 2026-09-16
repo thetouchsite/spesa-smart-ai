@@ -58,6 +58,8 @@ import {
   generatePricesParallel,
   GROUNDED_MODEL,
   MENU_MODEL,
+  chiamaMenu,
+  parseJson,
 } from "./app/plan-grounded.js";
 import type { CheckedRow } from "./api/price-page.js";
 import {
@@ -80,6 +82,7 @@ import { annota } from "./base/diario.js";
 import { statoVocabolario, quanteImparate } from "./api/vocabolario.js";
 import { saluteIA } from "./base/salute-ia.js";
 import { rispostaPrezziV1 } from "./api/contratto-v1.js";
+import { collegaTraduttore } from "./api/aiuti-esterni.js";
 import { consumoDiOggi, controllaChiave } from "./api/chiavi.js";
 import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./api/catalogo.js";
 import { paesiConCatalogo } from "./api/catalogo-fonti.js";
@@ -1777,6 +1780,56 @@ process.on("unhandledRejection", (reason) => {
 process.on("uncaughtException", (err) => {
   console.error("[server] eccezione non gestita, resto in piedi:", err);
 });
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DOVE I DUE BLOCCHI SI DANNO LA MANO
+
+   `api/` non importa niente da `app/` — lo verifica il build, e da oggi e'
+   vero senza eccezioni. Ma l'API una cosa dall'app la vorrebbe: quando il
+   dizionario della spesa incontra una parola che non conosce, qualcuno che
+   gliela traduca.
+
+   Invece di andarsela a prendere, la dichiara e aspetta. Qui gliela diamo.
+
+   E' l'unico punto del programma in cui i due blocchi si toccano, ed e' in
+   radice — cioe' fuori da tutti e due. Staccando `api/` questo file non parte
+   con lei, e l'API funziona lo stesso: senza traduttore, con il dizionario da
+   solo, che copre la stragrande maggioranza delle liste.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+collegaTraduttore(async (parole, lingua) => {
+  const prompt =
+    `Come si chiamano queste cose al supermercato in ${lingua}? Il nome ` +
+    `commerciale, quello scritto sullo scaffale, non la traduzione letterale: ` +
+    `«funghi» in inglese e' "mushrooms", non "fungi".
+` +
+    `Una parola o due per voce, minuscolo, stesso ordine, stessa lunghezza. ` +
+    `Solo JSON:
+{"tradotte":["...","..."]}
+
+${JSON.stringify(parole)}`;
+
+  try {
+    const r = await chiamaMenu(MENU_MODEL, prompt, 45_000);
+    recordCost(r.cost, "api");
+    const dati = parseJson(r.text) as { tradotte?: unknown };
+    const fuori = dati.tradotte;
+    if (!Array.isArray(fuori) || fuori.length !== parole.length) return null;
+    return fuori.map((x) => (typeof x === "string" ? x : ""));
+  } catch (err) {
+    /* Non si rilancia: chi ha chiesto sta gia' rispondendo a qualcuno, e una
+       traduzione mancata non deve spegnere il catalogo. `null` vuol dire «non
+       ce l'ho fatta», e di la' sanno cosa farne. */
+    console.warn("[traduttore] non riuscito, il dizionario fa da solo:", err);
+    return null;
+  }
+});
+
+/* Il selettore NON si collega, ed e' una decisione presa con dei numeri: su
+   duecento prove il modello sceglieva 151 volte giusto contro le 157 della
+   classifica. Il posto resta perche' il confronto va rifatto quando la ricerca
+   cambiera' — si scrive una riga qui e torna com'era. */
 
 const port = Number(process.env.PORT ?? 3000);
 if (!isConfigured()) console.warn("ATTENZIONE: GOOGLE_GENERATIVE_AI_API_KEY assente — /ai/* risponde 503.");

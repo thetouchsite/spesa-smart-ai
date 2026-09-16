@@ -475,6 +475,8 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
 
 /** Una riga di prezzo dopo il controllo, pronta per il client. */
 export interface CheckedRow {
+  /** Quanto era pertinente il candidato: 0 e' il primo della classifica. */
+  posto?: number;
   /**
    * Quando quella pagina e' stata guardata, in ISO.
    *
@@ -773,6 +775,8 @@ export interface Offer {
    * un'API di prezzi non si puo' permettere.
    */
   letto?: string;
+  /** Quanto era pertinente il candidato: 0 e' il primo della classifica. */
+  posto?: number;
   /** Il negozio dell'insegna piu' vicino a chi chiede. NON e' la fonte del prezzo. */
   negozioPiuVicino?: string;
   /** Presenti solo se il prodotto è in promozione in quel negozio. */
@@ -839,6 +843,7 @@ export function groupByProduct(rows: CheckedRow[]): ProductOffers[] {
       link: r.verifica === "non-raggiungibile" ? "" : r.link,
       verifica: r.verifica,
       letto: r.letto,
+      posto: r.posto,
       prezzoListino: r.prezzoListino,
       risparmio: r.risparmio,
       scontoPercento: r.scontoPercento,
@@ -862,9 +867,42 @@ export function groupByProduct(rows: CheckedRow[]): ProductOffers[] {
     // prezzi di cui abbiamo aperto la pagina.
     // Le righe senza prezzo restano in fondo: sono un posto dove andare, non
     // un prezzo, e non devono mai finire in cima come «piu' conveniente».
+    /* CHI C'ENTRA POCO NON PUO' PRENDERE IL POSTO D'ONORE.
+       Ordinando per solo prezzo, un prodotto che c'entra poco ma costa meno
+       finiva primo e l'app lo chiamava «il piu' conveniente». Misurato su
+       duecento voci: undici volte il prodotto giusto c'era, ma piu' in basso.
+
+         «Butter»          mostrava  Biona butter beans 400g
+                           il giusto era in seconda posizione: Anchor salted butter
+         «Mozzarella»      mostrava  12 mozzarella sticks 175g
+                           il giusto in terza: Galbani mozzarella
+         «Mature cheddar»  mostrava  Taylors mature cheddar ONION (patatine)
+                           il giusto in seconda: Cathedral city mature cheddar
+
+       Non e' che costassero meno «della stessa cosa»: erano un'altra cosa.
+
+       La cura non e' smettere di ordinare per prezzo — quello resta, ed e' cio'
+       che l'utente e' venuto a fare. E' che sul prezzo si compete SOLO fra pari
+       pertinenza. Il gruppo di testa e' chi sta entro una posizione dal
+       migliore; dentro quel gruppo vince il piu' economico, e chi sta piu'
+       indietro resta sotto per quanto costi poco.
+
+       Una posizione di tolleranza e non zero, perche' fra il primo e il secondo
+       candidato la differenza e' spesso il nome della marca, e li' il prezzo
+       deve poter decidere. */
+    const pertinenzaMigliore = Math.min(
+      ...offerte.map((o) => (typeof o.posto === "number" ? o.posto : 99)),
+    );
+    const inTesta = (o: Offer) =>
+      (typeof o.posto === "number" ? o.posto : 99) <= pertinenzaMigliore + 1;
+
     offerte.sort((a, b) => {
+      // Le righe senza prezzo restano in fondo: sono un posto dove andare, non
+      // un prezzo, e non devono mai finire in cima come «piu' conveniente».
       if (a.prezzo == null) return b.prezzo == null ? 0 : 1;
       if (b.prezzo == null) return -1;
+      const ta = inTesta(a), tb = inTesta(b);
+      if (ta !== tb) return ta ? -1 : 1;
       return a.prezzo - b.prezzo;
     });
 
