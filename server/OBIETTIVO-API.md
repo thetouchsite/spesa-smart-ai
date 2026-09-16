@@ -525,6 +525,46 @@ nessuna riga di logica cambiata, così il diff si legge e il merge non fa male.
 > Le misure si scrivono qui: numero, data, e **come** è stato ottenuto. Un
 > numero senza il metodo è un'opinione con le cifre.
 
+**16 settembre 2026 — Fase 2: il metro esiste, e il primo numero**
+
+`prove/ricerca.json`, 80 voci fra IT e GB, con le trappole viste nei cataloghi
+veri. `npx tsx scripts/metro-ricerca.mjs`.
+
+| | IT | GB | totale |
+|---|---|---|---|
+| **sola ricerca**, nessun aiuto | 36/40 · 90% | 38/40 · 95% | **74/80 · 93%** |
+| strada prezzi, modello spento | 34/40 · 85% | 33/40 · 83% | 67/80 · 84% |
+| strada prezzi, modello acceso | *non valido* | *non valido* | *non valido* |
+
+**La prima riga vale.** Le altre due no, e va detto: la quota Google era finita,
+quindi anche il servizio «con IA» ripiegava sull'ordine del catalogo — le due
+righe erano la stessa cosa, non un confronto. **Da rifare quando il modello
+risponde.**
+
+Il metro adesso guarda `/v1/stato` e si rifiuta di confrontare se il modello
+non ha risposto. Un metro che in quel caso stampa una tabella mente con
+convinzione.
+
+Due bachi veri trovati provando a misurare:
+
+- **la chiave della cache non includeva come la risposta era stata calcolata.**
+  «Con modello» e «senza» dividevano la stessa voce, e la seconda leggeva la
+  risposta della prima. In produzione vuol dire servire sotto un'impostazione
+  una risposta calcolata sotto un'altra.
+- **la cache su database colpiva in silenzio.** Quella in memoria scriveva una
+  riga di log, quella su Mongo no.
+
+E una conferma arrivata per caso, dal log: `[vocabolario] GB: modello non
+raggiungibile, uso il dizionario da solo`. Il dizionario ha retto mentre il
+modello moriva.
+
+Perche' la seconda riga (84%) sia piu' bassa della prima (93%) e' la domanda
+successiva: la strada dei prezzi mostra per prima l'offerta **piu' economica**
+fra quelle tenute, e la piu' economica e' spesso la confezione piu' piccola o
+il prodotto sbagliato — `12 mozzarella sticks` per «mozzarella», `Biona butter
+beans` per «butter». E' lo stesso difetto del prezzo al chilo, visto da un'altra
+parte.
+
 **16 settembre 2026 — Fase 1, cinque pezzi su otto**
 
 Fatti, tutti provati facendoli fallire prima di dichiararli riusciti:
