@@ -824,7 +824,18 @@ async function prezzaLista(
       vociInLista: items.length,
     },
     meta: {
-      motorePrezzi: fonte === "serpapi" ? "Google Shopping (SerpAPI)" : GROUNDED_MODEL,
+      /* CHI HA TROVATO QUESTI PREZZI, DAVVERO.
+         Con il catalogo nostro il modello non c'entra niente: gli indirizzi
+         vengono dalle sitemap dei negozi e i prezzi si leggono aprendo la
+         pagina. Dichiarare il nome del modello era comodo — c'era una riga
+         sola — ma diceva una cosa falsa proprio nel campo che si guarda per
+         sapere di chi fidarsi. */
+      motorePrezzi:
+        fonte === "catalogo"
+          ? "catalogo proprietario (sitemap + lettura della pagina)"
+          : fonte === "serpapi"
+            ? "Google Shopping (SerpAPI)"
+            : GROUNDED_MODEL,
       fontePrezzi: fonte,
       secondiPrezzi: Math.round(secondi),
       ricerche,

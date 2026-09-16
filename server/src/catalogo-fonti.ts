@@ -4,7 +4,7 @@
  * Generato da `scripts/aggiorna-fonti.mjs` — non si scrive a mano, si
  * rigenera dopo una passata di raccolta.
  *
- * 138 insegne · 38 paesi · 2.208.428 prodotti
+ * 145 insegne · 38 paesi · 2.718.692 prodotti
  *
  * I NUMERI SONO CONTATI, NON STIMATI
  * ----------------------------------
@@ -52,6 +52,7 @@ export const FONTI: FonteCatalogo[] = [
 
   { paese: "AR", insegna: "Carrefour Argentina", dominio: "www.carrefour.com.ar", sitemap: "https://www.carrefour.com.ar/sitemap/product-0.xml", resa: 0.5, stimati: 422 },
 
+  { paese: "AT", insegna: "Interspar", dominio: "www.interspar.at", sitemap: "https://www.interspar.at/shop/lebensmittel/sitemap.xml", resa: 0, stimati: 22489 },
   { paese: "AT", insegna: "Bipa", dominio: "www.bipa.at", sitemap: "https://www.bipa.at/main-sitemap.xml", resa: 1, stimati: 15317 },
   { paese: "AT", insegna: "dm Austria", dominio: "www.dm.at", sitemap: "https://www.dm.at/sitemap.xml", resa: 0, stimati: 13577 },
   { paese: "AT", insegna: "MPreis", dominio: "www.mpreis.at", sitemap: "https://www.mpreis.at/sitemap.xml", resa: 0.97, stimati: 12793 },
@@ -77,6 +78,7 @@ export const FONTI: FonteCatalogo[] = [
 
   { paese: "CZ", insegna: "Billa CZ", dominio: "www.billa.cz", sitemap: "https://www.billa.cz/sitemap.xml", resa: 1, stimati: 13303 },
 
+  { paese: "DE", insegna: "Müller", dominio: "www.mueller.de", sitemap: "https://www.mueller.de/sitemaps/sitemap.xml", resa: 0, stimati: 70589 },
   { paese: "DE", insegna: "Fressnapf", dominio: "www.fressnapf.de", sitemap: "https://www.fressnapf.de/sitemap.xml", resa: 1, stimati: 34785 },
   { paese: "DE", insegna: "Rossmann", dominio: "www.rossmann.de", sitemap: "https://www.rossmann.de/de/sitemap_index.xml", resa: 0, stimati: 32301 },
   { paese: "DE", insegna: "dm", dominio: "www.dm.de", sitemap: "https://www.dm.de/sitemap.xml", resa: 0, stimati: 20966 },
@@ -93,6 +95,7 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "DK", insegna: "Føtex", dominio: "foetex.dk", sitemap: "https://foetex.dk/sitemap/sitemap-index.xml", resa: 1, stimati: 28338 },
   { paese: "DK", insegna: "Matas", dominio: "www.matas.dk", sitemap: "https://www.matas.dk/sitemap", resa: 0.93, stimati: 7441 },
   { paese: "DK", insegna: "Nemlig.com", dominio: "www.nemlig.com", sitemap: "https://www.nemlig.com/googleproductsitemap", resa: 0, stimati: 4046 },
+  { paese: "DK", insegna: "Nemlig", dominio: "www.nemlig.com", sitemap: "https://www.nemlig.com/googleproductsitemap", resa: 0, stimati: 4046 },
 
   { paese: "EE", insegna: "Rimi Estonia", dominio: "www.rimi.ee", sitemap: "https://www.rimi.ee/epood/sitemap.xml", resa: 1, stimati: 58320 },
   { paese: "EE", insegna: "Barbora Estonia", dominio: "barbora.ee", sitemap: "https://barbora.ee/sitemap.xml", resa: 1, stimati: 18595 },
@@ -109,6 +112,7 @@ export const FONTI: FonteCatalogo[] = [
 
   { paese: "FI", insegna: "Lidl Suomi", dominio: "www.lidl.fi", sitemap: "https://www.lidl.fi/static/sitemap.xml", resa: 1, stimati: 439 },
 
+  { paese: "FR", insegna: "Greenweez", dominio: "cdn.greenweez.com", sitemap: "https://cdn.greenweez.com/sitemaps/sitemap-products_0.xml", resa: 0, stimati: 45317 },
   { paese: "FR", insegna: "Auchan", dominio: "www.auchan.fr", sitemap: "https://www.auchan.fr/sitemap.xml", resa: 1, stimati: 8708 },
   { paese: "FR", insegna: "Kazidomi", dominio: "www.kazidomi.com", sitemap: "https://www.kazidomi.com/sitemap/sitemap.xml", resa: 1, stimati: 8039 },
   { paese: "FR", insegna: "Naturalia", dominio: "www.naturalia.fr", sitemap: "https://www.naturalia.fr/media/sitemap_product.xml", resa: 1, stimati: 6072 },
@@ -116,9 +120,9 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "FR", insegna: "Picard", dominio: "www.picard.fr", sitemap: "https://www.picard.fr/sitemap_0.xml", resa: 0.97, stimati: 1569 },
   { paese: "FR", insegna: "Zooplus France", dominio: "www.zooplus.fr", sitemap: "https://www.zooplus.fr/sitemap.xml", resa: 1, stimati: 270 },
 
+  { paese: "GB", insegna: "Marks & Spencer", dominio: "www.marksandspencer.com", sitemap: "https://www.marksandspencer.com/en/sitemap/sitemap_index.xml", resa: 0.73, stimati: 270094 },
   { paese: "GB", insegna: "Morrisons Groceries", dominio: "groceries.morrisons.com", sitemap: "https://groceries.morrisons.com/sitemaps/sitemap_index.xml", resa: 0.93, stimati: 32873 },
   { paese: "GB", insegna: "Morrisons", dominio: "groceries.morrisons.com", sitemap: "https://groceries.morrisons.com/sitemaps/sitemap_index.xml", resa: 0.93, stimati: 32873 },
-  { paese: "GB", insegna: "Marks & Spencer", dominio: "www.marksandspencer.com", sitemap: "https://www.marksandspencer.com/sitemap/sitemap_index.xml", resa: 1, stimati: 31440 },
   { paese: "GB", insegna: "Waitrose", dominio: "www.waitrose.com", sitemap: "https://www.waitrose.com/sitemapIndex.xml", resa: 1, stimati: 18182 },
   { paese: "GB", insegna: "Pets at Home", dominio: "www.petsathome.com", sitemap: "https://www.petsathome.com/sitemap.xml", resa: 1, stimati: 16156 },
   { paese: "GB", insegna: "Aldi UK", dominio: "www.aldi.co.uk", sitemap: "https://www.aldi.co.uk/sitemap_products.xml", resa: 0.93, stimati: 4989 },
@@ -138,6 +142,7 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "HU", insegna: "Auchan HU", dominio: "auchan.hu", sitemap: "https://auchan.hu/sitemap.xml", resa: 1, stimati: 249 },
   { paese: "HU", insegna: "Kifli.hu", dominio: "kifli.hu", sitemap: "https://www.kifli.hu/sitemap_products.xml", resa: 0.5, stimati: 28 },
 
+  { paese: "IE", insegna: "Tesco Ireland", dominio: "www.tesco.ie", sitemap: "https://www.tesco.ie/sitemaps/en-IE/groceries/products-index.xml", resa: 0, stimati: 22467 },
   { paese: "IE", insegna: "SuperValu Online", dominio: "shop.supervalu.ie", sitemap: "https://shop.supervalu.ie/sitemap.xml", resa: 0, stimati: 11807 },
   { paese: "IE", insegna: "SuperValu", dominio: "shop.supervalu.ie", sitemap: "https://shop.supervalu.ie/sitemap.xml", resa: 0, stimati: 11807 },
   { paese: "IE", insegna: "Aldi Ireland", dominio: "www.aldi.ie", sitemap: "https://www.aldi.ie/sitemap_products.xml", resa: 0.97, stimati: 4300 },
@@ -179,7 +184,7 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "LV", insegna: "Barbora Latvia", dominio: "barbora.lv", sitemap: "https://barbora.lv/sitemap.xml", resa: 1, stimati: 495 },
   { paese: "LV", insegna: "Barbora LV", dominio: "barbora.lv", sitemap: "https://barbora.lv/sitemap.xml", resa: 1, stimati: 495 },
 
-  { paese: "NL", insegna: "Etos", dominio: "www.etos.nl", sitemap: "https://www.etos.nl/sitemap_index.xml", resa: 1, stimati: 9101 },
+  { paese: "NL", insegna: "Etos", dominio: "www.etos.nl", sitemap: "https://www.etos.nl/sitemap_index.xml", resa: 1, stimati: 9281 },
   { paese: "NL", insegna: "Spar NL", dominio: "www.spar.nl", sitemap: "https://www.spar.nl/sitemap.xml", resa: 0.97, stimati: 6647 },
   { paese: "NL", insegna: "Gall & Gall", dominio: "www.gall.nl", sitemap: "https://www.gall.nl/sitemap_index.xml", resa: 1, stimati: 4968 },
   { paese: "NL", insegna: "Dirk", dominio: "www.dirk.nl", sitemap: "https://www.dirk.nl/sitemap.xml", resa: 0.97, stimati: 4781 },
@@ -193,6 +198,7 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "PL", insegna: "Rossmann Polska", dominio: "www.rossmann.pl", sitemap: "https://www.rossmann.pl/sitemap.xml", resa: 1, stimati: 14078 },
 
   { paese: "PT", insegna: "Continente Online", dominio: "www.continente.pt", sitemap: "https://www.continente.pt/sitemap_index.xml", resa: 0.7, stimati: 89297 },
+  { paese: "PT", insegna: "Continente", dominio: "www.continente.pt", sitemap: "https://www.continente.pt/sitemap_index.xml", resa: 0.57, stimati: 89286 },
   { paese: "PT", insegna: "Auchan Portugal", dominio: "www.auchan.pt", sitemap: "https://www.auchan.pt/sitemap_index.xml", resa: 0.97, stimati: 44039 },
   { paese: "PT", insegna: "Recheio", dominio: "www.recheio.pt", sitemap: "https://www.recheio.pt/portal/sitemap.xml", resa: 0, stimati: 20283 },
   { paese: "PT", insegna: "Pingo Doce", dominio: "www.pingodoce.pt", sitemap: "https://www.pingodoce.pt/home/sitemap_index.xml", resa: 0, stimati: 12441 },
@@ -212,6 +218,7 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "SE", insegna: "Lidl Sverige", dominio: "www.lidl.se", sitemap: "https://www.lidl.se/static/sitemap.xml", resa: 1, stimati: 489 },
 
   { paese: "SI", insegna: "Mercator Online", dominio: "mercatoronline.si", sitemap: "https://mercatoronline.si/sitemap.xml", resa: 1, stimati: 17241 },
+  { paese: "SI", insegna: "Mercator", dominio: "mercatoronline.si", sitemap: "https://mercatoronline.si/sitemap.xml", resa: 1, stimati: 17236 },
   { paese: "SI", insegna: "Hofer SI", dominio: "www.hofer.si", sitemap: "https://www.hofer.si/sitemap_products.xml", resa: 0.93, stimati: 1035 },
 
   { paese: "SK", insegna: "Billa SK", dominio: "www.billa.sk", sitemap: "https://www.billa.sk/sitemap.xml", resa: 0.93, stimati: 4286 },
