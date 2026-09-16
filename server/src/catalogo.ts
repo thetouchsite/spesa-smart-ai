@@ -108,6 +108,25 @@ const ATTESA_CARICAMENTO_MS = 35_000;
 const MAX_PER_INSEGNA = 50_000;
 
 /**
+ * Tetto per PAESE, che prima non serviva.
+ *
+ * Finche' il catalogo si scaricava al volo, fermarsi a quaranta file di
+ * sitemap per insegna teneva basso il totale da solo. Leggendolo dal database
+ * quel freno non c'e' piu': il catalogo e' completo, ed e' esattamente cio'
+ * che volevamo — ma l'Italia ha ventidue insegne, e ventidue cataloghi interi
+ * hanno fatto cadere Render con un 502.
+ *
+ * Duecentomila voci sono circa sessanta megabyte fra nomi, indirizzi e indice
+ * delle parole: tre paesi in memoria ci stanno nei 512 MB del piano gratuito,
+ * con margine per il resto dell'app.
+ *
+ * Le insegne si servono in ordine di resa — le piu' generose per prime, lo fa
+ * `fontiDi` — quindi se il tetto taglia, taglia quelle che i prezzi non li
+ * dichiarano comunque.
+ */
+const MAX_PER_PAESE = 200_000;
+
+/**
  * Quante sitemap figlie aprire per ogni indice.
  *
  * Quaranta: i cataloghi veri sono spezzati in decine di file — Alcampo ne ha
@@ -442,7 +461,18 @@ async function costruisci(paese: string): Promise<CatalogoPaese | null> {
        per il prossimo risveglio. */
     const salvate = await catalogoSalvato(paese, f.insegna);
     if (salvate) {
+      /* IL TETTO VALE ANCHE QUI, E LA PRIMA VERSIONE SE L'ERA DIMENTICATO.
+         Scaricando dalle sitemap ci si ferma a quaranta file per insegna, e
+         quel limite teneva bassa la memoria per conto suo. Il catalogo del
+         database e' invece completo — ed e' il motivo per cui lo abbiamo
+         fatto: la Spagna passa da 197.721 prodotti a 284.592 — ma senza freno
+         l'Italia, che di insegne ne ha ventidue, ha saturato i 512 MB di
+         Render e la macchina e' caduta con un 502.
+
+         Piu' catalogo e' meglio finche' ci sta in memoria. */
+      let presi = 0;
       for (const s of salvate) {
+        if (presi >= MAX_PER_INSEGNA || voci.length >= MAX_PER_PAESE) break;
         const p = parole(s.nome);
         if (p.length === 0) continue;
         voci.push({
@@ -452,10 +482,16 @@ async function costruisci(paese: string): Promise<CatalogoPaese | null> {
           parole: conSinonimi(p, f.paese),
           resa: f.resa ?? 0.5,
         });
+        presi++;
       }
       insegne.push(f.insegna);
       daDatabase++;
       continue;
+    }
+
+    if (voci.length >= MAX_PER_PAESE) {
+      console.info(`[catalogo] ${paese}: tetto di ${MAX_PER_PAESE} voci raggiunto, mi fermo`);
+      break;
     }
 
     const sue = await daUnaFonte(f);
