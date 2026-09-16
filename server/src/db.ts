@@ -8,6 +8,8 @@
  *   users  — account (email + password con hash scrypt)
  *   plans  — piani salvati dall'utente, non più solo nel browser
  *   cache  — risposte AI condivise fra TUTTI gli utenti
+ *   prezzi — schede prodotto gia' lette: prezzo, link e quando l'abbiamo visto
+ *   cataloghi — gli indirizzi di ogni insegna, compressi: uno per insegna
  *
  * La collezione `cache` è quella che tiene in piedi i conti: senza, ogni
  * utente ripaga le stesse chiamate a Gemini (~0,15 € a piano). Con la cache
@@ -15,7 +17,8 @@
  * regime il costo scende a ~0,02 € a piano.
  */
 
-import { MongoClient, type Collection, type Db } from "mongodb";
+import { MongoClient, type Binary, type Collection, type Db } from "mongodb";
+import type { VerifyStatus } from "./price-page.js";
 
 export interface UserDoc {
   _id?: unknown;
@@ -36,6 +39,47 @@ export interface PlanDoc {
   score: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * Una scheda prodotto gia' letta: prezzo, stato e quando l'abbiamo vista.
+ *
+ * L'indirizzo e' la chiave, perche' e' l'unica cosa che identifica davvero la
+ * scheda — il nome lo scrive il negozio e puo' cambiare.
+ *
+ * Perche' esiste: senza, ogni richiesta riapre le stesse pagine. Con cento
+ * persone che generano un piano a Madrid erano seimila richieste ai negozi
+ * spagnoli invece di sessanta. Vedi `prezzi-magazzino.ts`.
+ */
+export interface PrezzoDoc {
+  _id: string; // l'indirizzo della scheda
+  /** Null quando la pagina si apre ma il prezzo non e' nell'HTML. */
+  prezzo: number | null;
+  valuta: string;
+  nome: string;
+  insegna: string;
+  verifica: VerifyStatus;
+  /** Quando l'abbiamo letta: decide se vale ancora. */
+  visto: Date;
+  /** TTL: Mongo la cancella da sola a questa data. */
+  scadeIl: Date;
+}
+
+/**
+ * Il catalogo di un'insegna, compresso in un documento solo.
+ *
+ * Tre milioni di prodotti come tre milioni di documenti sarebbero 867 MB con
+ * gli indici, e il piano gratuito ne da' 512. Gli stessi dati compressi, uno
+ * per insegna, sono 55 MB. Vedi `catalogo-magazzino.ts`.
+ */
+export interface CatalogoDoc {
+  _id: string; // "PAESE|Insegna"
+  paese: string;
+  insegna: string;
+  prodotti: number;
+  /** Indirizzo e nome per riga, separati da tabulazione, poi gzip. */
+  dati: Binary;
+  aggiornato: Date;
 }
 
 export interface CacheDoc {
@@ -79,6 +123,13 @@ export async function getDb(): Promise<Db> {
     db.collection<PlanDoc>("plans").createIndex({ userId: 1, createdAt: -1 }),
     // expireAfterSeconds: 0 => Mongo usa il valore del campo come scadenza.
     db.collection<CacheDoc>("cache").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection<PrezzoDoc>("prezzi").createIndex({ scadeIl: 1 }, { expireAfterSeconds: 0 }),
+    // Si cercano sempre per indirizzo E per freschezza insieme: un indice solo
+    // su `visto` farebbe scorrere tutte le righe recenti per trovarne dodici.
+    db.collection<PrezzoDoc>("prezzi").createIndex({ visto: -1 }),
+    // Nessun indice sul contenuto: qui dentro non si cerca, si legge il
+    // pacchetto della propria insegna e lo si scompatta.
+    db.collection<CatalogoDoc>("cataloghi").createIndex({ paese: 1 }),
   ]);
 
   console.info("[db] connesso a MongoDB");
@@ -95,6 +146,14 @@ export async function plans(): Promise<Collection<PlanDoc>> {
 
 export async function cache(): Promise<Collection<CacheDoc>> {
   return (await getDb()).collection<CacheDoc>("cache");
+}
+
+export async function prezzi(): Promise<Collection<PrezzoDoc>> {
+  return (await getDb()).collection<PrezzoDoc>("prezzi");
+}
+
+export async function cataloghi(): Promise<Collection<CatalogoDoc>> {
+  return (await getDb()).collection<CatalogoDoc>("cataloghi");
 }
 
 export async function closeDb(): Promise<void> {

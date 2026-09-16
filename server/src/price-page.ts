@@ -108,14 +108,110 @@ function firstNumber(html: string, patterns: RegExp[]): number | null {
  * ovunque si trovi.
  */
 export function porzioneConPrezzi(html: string): string {
-  const testa = html.slice(0, 120_000);
-  const i = html.search(/application\/ld\+json/i);
-  if (i < 0 || i < 120_000) return testa;
-  return `${testa}\n${html.slice(i, i + 160_000)}`;
+  if (html.length <= TESTA) return html;
+
+  /* DOVE VALE LA PENA GUARDARE.
+     La versione precedente prendeva la testa e, se i dati strutturati stavano
+     oltre, una finestra attorno a quelli. Bastava finche' il prezzo stava in
+     uno dei due posti — e non e' vero.
+
+     Picard: pagina da 403.951 byte, `ld+json` al byte 36.662, quindi dentro la
+     testa, quindi ci si fermava li'. Il prezzo vero stava al byte 267.087, in
+     un attributo per Analytics che nessuno guardava. Un'insegna intera
+     classificata come muta perche' cercavamo nel posto giusto per gli altri.
+
+     Ora si raccolgono le finestre attorno a TUTTI i segni di prezzo che si
+     trovano, non attorno al primo. Costa qualche ricerca di stringa su una
+     pagina gia' in memoria: niente, rispetto a rileggere l'HTML intero con
+     una dozzina di espressioni. */
+  const pezzi = [html.slice(0, TESTA)];
+  let preso = TESTA;
+
+  for (const segno of SEGNI_DI_PREZZO) {
+    if (preso >= TETTO) break;
+    let da = TESTA;
+    for (let quante = 0; quante < 3; quante++) {
+      const i = html.indexOf(segno, da);
+      if (i < 0) break;
+      const inizio = Math.max(0, i - 400);
+      const fine = Math.min(html.length, i + FINESTRA);
+      pezzi.push(html.slice(inizio, fine));
+      preso += fine - inizio;
+      da = fine;
+      if (preso >= TETTO) break;
+    }
+  }
+  return pezzi.join("\n");
 }
 
+/** Quanto della testa si prende sempre: i dati strutturati stanno quasi sempre li'. */
+const TESTA = 120_000;
+/** Quanto si prende attorno a ogni segno di prezzo trovato piu' avanti. */
+const FINESTRA = 40_000;
+/** Oltre questo non si va: le pagine da megabyte esistono e la memoria no. */
+const TETTO = 400_000;
+
+/**
+ * I segni che da queste parti potrebbe esserci un prezzo.
+ *
+ * Sia in chiaro sia con le virgolette codificate, perche' i dati dentro gli
+ * attributi sono scritti cosi' — ed e' esattamente li' che stava il prezzo di
+ * Picard.
+ */
+const SEGNI_DI_PREZZO = [
+  "application/ld+json",
+  '"price"',
+  "&quot;price&quot;",
+  "priceCurrency",
+  "itemprop=\"price\"",
+  "data-price",
+];
+
 /** Legge prezzo, listino e scadenza dell'offerta dai dati strutturati. */
+/**
+ * Le entita' HTML sciolte, per i JSON nascosti dentro gli attributi.
+ *
+ * PERCHE' SERVE
+ * -------------
+ * Picard il prezzo ce l'ha nella pagina, e per noi era muta. Il motivo e' che
+ * lo tiene dentro un attributo per Google Analytics:
+ *
+ *     data-gtm="{&quot;item_name&quot;:&quot;PAIN SANS GLUTEN&quot;,&quot;price&quot;:4.89}"
+ *
+ * E' JSON a tutti gli effetti, ma le virgolette sono `&quot;` perche' dentro
+ * un attributo quelle vere chiuderebbero l'attributo stesso. Le nostre
+ * espressioni cercano `"price"` con le virgolette vere e non combaciano mai.
+ *
+ * Un'insegna intera classificata come «non pubblica i prezzi» per sei
+ * caratteri di codifica.
+ *
+ * Non e' un caso isolato: ogni sito che mette dati strutturati in un attributo
+ * — e sono tanti, perche' e' come si passano informazioni a Analytics, a
+ * Tag Manager, ai componenti — li codifica cosi'.
+ */
+function sciogliEntita(html: string): string {
+  return html
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?34;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+/**
+ * Legge prezzo, listino e scadenza dell'offerta dai dati strutturati.
+ *
+ * Due passate: prima la pagina com'e', poi — solo se non si e' trovato niente
+ * — la stessa pagina con le entita' sciolte. In quest'ordine perche' la
+ * stragrande maggioranza dei siti il prezzo lo espone in chiaro, e sciogliere
+ * mezzo megabyte di HTML per ogni scheda quando non serve sarebbe lavoro
+ * buttato su decine di migliaia di pagine.
+ */
 export function readPrices(html: string): PagePrice | null {
+  return leggiDa(html) ?? (html.includes("&quot;") ? leggiDa(sciogliEntita(html)) : null);
+}
+
+function leggiDa(html: string): PagePrice | null {
   const current = firstNumber(html, [
     /* IL PREZZO ATTACCATO ALLA SUA VALUTA, PRIMA DI TUTTO.
        Un prezzo vero sta quasi sempre a fianco di `priceCurrency`, dentro il

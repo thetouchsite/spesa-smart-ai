@@ -47,6 +47,7 @@
 import { gunzipSync } from "node:zlib";
 import { fontiDi, paesiConCatalogo, partiSuccessive, type FonteCatalogo } from "./catalogo-fonti.js";
 import { conSinonimi } from "./sinonimi.js";
+import { catalogoSalvato, salvaCatalogo } from "./catalogo-magazzino.js";
 
 /** Un prodotto del catalogo. */
 export interface VoceCatalogo {
@@ -199,7 +200,7 @@ const SEGMENTI_INUTILI = new Set([
   "sv", "hr", "hu", "lt", "sr", "bg", "ko", "za", "ca", "us", "www", "html",
 ]);
 
-function nomeDaUrl(url: string): string | null {
+export function nomeDaUrl(url: string): string | null {
   let percorso: string;
   try {
     percorso = decodeURIComponent(new URL(url).pathname);
@@ -426,15 +427,56 @@ async function costruisci(paese: string): Promise<CatalogoPaese | null> {
 
   // Una fonte alla volta, non tutte insieme: sono file da megabyte e il piano
   // gratuito ha poca memoria. Qualche secondo in piu' vale la stabilita'.
+  let daDatabase = 0;
+
   for (const f of fonti) {
+    /* PRIMA IL DATABASE, I NEGOZI SOLO SE MANCA.
+       Le sitemap di un paese sono decine di megabyte e fino a trentacinque
+       secondi, e su Render la macchina si spegne dopo un quarto d'ora: senza
+       questo passaggio quasi ogni utente pagava quel tempo, e i negozi
+       ricevevano quelle richieste, per un catalogo che nel frattempo non era
+       cambiato di una riga.
+
+       Il salvataggio lo fa il lavoro notturno. Qui si legge e basta — tranne
+       quando non c'e' niente da leggere: allora si scarica e si mette da parte
+       per il prossimo risveglio. */
+    const salvate = await catalogoSalvato(paese, f.insegna);
+    if (salvate) {
+      for (const s of salvate) {
+        const p = parole(s.nome);
+        if (p.length === 0) continue;
+        voci.push({
+          nome: s.nome,
+          url: s.url,
+          insegna: f.insegna,
+          parole: conSinonimi(p, f.paese),
+          resa: f.resa ?? 0.5,
+        });
+      }
+      insegne.push(f.insegna);
+      daDatabase++;
+      continue;
+    }
+
     const sue = await daUnaFonte(f);
     if (sue.length > 0) {
       voci.push(...sue);
       insegne.push(f.insegna);
       console.info(`[catalogo] ${paese} ${f.insegna}: ${sue.length} prodotti`);
+      // Messo da parte per il prossimo avvio: e' l'unica scrittura fatta
+      // mentre qualcuno aspetta, e non se ne accorge perche' non si attende.
+      void salvaCatalogo(
+        paese,
+        f.insegna,
+        sue.map((v) => ({ url: v.url, nome: v.nome })),
+      );
     } else {
       console.warn(`[catalogo] ${paese} ${f.insegna}: niente (la sitemap non ha risposto)`);
     }
+  }
+
+  if (daDatabase > 0) {
+    console.info(`[catalogo] ${paese}: ${daDatabase}/${fonti.length} insegne lette dal database`);
   }
 
   if (voci.length === 0) return null;
