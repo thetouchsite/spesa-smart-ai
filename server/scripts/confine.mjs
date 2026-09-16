@@ -100,6 +100,9 @@ const PADRONI = {
   /* Chi puo' chiamare l'API e quanto. E' il prodotto che decide a chi apre la
      porta, non il servizio accanto. */
   chiavi: "api",
+  /* Quanto ce n'e' dentro, letto dal nome del prodotto. E' il pezzo che manca
+     al prezzo al chilo, cioe' all'unica cosa che l'utente e' venuto a fare. */
+  quantita: "api",
   sinonimi: "api",
 
   // ── app ────────────────────────────────────────────────────────────

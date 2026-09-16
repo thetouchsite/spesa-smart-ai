@@ -1,4 +1,4 @@
-import { traduciVoce, statoVocabolario, quanteImparate } from "../src/vocabolario.js";
+import { traduciVoce, statoVocabolario, quanteImparate } from "../src/api/vocabolario.js";
 
 const LISTE: Array<[string, "en" | "es" | "fr" | "de" | "pt", string[]]> = [
   ["Regno Unito", "en", ["Pasta integrale", "Riso basmati", "Pomodori pelati", "Latte scremato", "Petto di pollo", "Funghi champignon", "Olio extravergine di oliva", "Uova 6 pezzi"]],

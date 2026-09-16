@@ -52,8 +52,8 @@
  * risponde non deve far fallire un piano.
  */
 
-import { isDbConfigured, prezzi as collezionePrezzi } from "./db.js";
-import { conInterruttore, statoInterruttore } from "./interruttore.js";
+import { isDbConfigured, prezzi as collezionePrezzi } from "../base/db.js";
+import { conInterruttore, statoInterruttore } from "../base/interruttore.js";
 import type { VerifyStatus } from "./price-page.js";
 
 /** Una scheda prodotto gia' letta. */

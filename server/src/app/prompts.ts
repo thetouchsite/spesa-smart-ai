@@ -8,7 +8,7 @@
  * dentro un handler.
  */
 
-import type { AiRecipeInput, ChefInput, PlanInput, WebRecipeInput } from "./schemas.js";
+import type { AiRecipeInput, ChefInput, PlanInput, WebRecipeInput } from "../base/schemas.js";
 
 
 /**

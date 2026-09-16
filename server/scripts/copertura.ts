@@ -35,8 +35,8 @@
  */
 
 import { writeFileSync } from "node:fs";
-import { prezzi as collezionePrezzi } from "../src/db.js";
-import { FONTI } from "../src/catalogo-fonti.js";
+import { prezzi as collezionePrezzi } from "../src/base/db.js";
+import { FONTI } from "../src/api/catalogo-fonti.js";
 
 const n = (x: number) => x.toLocaleString("it-IT");
 const perc = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : "—");

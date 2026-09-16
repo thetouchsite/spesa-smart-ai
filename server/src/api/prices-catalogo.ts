@@ -44,7 +44,7 @@
 import { cercaNelCatalogo } from "./catalogo.js";
 import { paesiConCatalogo } from "./catalogo-fonti.js";
 import { verifyProductPage } from "./price-page.js";
-import { chiamaMenu, MENU_MODEL, parseJson } from "./plan-grounded.js";
+import { chiamaMenu, MENU_MODEL, parseJson } from "../app/plan-grounded.js";
 import {
   traduciVoce,
   impara,
@@ -238,6 +238,23 @@ interface Scelta {
 async function facciScegliere(
   candidature: Array<{ voce: string; candidati: Array<{ nome: string; insegna: string }> }>,
 ): Promise<Map<number, number[]>> {
+  /* L'INTERRUTTORE, e non serve solo a misurare.
+     `SCELTA_MODELLO=no` salta la chiamata e tiene l'ordine del catalogo —
+     esattamente cio' che succede gia' quando il modello non risponde, quindi
+     non e' una strada nuova da mantenere: e' la strada di ripiego, resa
+     raggiungibile a comando.
+
+     Serve a due cose. La prima e' il metro: confrontare «col modello» e
+     «senza» cambiando UNA variabile sola. Senza l'interruttore si finisce a
+     confrontare il primo per rilevanza con il piu' economico fra gli
+     approvati, che differiscono per due cose e non dicono quale delle due
+     conta.
+
+     La seconda e' il criterio 3 del goal: staccare l'IA, rifare la stessa
+     spesa, e vedere se viene identica. Finche' questa riga non c'era, quella
+     prova si poteva fare solo rompendo la chiave. */
+  if (process.env.SCELTA_MODELLO === "no") return new Map();
+
   const utili = candidature
     .map((c, i) => ({ ...c, i }))
     .filter((c) => c.candidati.length > 0);

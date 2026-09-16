@@ -525,6 +525,105 @@ nessuna riga di logica cambiata, così il diff si legge e il merge non fa male.
 > Le misure si scrivono qui: numero, data, e **come** è stato ottenuto. Un
 > numero senza il metodo è un'opinione con le cifre.
 
+**16 settembre 2026 — Fase 3 e Fase 4**
+
+| fatto | misura |
+|---|---|
+| il peso non e' una parola del prodotto | 180 → 185 su 200 |
+| le dieresi tedesche | `Olivenöl` 0→5, `Hähnchenbrust` 0→5 |
+| le parole rare pesano di piu' | 185 → 186 (IT −1: da guardare) |
+| **prezzo al chilo** | lettore 19/19; copertura 35% delle offerte |
+| **cache divisa in due** | `cache_api` / `cache_app`, col ripiego sulla vecchia |
+| il ping che tiene sveglio Render | 55 s → 0,2 s, provato in esecuzione |
+| determinismo | due giri senza cache: risposte **identiche** |
+
+**Il determinismo e' provato per meta', e va detto quale meta'.** Due
+chiamate uguali, con la cache di mezzo tolta, danno lo stesso identico
+risultato — stessi prodotti, stesse insegne, stessi prezzi, stessi link — e la
+strada dei prezzi fa **zero** chiamate al modello. Quello che manca e'
+confrontare «col modello acceso» contro «spento»: la quota Google e' finita, e
+finche' non riparte quel numero non si puo' avere. Il metro si rifiuta di
+stamparlo, che e' il comportamento giusto.
+
+**Una cosa da sapere sul prezzo al chilo.** Sul catalogo la copertura e' 55% in
+Italia e 37% nel Regno Unito, ma nelle RISPOSTE si ribalta: 23% IT e 50% GB. La
+causa e' che la classifica preferisce i nomi in cui la cosa cercata occupa la
+quota maggiore — cioe' i nomi corti — e i nomi corti il formato non ce l'hanno.
+In Italia vince «latte intero», in Inghilterra «Warburtons soft farmhouse
+medium sliced bread 400g». La ricerca e il prezzo al chilo vogliono due cose
+diverse dallo stesso nome, e il modo di averle tutte e due e' leggere il peso
+dalla PAGINA invece che dal nome.
+
+**16 settembre 2026 — duecento prove sui cinque paesi, e la velocita'**
+
+`prove/ricerca.json` e' completo: 40 voci per paese, 200 in tutto, con le
+trappole viste nei cataloghi veri.
+
+| | IT | GB | DE | ES | FR | **totale** |
+|---|---|---|---|---|---|---|
+| **sola ricerca** | 90% | 95% | 90% | 93% | 83% | **180/200 · 90%** |
+
+La Francia e' la piu' debole, ed e' coerente: sei fonti, tre delle quali
+negozi bio. E' un'informazione per Antonio, non un difetto del codice.
+
+**E la velocita', criterio 4.** Dieci voci, Milano, catalogo caldo, modello
+spento, tre giri: **1,1 secondi** — con 10 prodotti su 10 trovati, sette
+insegne confrontate e quattro promozioni. L'obiettivo era sotto i cinque.
+Erano diciassette.
+
+```
+prima      17 s   di cui 14,6 la chiamata al modello
+adesso      1,1 s
+```
+
+Le trappole che il metro ha raccolto strada facendo meritano di essere lette,
+perche' dicono com'e' fatto davvero un catalogo di supermercato: `dreamies
+tuna treats` e `dreamies kaese` sono croccantini per gatti, `barbie coffee
+shop` e' un giocattolo, `oeufs en bois` sono uova di legno, `pince a sucre`
+sono le pinze per lo zucchero, `baratte a beurre` e' una zangola, `marzipan
+kartoffeln` sono dolcetti, `lacteos y huevos` e `uova latte e burro` sono
+pagine di categoria.
+
+**16 settembre 2026 — Fase 2: il metro esiste, e il primo numero**
+
+`prove/ricerca.json`, 80 voci fra IT e GB, con le trappole viste nei cataloghi
+veri. `npx tsx scripts/metro-ricerca.mjs`.
+
+| | IT | GB | totale |
+|---|---|---|---|
+| **sola ricerca**, nessun aiuto | 36/40 · 90% | 38/40 · 95% | **74/80 · 93%** |
+| strada prezzi, modello spento | 34/40 · 85% | 33/40 · 83% | 67/80 · 84% |
+| strada prezzi, modello acceso | *non valido* | *non valido* | *non valido* |
+
+**La prima riga vale.** Le altre due no, e va detto: la quota Google era finita,
+quindi anche il servizio «con IA» ripiegava sull'ordine del catalogo — le due
+righe erano la stessa cosa, non un confronto. **Da rifare quando il modello
+risponde.**
+
+Il metro adesso guarda `/v1/stato` e si rifiuta di confrontare se il modello
+non ha risposto. Un metro che in quel caso stampa una tabella mente con
+convinzione.
+
+Due bachi veri trovati provando a misurare:
+
+- **la chiave della cache non includeva come la risposta era stata calcolata.**
+  «Con modello» e «senza» dividevano la stessa voce, e la seconda leggeva la
+  risposta della prima. In produzione vuol dire servire sotto un'impostazione
+  una risposta calcolata sotto un'altra.
+- **la cache su database colpiva in silenzio.** Quella in memoria scriveva una
+  riga di log, quella su Mongo no.
+
+E una conferma arrivata per caso, dal log: `[vocabolario] GB: modello non
+raggiungibile, uso il dizionario da solo`. Il dizionario ha retto mentre il
+modello moriva.
+
+Perche' la seconda riga (84%) sia piu' bassa della prima (93%) e' la domanda
+successiva: la strada dei prezzi mostra per prima l'offerta **piu' economica**
+fra quelle tenute, e la piu' economica e' spesso la confezione piu' piccola o
+il prodotto sbagliato — `12 mozzarella sticks` per «mozzarella», `Biona butter
+beans` per «butter». E' lo stesso difetto del prezzo al chilo, visto da un'altra
+parte.
+
 **16 settembre 2026 — Fase 1, cinque pezzi su otto**
 
 Fatti, tutti provati facendoli fallire prima di dichiararli riusciti:

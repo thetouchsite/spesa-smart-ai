@@ -35,12 +35,12 @@ import { createHash } from "node:crypto";
 import { generateText, Output } from "ai";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import { createApp, HttpError } from "./http.js";
-import { isConfigured, model, MODEL_ID } from "./gemini.js";
-import { fetchPageContext, rankHits, searchProvider } from "./search.js";
-import { cache, isDbConfigured, plans, users } from "./db.js";
-import { hashPassword, issueToken, requireUser, verifyPassword } from "./auth.js";
-import { isShoppingConfigured, searchShopping } from "./shopping.js";
+import { createApp, HttpError } from "./base/http.js";
+import { isConfigured, model, MODEL_ID } from "./app/gemini.js";
+import { fetchPageContext, rankHits, searchProvider } from "./app/search.js";
+import { cache, cacheVecchia, isDbConfigured, plans, users } from "./base/db.js";
+import { hashPassword, issueToken, requireUser, verifyPassword } from "./app/auth.js";
+import { isShoppingConfigured, searchShopping } from "./app/shopping.js";
 import {
   type Blocco,
   budgetExhausted,
@@ -49,7 +49,7 @@ import {
   recordCost,
   recordUse,
   spendStatus,
-} from "./quota.js";
+} from "./base/quota.js";
 import {
   flussoPredefinito,
   generateListaSpesa,
@@ -58,8 +58,8 @@ import {
   generatePricesParallel,
   GROUNDED_MODEL,
   MENU_MODEL,
-} from "./plan-grounded.js";
-import type { CheckedRow } from "./price-page.js";
+} from "./app/plan-grounded.js";
+import type { CheckedRow } from "./api/price-page.js";
 import {
   groupByProduct,
   migliorePrezzoVerificato,
@@ -67,24 +67,24 @@ import {
   scartaImplausibili,
   togliOutlier,
   verifyPrices,
-} from "./price-page.js";
-import { generatePricesSerpapi } from "./prices-serpapi.js";
-import { catalogoDisponibilePer, generatePricesCatalogo, type PrezzoGrezzo } from "./prices-catalogo.js";
-import { cercaProdottoAmazon, isAmazonSearchConfigured } from "./amazon-search.js";
-import { linkDiRipiego } from "./fallback-link.js";
-import { isoDaPaese } from "./insegne-online.js";
-import { FRESCHEZZA_MS, statoMagazzino } from "./prezzi-magazzino.js";
-import { statoCataloghi } from "./catalogo-magazzino.js";
-import { prezziDaiCataloghiIT } from "./catalogo-it.js";
-import { annota } from "./diario.js";
-import { statoVocabolario, quanteImparate } from "./vocabolario.js";
-import { saluteIA } from "./salute-ia.js";
-import { rispostaPrezziV1 } from "./contratto-v1.js";
-import { consumoDiOggi, controllaChiave } from "./chiavi.js";
-import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./catalogo.js";
-import { paesiConCatalogo } from "./catalogo-fonti.js";
-import { negoziInCitta, statoNegozi, tuttiINegozi } from "./negozi.js";
-import { aggiornaCatalogo, avviaCatalogoNotturno } from "./catalogo-notturno.js";
+} from "./api/price-page.js";
+import { generatePricesSerpapi } from "./app/prices-serpapi.js";
+import { catalogoDisponibilePer, generatePricesCatalogo, type PrezzoGrezzo } from "./api/prices-catalogo.js";
+import { cercaProdottoAmazon, isAmazonSearchConfigured } from "./app/amazon-search.js";
+import { linkDiRipiego } from "./app/fallback-link.js";
+import { isoDaPaese } from "./api/insegne-online.js";
+import { FRESCHEZZA_MS, statoMagazzino } from "./api/prezzi-magazzino.js";
+import { statoCataloghi } from "./api/catalogo-magazzino.js";
+import { prezziDaiCataloghiIT } from "./api/catalogo-it.js";
+import { annota } from "./base/diario.js";
+import { statoVocabolario, quanteImparate } from "./api/vocabolario.js";
+import { saluteIA } from "./base/salute-ia.js";
+import { rispostaPrezziV1 } from "./api/contratto-v1.js";
+import { consumoDiOggi, controllaChiave } from "./api/chiavi.js";
+import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./api/catalogo.js";
+import { paesiConCatalogo } from "./api/catalogo-fonti.js";
+import { negoziInCitta, statoNegozi, tuttiINegozi } from "./api/negozi.js";
+import { aggiornaCatalogo, avviaCatalogoNotturno } from "./api/catalogo-notturno.js";
 import {
   AiRecipeInput,
   ChefInput,
@@ -94,14 +94,14 @@ import {
   RecipeSchema,
   WebRecipeInput,
   WebRecipeSchema,
-} from "./schemas.js";
+} from "./base/schemas.js";
 import {
   chefPrompt,
   planPrompt,
   recipePrompt,
   webExtractPrompt,
   webSynthesizePrompt,
-} from "./prompts.js";
+} from "./app/prompts.js";
 
 const app = createApp();
 
@@ -139,7 +139,7 @@ function memoryGet(key: string): unknown | undefined {
     memoryCache.delete(key);
     return undefined;
   }
-  return hit.value;
+  return hit;
 }
 
 function memorySet(key: string, value: unknown, durataMs?: number): void {
@@ -153,6 +153,26 @@ function memorySet(key: string, value: unknown, durataMs?: number): void {
     value,
     expires: Date.now() + (durataMs ?? CACHE_TTL_DAYS * 86_400_000),
   });
+}
+
+/**
+ * Cerca nella cache, e nel posto vecchio se nel nuovo non c'e'.
+ *
+ * La cache e' appena stata divisa in due collezioni — una dell'API e una
+ * dell'app — e quella di prima e' ancora piena. Senza questo ripiego, il
+ * giorno del passaggio ogni risposta salvata smetterebbe di valere e tutti
+ * ripagherebbero un lavoro gia' fatto. Su un servizio che al risveglio ci mette
+ * cinquantacinque secondi non e' un dettaglio.
+ *
+ * Le voci vecchie hanno una scadenza e Mongo le toglie da sola: fra qualche
+ * giorno la collezione `cache` sara' vuota, questa funzione potra' tornare una
+ * riga sola e `cacheVecchia` sparire.
+ */
+async function dallaCache(key: string): Promise<unknown | undefined> {
+  const nella = await (await cache(key)).findOne({ _id: key });
+  if (nella) return nella.value;
+  const prima = await (await cacheVecchia()).findOne({ _id: key });
+  return prima?.value;
 }
 
 function cacheKey(endpoint: string, payload: unknown): string {
@@ -185,11 +205,11 @@ async function generate<T extends z.ZodTypeAny>(
 
   if (isDbConfigured()) {
     try {
-      const hit = await (await cache()).findOne({ _id: key });
-      if (hit) {
+      const hit = await dallaCache(key);
+      if (hit !== undefined) {
         console.info(`[cache] HIT database ${key}`);
-        memorySet(key, hit.value);
-        return hit.value as z.infer<T>;
+        memorySet(key, hit);
+        return hit as z.infer<T>;
       }
     } catch (err) {
       // Una cache irraggiungibile non deve impedire la generazione.
@@ -213,7 +233,7 @@ async function generate<T extends z.ZodTypeAny>(
 
   if (isDbConfigured()) {
     try {
-      await (await cache()).insertOne({
+      await (await cache(key)).insertOne({
         _id: key,
         value: output,
         createdAt: new Date(),
@@ -973,10 +993,10 @@ app.post("/ai/menu", async (body) => {
   }
   if (isDbConfigured()) {
     try {
-      const hit = await (await cache()).findOne({ _id: key });
-      if (hit) {
-        memorySet(key, hit.value);
-        return hit.value;
+      const hit = await dallaCache(key);
+      if (hit !== undefined) {
+        memorySet(key, hit);
+        return hit;
       }
     } catch {
       /* cache irraggiungibile: si prosegue */
@@ -1012,7 +1032,7 @@ app.post("/ai/menu", async (body) => {
   memorySet(key, result);
   if (isDbConfigured()) {
     try {
-      await (await cache()).insertOne({
+      await (await cache(key)).insertOne({
         _id: key,
         value: result,
         createdAt: new Date(),
@@ -1160,7 +1180,20 @@ async function prezziDiLista(data: z.infer<typeof PricesInput>) {
      promette prezzi veri e' la bugia peggiore, perche' e' invisibile: la
      risposta e' ben formata, i link funzionano, solo le cifre sono di un'altra
      settimana. Ora scade insieme ai prezzi. */
-  const key = cacheKey("prices", { ...data, priceSource: fonte });
+  /* NELLA CHIAVE VA ANCHE COME E' STATA CALCOLATA.
+     Senza, la stessa lista chiesta con la scelta del modello accesa e spenta
+     divide la stessa voce di cache — e la seconda riceve la risposta della
+     prima. Si e' visto misurando: due servizi identici tranne
+     `SCELTA_MODELLO` davano risultati identici su tutte e ottanta le prove,
+     errore per errore. Sembrava una scoperta, ed era la cache.
+
+     In produzione e' peggio che in una prova: vuol dire servire sotto
+     un'impostazione una risposta calcolata sotto un'altra. */
+  const key = cacheKey("prices", {
+    ...data,
+    priceSource: fonte,
+    sceltaModello: process.env.SCELTA_MODELLO !== "no",
+  });
   const local = memoryGet(key);
   if (local !== undefined) {
     console.info(`[cache] HIT memoria ${key}`);
@@ -1168,10 +1201,18 @@ async function prezziDiLista(data: z.infer<typeof PricesInput>) {
   }
   if (isDbConfigured()) {
     try {
-      const hit = await (await cache()).findOne({ _id: key });
-      if (hit) {
-        memorySet(key, hit.value);
-        return hit.value;
+      const hit = await dallaCache(key);
+      if (hit !== undefined) {
+        /* SI DICE ANCHE QUANDO ARRIVA DAL DATABASE.
+           Questa riga non c'era, e quella di memoria si': una risposta che
+           arriva dal database non lasciava traccia. Misurando due strade
+           diverse sembravano dare lo stesso risultato ottanta volte su
+           ottanta — ed era la cache che rispondeva per tutte e due, senza
+           dirlo. Una cache silenziosa e' il modo piu' facile di misurare
+           una cosa e crederne un'altra. */
+        console.info(`[cache] HIT database ${key}`);
+        memorySet(key, hit);
+        return hit;
       }
     } catch {
       /* cache irraggiungibile */
@@ -1191,7 +1232,7 @@ async function prezziDiLista(data: z.infer<typeof PricesInput>) {
   memorySet(key, esito, FRESCHEZZA_MS);
   if (isDbConfigured()) {
     try {
-      await (await cache()).insertOne({
+      await (await cache(key)).insertOne({
         _id: key,
         value: esito,
         createdAt: new Date(),
@@ -1229,11 +1270,11 @@ app.post("/ai/plan-full", async (body) => {
   }
   if (isDbConfigured()) {
     try {
-      const hit = await (await cache()).findOne({ _id: key });
-      if (hit) {
+      const hit = await dallaCache(key);
+      if (hit !== undefined) {
         console.info(`[cache] HIT database ${key}`);
-        memorySet(key, hit.value);
-        return hit.value;
+        memorySet(key, hit);
+        return hit;
       }
     } catch (err) {
       console.warn("[cache] lettura fallita, proseguo senza:", err);
@@ -1269,7 +1310,7 @@ app.post("/ai/plan-full", async (body) => {
   memorySet(key, result);
   if (isDbConfigured()) {
     try {
-      await (await cache()).insertOne({
+      await (await cache(key)).insertOne({
         _id: key,
         value: result,
         createdAt: new Date(),
@@ -1322,11 +1363,11 @@ app.post("/product/amazon", async (body) => {
   }
   if (isDbConfigured()) {
     try {
-      const hit = await (await cache()).findOne({ _id: key });
-      if (hit) {
-        memorySet(key, hit.value);
+      const hit = await dallaCache(key);
+      if (hit !== undefined) {
+        memorySet(key, hit);
         console.info(`[cache] HIT database ${key} — nessun credito consumato`);
-        return hit.value;
+        return hit;
       }
     } catch {
       /* cache irraggiungibile: si prosegue */
@@ -1348,7 +1389,7 @@ app.post("/product/amazon", async (body) => {
     memorySet(key, risultato);
     if (isDbConfigured()) {
       try {
-        await (await cache()).insertOne({
+        await (await cache(key)).insertOne({
           _id: key,
           value: risultato,
           createdAt: new Date(),
@@ -1398,10 +1439,10 @@ app.post("/product/shopping", async (body) => {
   }
   if (isDbConfigured()) {
     try {
-      const hit = await (await cache()).findOne({ _id: key });
-      if (hit) {
-        memorySet(key, hit.value);
-        return hit.value;
+      const hit = await dallaCache(key);
+      if (hit !== undefined) {
+        memorySet(key, hit);
+        return hit;
       }
     } catch {
       /* cache irraggiungibile: si prosegue */
@@ -1417,7 +1458,7 @@ app.post("/product/shopping", async (body) => {
     memorySet(key, result);
     if (isDbConfigured()) {
       try {
-        await (await cache()).insertOne({
+        await (await cache(key)).insertOne({
           _id: key,
           value: result,
           createdAt: new Date(),

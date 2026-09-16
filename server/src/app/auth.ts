@@ -12,7 +12,7 @@
 
 import { createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { HttpError } from "./http.js";
+import { HttpError } from "../base/http.js";
 
 const scrypt = promisify(scryptCb) as (
   password: string,

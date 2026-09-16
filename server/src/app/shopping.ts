@@ -19,7 +19,7 @@
  * italiana torna con risultati americani in dollari.
  */
 
-import { HttpError } from "./http.js";
+import { HttpError } from "../base/http.js";
 
 export interface ShoppingItem {
   title: string;

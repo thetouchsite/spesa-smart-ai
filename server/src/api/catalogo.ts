@@ -316,13 +316,100 @@ export function nomeDaUrl(url: string): string | null {
   return nome.length >= 3 ? nome : null;
 }
 
-/** Parole confrontabili: senza accenti, senza numeri isolati, senza sigle corte. */
+/**
+ * L'ACCA CHE IL TEDESCO METTE AL POSTO DELLA DIERESI.
+ *
+ * Gli indirizzi dei negozi tedeschi non contengono ä, ö, ü: li scrivono ae,
+ * oe, ue, perche' un URL sta nell'alfabeto inglese. Quindi il catalogo dice
+ * `kaese`, `haehnchen`, `aepfel`, `broetchen`.
+ *
+ * Chi cerca invece scrive «Käse», e `parole()` toglie la dieresi ottenendo
+ * `kase`. Le due forme non si incontrano mai. Misurato su sette parole
+ * tedesche: ZERO risultati con la dieresi tolta, cinque con la traslitterazione.
+ * Un'intera classe di parole irraggiungibile, in silenzio, su DE AT e CH.
+ *
+ * Perche' non si traslittera e basta: lo spagnolo scrive `pingüino` e il suo
+ * indirizzo dice `pinguino`, non `pingueino`. Una regola sola romperebbe una
+ * lingua per aggiustarne un'altra. Quindi si tengono TUTTE E DUE le forme —
+ * nell'indice e nella ricerca — e si incontrano comunque.
+ */
+function tedescoDaIndirizzo(testo: string): string {
+  return testo
+    .replace(/ä/g, "ae").replace(/Ä/g, "Ae")
+    .replace(/ö/g, "oe").replace(/Ö/g, "Oe")
+    .replace(/ü/g, "ue").replace(/Ü/g, "Ue")
+    .replace(/ß/g, "ss");
+}
+
+/**
+ * Le forme sotto cui ogni parola va cercata, una riga per parola di partenza.
+ *
+ * Il raggruppamento non e' un vezzo: chi conta i punti deve sapere che `kase`
+ * e `kaese` sono LA STESSA parola chiesta, se no una voce con la dieresi
+ * varrebbe il doppio di una senza e la classifica si storcerebbe.
+ */
+export function formeDelleParole(testo: string): string[][] {
+  const dritte = parole(testo);
+  const tradotte = parole(tedescoDaIndirizzo(testo));
+
+  /* Le due liste hanno la stessa lunghezza e lo stesso ordine finche' la
+     traslitterazione non cambia la lunghezza di una parola — e non la cambia
+     mai: sostituisce lettere, non ne toglie. Se per qualche motivo divergono
+     si torna alle sole forme dritte, che e' il comportamento di prima. */
+  if (tradotte.length !== dritte.length) return dritte.map((p) => [p]);
+
+  return dritte.map((p, i) => (p === tradotte[i] ? [p] : [p, tradotte[i]]));
+}
+
+/**
+ * Le unita' di misura. Non dicono che cosa e' un prodotto, dicono quanto pesa.
+ */
+const UNITA = new Set([
+  "kg", "gr", "grammi", "ml", "cl", "lt", "litri", "litro",
+  "pz", "pezzi", "pezzo", "conf", "confezione", "bottiglia", "barattolo",
+  "vasetto", "busta", "sacchetto", "pack", "pcs", "unid", "unidades",
+  "stk", "stueck", "flasche", "packung", "piece", "pieces", "bouteille",
+]);
+
+/**
+ * Parole confrontabili: senza accenti, senza sigle corte, E SENZA NUMERI.
+ *
+ * PERCHE' IL PESO NON E' UNA PAROLA DEL PRODOTTO
+ * ----------------------------------------------
+ * Il peso finiva nell'indice come qualsiasi altra parola, e due prodotti che
+ * pesano uguale si somigliavano. Misurato, e visto da un utente in mezzo a una
+ * dimostrazione al cliente:
+ *
+ *     «Pomodorini»          → POMODORI E POMODORINI      quattro candidati
+ *     «Pomodorini 250 g»    → cuoco di bordo ORATA
+ *                             alla mediterranea          uno, ed e' un'orata
+ *
+ * La lista della spesa le quantita' ce le ha per forza — «1 confezione da
+ * 250 g» la scrive chi genera la lista — e bastavano a mandare la ricerca da
+ * un'altra parte. Lo stesso in inglese: cercando «zucchine 500g» tornavano le
+ * CHIACCHIERE, che pesano uguale.
+ *
+ * Via anche i codici prodotto, che cominciano per cifra — `1029250`,
+ * `000000000000488` — e che erano puro rumore dentro l'indice.
+ *
+ * Il peso NON si butta: e' un dato, e diventera' il prezzo al chilo. Ma e' un
+ * dato a parte, non una parola del nome.
+ */
 export function parole(testo: string): string[] {
   const piano = testo
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "");
-  return [...new Set(piano.split(/[^a-z0-9]+/).filter((p) => p.length > 2))];
+  return [
+    ...new Set(
+      piano
+        .split(/[^a-z0-9]+/)
+        .filter((p) => p.length > 2)
+        // Comincia per cifra: e' una quantita' o un codice, non un nome.
+        .filter((p) => !/^[0-9]/.test(p))
+        .filter((p) => !UNITA.has(p)),
+    ),
+  ];
 }
 
 /* ─────────────── Cosa non puo' MAI essere la risposta ─────────────── */
@@ -795,10 +882,16 @@ async function costruisci(paese: string): Promise<CatalogoPaese | null> {
   // L'indice inverso: senza, ogni ricerca scorrerebbe centomila voci.
   const indice = new Map<string, number[]>();
   voci.forEach((v, i) => {
-    for (const p of v.parole) {
-      const dove = indice.get(p);
-      if (dove) dove.push(i);
-      else indice.set(p, [i]);
+    /* Sotto TUTTE le forme, non solo quella con la dieresi tolta: un prodotto
+       che si chiama «Käse» si trova sia cercando `kase` sia cercando `kaese`,
+       e uno che si chiama `kaese` — come scrivono gli indirizzi — pure. Le due
+       scritture della stessa parola smettono di essere due parole. */
+    for (const forme of formeDelleParole(v.nome)) {
+      for (const p of forme) {
+        const dove = indice.get(p);
+        if (dove) dove.push(i);
+        else indice.set(p, [i]);
+      }
     }
   });
 
@@ -938,12 +1031,56 @@ export async function cercaNelCatalogo(
 
   // Quante volte ogni voce viene nominata dalle parole cercate.
   const conteggio = new Map<number, number>();
-  for (const p of cercate) {
-    const dove = cat.indice.get(p);
-    if (!dove) continue;
-    // Una parola presente in mezzo catalogo non distingue niente e rallenta.
-    if (dove.length > cat.voci.length / 3) continue;
-    for (const i of dove) conteggio.set(i, (conteggio.get(i) ?? 0) + 1);
+
+  /* E QUANTO PESANO QUELLE PAROLE, che non e' la stessa domanda.
+     Contandole e basta, «wholemeal» vale quanto «pasta» — e siccome di roba
+     integrale il catalogo e' pieno mentre la pasta e' una cosa sola, per
+     «Wholemeal pasta» vinceva un PANE: aveva una parola su due, come tutti
+     gli altri, e la spuntava sugli altri criteri.
+
+     Misurato, gli stessi errori in quattro lingue:
+       «Wholemeal pasta»      → Warburtons Wholemeal (pane)
+       «Oignons jaunes»       → lentilles jaunes      (matcha solo il colore)
+       «Yaourt grec nature»   → yaourt nature         (perde «grec»)
+       «Carne picada»         → bolitas de carne      (perde «picada»)
+       «Pommes Golden»        → puree pommes          (perde «golden»)
+
+     Una parola che compare in mezzo catalogo non distingue niente; una che
+     compare raramente distingue quasi da sola. Il peso e' il logaritmo di
+     quante voci NON la contengono — la misura di quanto sorprende trovarla —
+     ed e' la stessa cosa che fa qualunque motore di ricerca da cinquant'anni.
+     Qui serve perche' le liste della spesa sono fatte cosi': un nome e uno o
+     due aggettivi, e l'aggettivo da solo non e' mai la risposta. */
+  const peso = new Map<number, number>();
+  const quanteVoci = cat.voci.length || 1;
+
+  for (const forme of formeDelleParole(richiesta)) {
+    /* UNA PAROLA CHIESTA VALE UN PUNTO, anche quando si scrive in due modi.
+       «Käse» si cerca come `kase` e come `kaese`, e un prodotto che le ha tutte
+       e due nell'indice — perche' ce le ha messe il caricamento — non deve
+       prendere due punti per una parola sola: varrebbe il doppio di chi si
+       chiama «Gouda», e la classifica si storcerebbe a favore di chi ha la
+       dieresi. Quindi le voci toccate si raccolgono e si contano una volta. */
+    const toccate = new Set<number>();
+    for (const p of forme) {
+      const dove = cat.indice.get(p);
+      if (!dove) continue;
+      // Una parola presente in mezzo catalogo non distingue niente e rallenta.
+      if (dove.length > cat.voci.length / 3) continue;
+      for (const i of dove) toccate.add(i);
+    }
+    if (toccate.size === 0) continue;
+
+    /* Quanto e' rara questa parola nel catalogo di QUESTO paese. Si misura
+       ogni volta e non si scrive da nessuna parte: «bio» e' comune in
+       Germania e rara altrove, e un elenco fatto a mano invecchierebbe a ogni
+       insegna che Antonio aggiunge. */
+    const rarita = Math.log(quanteVoci / toccate.size);
+
+    for (const i of toccate) {
+      conteggio.set(i, (conteggio.get(i) ?? 0) + 1);
+      peso.set(i, (peso.get(i) ?? 0) + rarita);
+    }
   }
 
   /* CHI HA TUTTE LE PAROLE VIENE PRIMA, E DI SOLITO BASTA LUI.
@@ -981,6 +1118,10 @@ export async function cercaNelCatalogo(
      tutti nella stessa catena. */
   const ordinati = usati.sort(
     (a, b) =>
+      /* Il PESO viene prima del conteggio: chi ha la parola che distingue
+         batte chi ne ha tante di comuni. A parita' di peso — cioe' quando
+         hanno davvero le stesse parole — decidono i criteri di sempre. */
+      (peso.get(b[0]) ?? 0) - (peso.get(a[0]) ?? 0) ||
       b[1] - a[1] ||
       quota(b[0], b[1]) - quota(a[0], a[1]) ||
       // A pari pertinenza vince chi il prezzo lo dichiara piu' spesso: e' il

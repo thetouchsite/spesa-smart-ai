@@ -39,9 +39,9 @@ import { writeFileSync } from "node:fs";
 const CAMPIONE = 12;
 
 async function main() {
-  const { FONTI, paesiConCatalogo } = await import("../src/catalogo-fonti.js");
-  const { catalogoDi } = await import("../src/catalogo.js");
-  const { verifyProductPage } = await import("../src/price-page.js");
+  const { FONTI, paesiConCatalogo } = await import("../src/api/catalogo-fonti.js");
+  const { catalogoDi } = await import("../src/api/catalogo.js");
+  const { verifyProductPage } = await import("../src/api/price-page.js");
 
   const filtro = process.argv.includes("--solo")
     ? new Set(

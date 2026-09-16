@@ -36,9 +36,9 @@
  *   npx tsx scripts/riempi-prezzi.ts --voci 100      quante voci per paese
  */
 
-import { catalogoDi, cercaNelCatalogo } from "../src/catalogo.js";
-import { verifyProductPage } from "../src/price-page.js";
-import { prezziGiaVisti, salvaPrezzi, statoMagazzino, type PrezzoSalvato } from "../src/prezzi-magazzino.js";
+import { catalogoDi, cercaNelCatalogo } from "../src/api/catalogo.js";
+import { verifyProductPage } from "../src/api/price-page.js";
+import { prezziGiaVisti, salvaPrezzi, statoMagazzino, type PrezzoSalvato } from "../src/api/prezzi-magazzino.js";
 
 /**
  * La spesa di base, nella lingua di chi la compra.

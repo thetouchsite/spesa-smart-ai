@@ -29,7 +29,7 @@
  */
 
 import { linkRicercaAmazon } from "./amazon.js";
-import { insegnePerPaese, isoDaPaese } from "./insegne-online.js";
+import { insegnePerPaese, isoDaPaese } from "../api/insegne-online.js";
 
 /**
  * Nomi di paese verso codice ISO.

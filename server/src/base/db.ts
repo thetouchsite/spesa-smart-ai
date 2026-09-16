@@ -18,7 +18,7 @@
  */
 
 import { MongoClient, type Binary, type Collection, type Db } from "mongodb";
-import type { VerifyStatus } from "./price-page.js";
+import type { VerifyStatus } from "../api/price-page.js";
 
 export interface UserDoc {
   _id?: unknown;
@@ -132,6 +132,8 @@ export async function getDb(): Promise<Db> {
     db.collection<PlanDoc>("plans").createIndex({ userId: 1, createdAt: -1 }),
     // expireAfterSeconds: 0 => Mongo usa il valore del campo come scadenza.
     db.collection<CacheDoc>("cache").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection<CacheDoc>("cache_api").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection<CacheDoc>("cache_app").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection<PrezzoDoc>("prezzi").createIndex({ scadeIl: 1 }, { expireAfterSeconds: 0 }),
     // Si cercano sempre per indirizzo E per freschezza insieme: un indice solo
     // su `visto` farebbe scorrere tutte le righe recenti per trovarne dodici.
@@ -153,7 +155,49 @@ export async function plans(): Promise<Collection<PlanDoc>> {
   return (await getDb()).collection<PlanDoc>("plans");
 }
 
-export async function cache(): Promise<Collection<CacheDoc>> {
+/**
+ * LA CACHE E' DUE, NON UNA.
+ *
+ * Era una collezione sola, e dentro ci finivano tutte e due le meta' del
+ * sistema: le risposte sui prezzi — che sono l'API, il prodotto — insieme ai
+ * menu, alle ricette e alle liste, che sono l'app del cliente.
+ *
+ * Finche' vivono in casa insieme non e' un problema pratico: il problema e'
+ * che il giorno in cui l'API se ne va per conto suo, quella collezione va
+ * divisa a mano, con dentro qualche milione di documenti. Adesso costa cinque
+ * righe; fra sei mesi e' una migrazione.
+ *
+ * E c'e' una ragione piu' immediata: le due meta' hanno vite diverse. Una
+ * risposta sui prezzi scade in ventiquattro ore perche' i prezzi cambiano; un
+ * menu potrebbe durare settimane. Nella stessa collezione si finisce per dare
+ * a tutti la soglia piu' corta — che e' esattamente cio' che succedeva.
+ *
+ * Chi va dove lo dice il prefisso della chiave, che c'era gia':
+ *
+ *     prices                                   → api
+ *     menu, lista, plan-full, menu-da-prodotti → app
+ *     amazon, shopping                         → app (strade alternative)
+ */
+function dovePosare(chiave: string): "cache_api" | "cache_app" {
+  return chiave.startsWith("prices:") ? "cache_api" : "cache_app";
+}
+
+export async function cache(chiave?: string): Promise<Collection<CacheDoc>> {
+  const db = await getDb();
+  // Senza chiave — succede solo negli script di servizio — si risponde con
+  // quella dell'app, che e' la piu' grande.
+  return db.collection<CacheDoc>(chiave ? dovePosare(chiave) : "cache_app");
+}
+
+/**
+ * La collezione di prima, che va svuotandosi da sola.
+ *
+ * Le voci hanno tutte una scadenza e Mongo le toglie: nel giro di qualche
+ * giorno resta vuota e si puo' cancellare. Fino ad allora la si legge ancora,
+ * se no il giorno del passaggio tutti pagherebbero di nuovo un lavoro gia'
+ * fatto — e quel giorno c'era una dimostrazione al cliente in corso.
+ */
+export async function cacheVecchia(): Promise<Collection<CacheDoc>> {
   return (await getDb()).collection<CacheDoc>("cache");
 }
 

@@ -96,6 +96,15 @@ services:
       # paga. Senza questa riga il valore e' tre quarti del tetto.
       - key: SPESA_MAX_USD_APP
         value: "3.75"
+      # Chi puo' chiamare l'API DA UN BROWSER. Senza questa riga il valore e'
+      # `*`, cioe' chiunque: un sito qualunque poteva far fare le richieste al
+      # visitatore e consumare il nostro credito.
+      #
+      # Le app native NON sono toccate: non mandano `Origin`, e CORS e' una
+      # regola del browser. Qui dentro servono solo le origini web — la
+      # preview di Expo in sviluppo e il sito statico in produzione.
+      - key: ALLOWED_ORIGINS
+        value: "https://spesa-smart-app.onrender.com,http://localhost:8081,http://127.0.0.1:8081,http://localhost:19006"
 
       # ── Facoltative: senza, i pezzi che le usano restano spenti ────────
       # Prodotti Amazon veri al tocco su una voce.

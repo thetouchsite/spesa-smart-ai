@@ -31,9 +31,9 @@
  */
 
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { insegnePerPaese } from "../src/insegne-online.js";
-import { searchProvider } from "../src/search.js";
-import { verifyProductPage } from "../src/price-page.js";
+import { insegnePerPaese } from "../src/api/insegne-online.js";
+import { searchProvider } from "../src/app/search.js";
+import { verifyProductPage } from "../src/api/price-page.js";
 
 const PAESE = (process.argv[2] ?? "IT").toUpperCase();
 const QUANTI = Number(process.argv[3] ?? 8);

@@ -55,8 +55,8 @@
  */
 
 import { z } from "zod";
-import { elencoChiuso, isoDaPaese, linkCostruitiAttivo, rigaInsegne } from "./insegne-online.js";
-import { annotaEsito } from "./salute-ia.js";
+import { elencoChiuso, isoDaPaese, linkCostruitiAttivo, rigaInsegne } from "../api/insegne-online.js";
+import { annotaEsito } from "../base/salute-ia.js";
 
 /** Fase 2: il modello che cerca. È quello che si paga. */
 export const GROUNDED_MODEL = process.env.GEMINI_GROUNDED_MODEL ?? "gemini-3-flash-preview";

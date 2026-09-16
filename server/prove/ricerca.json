@@ -1,0 +1,3184 @@
+{
+  "_": "Le regole di cosa sia «giusto» per ogni voce. Vedi ricerca.md. Le `mai` sono trappole VISTE nei cataloghi veri, non immaginate: ogni voce sbagliata che si trova va aggiunta qui, cosi' quell'errore non torna.",
+  "IT": [
+    {
+      "voce": "Latte intero",
+      "deve": [
+        "latte"
+      ],
+      "unaDi": [
+        "intero"
+      ],
+      "mai": [
+        "capra",
+        "soia",
+        "cocco",
+        "mandorl",
+        "avena",
+        "riso",
+        "pane",
+        "dessert",
+        "mousse",
+        "carezza",
+        "uova latte"
+      ]
+    },
+    {
+      "voce": "Latte scremato",
+      "deve": [
+        "latte"
+      ],
+      "unaDi": [
+        "scremat"
+      ],
+      "mai": [
+        "capra",
+        "soia",
+        "cocco",
+        "pane",
+        "dessert"
+      ]
+    },
+    {
+      "voce": "Pasta integrale",
+      "deve": [
+        "pasta"
+      ],
+      "unaDi": [
+        "integral"
+      ],
+      "mai": [
+        "sfoglia",
+        "sugo",
+        "biscott",
+        "insalat",
+        "brisee",
+        "pizza"
+      ]
+    },
+    {
+      "voce": "Pasta di semola",
+      "deve": [
+        "pasta"
+      ],
+      "mai": [
+        "sfoglia",
+        "sugo",
+        "biscott",
+        "insalat",
+        "brisee",
+        "e fagioli",
+        "ripien"
+      ]
+    },
+    {
+      "voce": "Riso Carnaroli",
+      "deve": [
+        "riso"
+      ],
+      "unaDi": [
+        "carnaroli"
+      ],
+      "mai": [
+        "pronto",
+        "insalat",
+        "latte di riso",
+        "farina"
+      ]
+    },
+    {
+      "voce": "Riso basmati",
+      "deve": [
+        "riso"
+      ],
+      "unaDi": [
+        "basmati"
+      ],
+      "mai": [
+        "pronto in",
+        "insalat",
+        "farina"
+      ]
+    },
+    {
+      "voce": "Pomodori pelati",
+      "deve": [
+        "pelati"
+      ],
+      "unaDi": [
+        "pomodor"
+      ],
+      "mai": [
+        "sugo",
+        "passata"
+      ]
+    },
+    {
+      "voce": "Passata di pomodoro",
+      "deve": [
+        "passata"
+      ],
+      "unaDi": [
+        "pomodor"
+      ],
+      "mai": [
+        "verdur",
+        "legumi",
+        "zuppa"
+      ]
+    },
+    {
+      "voce": "Doppio concentrato di pomodoro",
+      "deve": [
+        "concentrato"
+      ],
+      "unaDi": [
+        "pomodor"
+      ],
+      "mai": [
+        "brodo"
+      ]
+    },
+    {
+      "voce": "Olio extravergine di oliva",
+      "deve": [
+        "olio"
+      ],
+      "unaDi": [
+        "extravergine",
+        "extra vergine"
+      ],
+      "mai": [
+        "spray",
+        "girasole",
+        "semi",
+        "cocco",
+        "palma"
+      ]
+    },
+    {
+      "voce": "Olio di semi di girasole",
+      "deve": [
+        "olio"
+      ],
+      "unaDi": [
+        "girasole"
+      ],
+      "mai": [
+        "oliva",
+        "spray"
+      ]
+    },
+    {
+      "voce": "Uova fresche",
+      "deve": [
+        "uova"
+      ],
+      "mai": [
+        "latte e burro",
+        "tegamino",
+        "caramell",
+        "pasta",
+        "sostituto",
+        "liquide"
+      ]
+    },
+    {
+      "voce": "Petto di pollo",
+      "deve": [
+        "pollo"
+      ],
+      "unaDi": [
+        "petto"
+      ],
+      "mai": [
+        "tagliata",
+        "panat",
+        "cotolett",
+        "arrost",
+        "insalat",
+        "brodo",
+        "wurstel"
+      ]
+    },
+    {
+      "voce": "Macinato di manzo",
+      "deve": [
+        "macinat"
+      ],
+      "unaDi": [
+        "manzo",
+        "bovin",
+        "vitell"
+      ],
+      "mai": [
+        "pollo",
+        "tacchino",
+        "suin",
+        "vegetal",
+        "soia"
+      ]
+    },
+    {
+      "voce": "Tonno in scatola",
+      "deve": [
+        "tonno"
+      ],
+      "mai": [
+        "carpaccio",
+        "bottarga",
+        "poke",
+        "sugo",
+        "insalat",
+        "gatt",
+        "crocchett",
+        "tartare",
+        "affumicat"
+      ]
+    },
+    {
+      "voce": "Salmone affumicato",
+      "deve": [
+        "salmone"
+      ],
+      "unaDi": [
+        "affumicat"
+      ],
+      "mai": [
+        "gatt",
+        "pate",
+        "burger",
+        "sugo"
+      ]
+    },
+    {
+      "voce": "Merluzzo surgelato",
+      "deve": [
+        "merluzzo"
+      ],
+      "mai": [
+        "panat",
+        "bastoncin",
+        "gatt",
+        "olio di fegato"
+      ]
+    },
+    {
+      "voce": "Zucchine",
+      "deve": [
+        "zucchin"
+      ],
+      "mai": [
+        "melanzane",
+        "griglia",
+        "grigliat",
+        "sott",
+        "crema",
+        "vellutat",
+        "ripien",
+        "surgelat"
+      ]
+    },
+    {
+      "voce": "Melanzane",
+      "deve": [
+        "melanzan"
+      ],
+      "mai": [
+        "zucchin",
+        "griglia",
+        "sott",
+        "parmigiana",
+        "ripien",
+        "crema"
+      ]
+    },
+    {
+      "voce": "Pomodorini ciliegino",
+      "deve": [
+        "ciliegin"
+      ],
+      "mai": [
+        "passata",
+        "sugo",
+        "secchi",
+        "conserva"
+      ]
+    },
+    {
+      "voce": "Patate",
+      "deve": [
+        "patat"
+      ],
+      "mai": [
+        "chips",
+        "snack",
+        "purea",
+        "puree",
+        "croccant",
+        "gnocchi",
+        "marzipan",
+        "crocchett",
+        "surgelat",
+        "fritte"
+      ]
+    },
+    {
+      "voce": "Cipolle",
+      "deve": [
+        "cipoll"
+      ],
+      "mai": [
+        "anelli",
+        "sott",
+        "chips",
+        "zuppa",
+        "crema",
+        "confettura"
+      ]
+    },
+    {
+      "voce": "Carote",
+      "deve": [
+        "carot"
+      ],
+      "mai": [
+        "succo",
+        "torta",
+        "zuppa",
+        "crema",
+        "baby food",
+        "omogeneizzat"
+      ]
+    },
+    {
+      "voce": "Insalata mista",
+      "deve": [
+        "insalat"
+      ],
+      "mai": [
+        "riso",
+        "pasta",
+        "pollo",
+        "tonno",
+        "mare",
+        "russa"
+      ]
+    },
+    {
+      "voce": "Mele Golden",
+      "deve": [
+        "mele"
+      ],
+      "unaDi": [
+        "golden"
+      ],
+      "mai": [
+        "succo",
+        "torta",
+        "aceto",
+        "composta",
+        "chips",
+        "omogeneizzat"
+      ]
+    },
+    {
+      "voce": "Banane",
+      "deve": [
+        "banan"
+      ],
+      "mai": [
+        "chips",
+        "succo",
+        "yogurt",
+        "gelat",
+        "frullat",
+        "budin"
+      ]
+    },
+    {
+      "voce": "Arance",
+      "deve": [
+        "aranc"
+      ],
+      "mai": [
+        "succo",
+        "spremuta",
+        "marmellat",
+        "aranciata",
+        "scorza",
+        "canditi"
+      ]
+    },
+    {
+      "voce": "Parmigiano Reggiano",
+      "deve": [
+        "parmigiano"
+      ],
+      "mai": [
+        "grattugiat gia",
+        "snack",
+        "crema",
+        "fonduta",
+        "melanzane"
+      ]
+    },
+    {
+      "voce": "Mozzarella di bufala",
+      "deve": [
+        "mozzarella"
+      ],
+      "unaDi": [
+        "bufala"
+      ],
+      "mai": [
+        "fette",
+        "pizza",
+        "julienne",
+        "cubetti",
+        "carrozza"
+      ]
+    },
+    {
+      "voce": "Yogurt greco bianco",
+      "deve": [
+        "yogurt"
+      ],
+      "unaDi": [
+        "greco"
+      ],
+      "mai": [
+        "cocco",
+        "granola",
+        "lampon",
+        "fragol",
+        "frutt",
+        "cioccolat",
+        "vanigli",
+        "miele"
+      ]
+    },
+    {
+      "voce": "Burro",
+      "deve": [
+        "burro"
+      ],
+      "mai": [
+        "uova latte",
+        "arachid",
+        "cacao",
+        "biscott",
+        "brioche",
+        "croissant",
+        "salato di",
+        "chiarificato"
+      ]
+    },
+    {
+      "voce": "Ricotta",
+      "deve": [
+        "ricotta"
+      ],
+      "mai": [
+        "cannol",
+        "torta",
+        "ravioli",
+        "tortellin",
+        "crostat",
+        "sfoglia"
+      ]
+    },
+    {
+      "voce": "Pane integrale",
+      "deve": [
+        "integral"
+      ],
+      "unaDi": [
+        "pane",
+        "pan bauletto",
+        "pan carre",
+        "pancarre",
+        "pagnotta"
+      ],
+      "mai": [
+        "grattugiat",
+        "carasau",
+        "azzimo",
+        "spezie",
+        "aromatizz"
+      ],
+      "_nota": "«pan bauletto integrale» E' pane integrale: la regola pretendeva la parola «pane» e in italiano si dice anche «pan». Etichetta sbagliata da me, corretta — non una prova ammorbidita per far passare qualcosa."
+    },
+    {
+      "voce": "Farina 00",
+      "deve": [
+        "farina"
+      ],
+      "mai": [
+        "riso",
+        "mais",
+        "ceci",
+        "mandorl",
+        "cocco",
+        "preparato",
+        "pizza pronta"
+      ]
+    },
+    {
+      "voce": "Zucchero semolato",
+      "deve": [
+        "zucchero"
+      ],
+      "mai": [
+        "senza zucchero",
+        "filato",
+        "velo",
+        "canna",
+        "dolcificant",
+        "vanigliato"
+      ]
+    },
+    {
+      "voce": "Sale fino",
+      "deve": [
+        "sale"
+      ],
+      "mai": [
+        "salest",
+        "salame",
+        "salsa",
+        "salsiccia",
+        "iposodico",
+        "da bagno",
+        "grosso"
+      ]
+    },
+    {
+      "voce": "Caffe macinato",
+      "deve": [
+        "caffe"
+      ],
+      "mai": [
+        "dessert",
+        "grisbi",
+        "gelat",
+        "liquore",
+        "te e tisane",
+        "biscott",
+        "crema",
+        "macchina",
+        "capsul",
+        "cialde",
+        "shop"
+      ]
+    },
+    {
+      "voce": "Fagioli borlotti",
+      "deve": [
+        "fagioli"
+      ],
+      "unaDi": [
+        "borlott"
+      ],
+      "mai": [
+        "fagiolini",
+        "pasta e",
+        "zuppa",
+        "vellutat",
+        "burger"
+      ]
+    },
+    {
+      "voce": "Ceci in scatola",
+      "deve": [
+        "ceci"
+      ],
+      "mai": [
+        "farina",
+        "hummus",
+        "pasta di",
+        "snack",
+        "tostati",
+        "zuppa"
+      ]
+    },
+    {
+      "voce": "Lenticchie secche",
+      "deve": [
+        "lenticchie"
+      ],
+      "mai": [
+        "zuppa",
+        "vellutat",
+        "burger",
+        "cotechino",
+        "pronte"
+      ]
+    }
+  ],
+  "GB": [
+    {
+      "voce": "Whole milk",
+      "deve": [
+        "milk"
+      ],
+      "unaDi": [
+        "whole"
+      ],
+      "mai": [
+        "chocolate",
+        "coconut",
+        "soya",
+        "oat",
+        "almond",
+        "milkshake",
+        "eggs butter",
+        "condensed",
+        "powder"
+      ]
+    },
+    {
+      "voce": "Semi skimmed milk",
+      "deve": [
+        "milk"
+      ],
+      "unaDi": [
+        "skimmed"
+      ],
+      "mai": [
+        "coconut",
+        "soya",
+        "oat",
+        "almond",
+        "powder",
+        "condensed"
+      ]
+    },
+    {
+      "voce": "Wholemeal pasta",
+      "deve": [
+        "pasta"
+      ],
+      "unaDi": [
+        "wholemeal",
+        "wholewheat",
+        "whole wheat"
+      ],
+      "mai": [
+        "sauce",
+        "bake",
+        "meat feast",
+        "pesto",
+        "salad",
+        "ready",
+        "pot"
+      ]
+    },
+    {
+      "voce": "Basmati rice",
+      "deve": [
+        "rice"
+      ],
+      "unaDi": [
+        "basmati"
+      ],
+      "mai": [
+        "pudding",
+        "cake",
+        "milk",
+        "ready",
+        "microwave",
+        "salad",
+        "flour"
+      ]
+    },
+    {
+      "voce": "Chopped tomatoes",
+      "deve": [
+        "tomatoes"
+      ],
+      "unaDi": [
+        "chopped",
+        "plum"
+      ],
+      "mai": [
+        "soup",
+        "sauce",
+        "ketchup",
+        "sun dried",
+        "passata"
+      ]
+    },
+    {
+      "voce": "Tomato puree",
+      "deve": [
+        "tomato"
+      ],
+      "unaDi": [
+        "puree"
+      ],
+      "mai": [
+        "soup",
+        "ketchup",
+        "juice"
+      ]
+    },
+    {
+      "voce": "Olive oil",
+      "deve": [
+        "olive oil"
+      ],
+      "mai": [
+        "spray",
+        "sunflower",
+        "rapeseed",
+        "coconut",
+        "soap",
+        "hair",
+        "infused"
+      ]
+    },
+    {
+      "voce": "Extra virgin olive oil",
+      "deve": [
+        "olive oil"
+      ],
+      "unaDi": [
+        "extra virgin"
+      ],
+      "mai": [
+        "spray",
+        "sunflower",
+        "rapeseed",
+        "soap"
+      ]
+    },
+    {
+      "voce": "Free range eggs",
+      "deve": [
+        "eggs"
+      ],
+      "mai": [
+        "scotch",
+        "milk eggs",
+        "chocolate",
+        "easter",
+        "creme",
+        "noodle",
+        "substitute",
+        "liquid"
+      ]
+    },
+    {
+      "voce": "Chicken breast",
+      "deve": [
+        "chicken"
+      ],
+      "unaDi": [
+        "breast"
+      ],
+      "mai": [
+        "kiev",
+        "nugget",
+        "breaded",
+        "goujon",
+        "soup",
+        "stock",
+        "cat",
+        "dog",
+        "treat",
+        "butter chicken",
+        "ready meal"
+      ]
+    },
+    {
+      "voce": "Beef mince",
+      "deve": [
+        "mince"
+      ],
+      "unaDi": [
+        "beef",
+        "steak"
+      ],
+      "mai": [
+        "pork",
+        "turkey",
+        "quorn",
+        "vegan",
+        "pie",
+        "mincemeat",
+        "lasagne"
+      ]
+    },
+    {
+      "voce": "Tinned tuna",
+      "deve": [
+        "tuna"
+      ],
+      "mai": [
+        "dreamies",
+        "treat",
+        "cat",
+        "dog",
+        "pet",
+        "squeaky bean",
+        "pasta bake",
+        "sandwich",
+        "melt",
+        "steak"
+      ]
+    },
+    {
+      "voce": "Smoked salmon",
+      "deve": [
+        "salmon"
+      ],
+      "unaDi": [
+        "smoked"
+      ],
+      "mai": [
+        "cat",
+        "dog",
+        "pate",
+        "burger",
+        "fishcake",
+        "terrine"
+      ]
+    },
+    {
+      "voce": "Cod fillets",
+      "deve": [
+        "cod"
+      ],
+      "mai": [
+        "battered",
+        "breaded",
+        "finger",
+        "cat",
+        "liver oil",
+        "goujon"
+      ]
+    },
+    {
+      "voce": "Courgettes",
+      "deve": [
+        "courgette"
+      ],
+      "mai": [
+        "soup",
+        "spiral",
+        "ribbon",
+        "roasted",
+        "chutney",
+        "cake"
+      ]
+    },
+    {
+      "voce": "Mushrooms",
+      "deve": [
+        "mushroom"
+      ],
+      "mai": [
+        "soup",
+        "sauce",
+        "pate",
+        "ketchup",
+        "risotto",
+        "pie",
+        "stroganoff"
+      ]
+    },
+    {
+      "voce": "Potatoes",
+      "deve": [
+        "potato"
+      ],
+      "mai": [
+        "crisp",
+        "chip",
+        "wedge",
+        "mash",
+        "waffle",
+        "rosti",
+        "salad",
+        "sweet potato fries",
+        "snack"
+      ]
+    },
+    {
+      "voce": "Onions",
+      "deve": [
+        "onion"
+      ],
+      "mai": [
+        "ring",
+        "crisp",
+        "mccoy",
+        "soup",
+        "chutney",
+        "gravy",
+        "bhaji",
+        "powder"
+      ]
+    },
+    {
+      "voce": "Carrots",
+      "deve": [
+        "carrot"
+      ],
+      "mai": [
+        "cake",
+        "juice",
+        "soup",
+        "batons in",
+        "puree"
+      ]
+    },
+    {
+      "voce": "Broccoli",
+      "deve": [
+        "broccoli"
+      ],
+      "mai": [
+        "soup",
+        "cheese bake",
+        "stir fry",
+        "quiche"
+      ]
+    },
+    {
+      "voce": "Gala apples",
+      "deve": [
+        "apple"
+      ],
+      "unaDi": [
+        "gala"
+      ],
+      "mai": [
+        "juice",
+        "pie",
+        "sauce",
+        "crumble",
+        "cider",
+        "vinegar",
+        "crisp"
+      ]
+    },
+    {
+      "voce": "Bananas",
+      "deve": [
+        "banana"
+      ],
+      "mai": [
+        "chip",
+        "bread",
+        "milkshake",
+        "smoothie",
+        "loaf",
+        "split"
+      ]
+    },
+    {
+      "voce": "Strawberries",
+      "deve": [
+        "strawberr"
+      ],
+      "mai": [
+        "jam",
+        "yoghurt",
+        "milkshake",
+        "flavour",
+        "sweets",
+        "laces",
+        "trifle"
+      ]
+    },
+    {
+      "voce": "Mature cheddar",
+      "deve": [
+        "cheddar"
+      ],
+      "mai": [
+        "mccoy",
+        "onion",
+        "crisp",
+        "snack",
+        "sauce",
+        "puff",
+        "biscuit",
+        "flavour"
+      ]
+    },
+    {
+      "voce": "Mozzarella",
+      "deve": [
+        "mozzarella"
+      ],
+      "mai": [
+        "stick",
+        "dipper",
+        "pizza",
+        "grated",
+        "bite",
+        "salad"
+      ]
+    },
+    {
+      "voce": "Greek yoghurt",
+      "deve": [
+        "yoghurt"
+      ],
+      "unaDi": [
+        "greek"
+      ],
+      "mai": [
+        "strawberr",
+        "fruit",
+        "granola",
+        "honey",
+        "vanilla",
+        "chocolate",
+        "mango",
+        "drink"
+      ]
+    },
+    {
+      "voce": "Butter",
+      "deve": [
+        "butter"
+      ],
+      "mai": [
+        "peanut",
+        "chicken",
+        "milk eggs",
+        "shortbread",
+        "bean",
+        "cocoa",
+        "body",
+        "milk butter"
+      ]
+    },
+    {
+      "voce": "Wholemeal bread",
+      "deve": [
+        "bread"
+      ],
+      "unaDi": [
+        "wholemeal",
+        "brown"
+      ],
+      "mai": [
+        "crumb",
+        "sauce",
+        "pudding",
+        "stuffing",
+        "flour",
+        "mix"
+      ]
+    },
+    {
+      "voce": "Porridge oats",
+      "deve": [
+        "oats"
+      ],
+      "mai": [
+        "bar",
+        "biscuit",
+        "drink",
+        "milk",
+        "cookie",
+        "flapjack"
+      ]
+    },
+    {
+      "voce": "Plain flour",
+      "deve": [
+        "flour"
+      ],
+      "mai": [
+        "rice",
+        "almond",
+        "coconut",
+        "self raising",
+        "bread mix",
+        "pizza base"
+      ]
+    },
+    {
+      "voce": "Caster sugar",
+      "deve": [
+        "sugar"
+      ],
+      "mai": [
+        "free",
+        "no added",
+        "sweetener",
+        "candy floss",
+        "icing",
+        "snap"
+      ]
+    },
+    {
+      "voce": "Ground coffee",
+      "deve": [
+        "coffee"
+      ],
+      "mai": [
+        "liqueur",
+        "kahlua",
+        "barbie",
+        "shop",
+        "machine",
+        "pod",
+        "capsule",
+        "cake",
+        "biscuit",
+        "toy",
+        "table",
+        "mug"
+      ]
+    },
+    {
+      "voce": "Tea bags",
+      "deve": [
+        "tea"
+      ],
+      "mai": [
+        "towel",
+        "pot",
+        "spoon",
+        "tree oil",
+        "steak",
+        "instead",
+        "cake",
+        "light"
+      ]
+    },
+    {
+      "voce": "Baked beans",
+      "deve": [
+        "beans"
+      ],
+      "unaDi": [
+        "baked"
+      ],
+      "mai": [
+        "green beans",
+        "coffee bean",
+        "cocoa",
+        "burger",
+        "soup"
+      ]
+    },
+    {
+      "voce": "Chickpeas",
+      "deve": [
+        "chickpea"
+      ],
+      "mai": [
+        "hummus",
+        "flour",
+        "snack",
+        "roasted",
+        "pasta made"
+      ]
+    },
+    {
+      "voce": "Red lentils",
+      "deve": [
+        "lentil"
+      ],
+      "mai": [
+        "soup",
+        "dahl",
+        "ready",
+        "crisp",
+        "pasta made"
+      ]
+    },
+    {
+      "voce": "Orange juice",
+      "deve": [
+        "orange"
+      ],
+      "unaDi": [
+        "juice"
+      ],
+      "mai": [
+        "squash",
+        "cordial",
+        "flavour",
+        "sweets",
+        "chocolate"
+      ]
+    },
+    {
+      "voce": "Sparkling water",
+      "deve": [
+        "water"
+      ],
+      "unaDi": [
+        "sparkling"
+      ],
+      "mai": [
+        "flavour",
+        "bottle",
+        "filter",
+        "balloon",
+        "pistol",
+        "colour"
+      ]
+    },
+    {
+      "voce": "Bacon rashers",
+      "deve": [
+        "bacon"
+      ],
+      "unaDi": [
+        "rasher",
+        "back",
+        "streaky"
+      ],
+      "mai": [
+        "flavour",
+        "crisp",
+        "fries",
+        "bits",
+        "vegan",
+        "quorn",
+        "sandwich"
+      ]
+    },
+    {
+      "voce": "Pork sausages",
+      "deve": [
+        "sausage"
+      ],
+      "unaDi": [
+        "pork"
+      ],
+      "mai": [
+        "roll",
+        "vegan",
+        "quorn",
+        "meat free",
+        "dog",
+        "casserole"
+      ]
+    }
+  ],
+  "DE": [
+    {
+      "voce": "Vollmilch",
+      "deve": [
+        "milch"
+      ],
+      "unaDi": [
+        "voll"
+      ],
+      "mai": [
+        "choco",
+        "schoko",
+        "lindt",
+        "tafel",
+        "keks",
+        "leibniz",
+        "riegel",
+        "pulver",
+        "kondens",
+        "hafer",
+        "soja",
+        "mandel",
+        "kokos"
+      ]
+    },
+    {
+      "voce": "Fettarme Milch",
+      "deve": [
+        "milch"
+      ],
+      "unaDi": [
+        "fettarm"
+      ],
+      "mai": [
+        "schoko",
+        "pulver",
+        "kondens",
+        "hafer",
+        "soja",
+        "kokos"
+      ]
+    },
+    {
+      "voce": "Vollkornnudeln",
+      "deve": [
+        "nudeln"
+      ],
+      "unaDi": [
+        "vollkorn"
+      ],
+      "mai": [
+        "suppe",
+        "salat",
+        "auflauf",
+        "fertig",
+        "pfanne",
+        "topf"
+      ]
+    },
+    {
+      "voce": "Basmati Reis",
+      "deve": [
+        "reis"
+      ],
+      "unaDi": [
+        "basmati"
+      ],
+      "mai": [
+        "waffel",
+        "milch",
+        "pudding",
+        "mehl",
+        "fertig",
+        "pfanne",
+        "salat"
+      ]
+    },
+    {
+      "voce": "Gehackte Tomaten",
+      "deve": [
+        "tomaten"
+      ],
+      "unaDi": [
+        "gehackt",
+        "geschalt",
+        "passiert"
+      ],
+      "mai": [
+        "suppe",
+        "ketchup",
+        "sauce",
+        "getrocknet",
+        "mark"
+      ]
+    },
+    {
+      "voce": "Tomatenmark",
+      "deve": [
+        "tomatenmark"
+      ],
+      "mai": [
+        "suppe",
+        "ketchup",
+        "sauce"
+      ]
+    },
+    {
+      "voce": "Olivenöl",
+      "deve": [
+        "olivenoel"
+      ],
+      "mai": [
+        "thunfisch",
+        "sardinen",
+        "seife",
+        "spray",
+        "sonnenblumen",
+        "raps",
+        "haut"
+      ]
+    },
+    {
+      "voce": "Eier",
+      "deve": [
+        "eier"
+      ],
+      "mai": [
+        "nudeln",
+        "likoer",
+        "schoko",
+        "oster",
+        "salat",
+        "pulver",
+        "holz",
+        "ersatz"
+      ]
+    },
+    {
+      "voce": "Hähnchenbrust",
+      "deve": [
+        "haehnchenbrust"
+      ],
+      "mai": [
+        "aufschnitt",
+        "wurst",
+        "paniert",
+        "nugget",
+        "katzen",
+        "hunde",
+        "snack",
+        "suppe"
+      ]
+    },
+    {
+      "voce": "Rinderhackfleisch",
+      "deve": [
+        "hackfleisch"
+      ],
+      "unaDi": [
+        "rind"
+      ],
+      "mai": [
+        "schwein",
+        "pute",
+        "vegan",
+        "soja",
+        "lasagne",
+        "fertig"
+      ]
+    },
+    {
+      "voce": "Thunfisch",
+      "deve": [
+        "thunfisch"
+      ],
+      "mai": [
+        "katzen",
+        "hunde",
+        "dreamies",
+        "snack",
+        "tartar",
+        "salat",
+        "creme",
+        "pizza"
+      ]
+    },
+    {
+      "voce": "Lachsfilet",
+      "deve": [
+        "lachs"
+      ],
+      "unaDi": [
+        "filet"
+      ],
+      "mai": [
+        "katzen",
+        "hunde",
+        "creme",
+        "aufstrich",
+        "mit linsen",
+        "suppe",
+        "pastete"
+      ]
+    },
+    {
+      "voce": "Zucchini",
+      "deve": [
+        "zucchini"
+      ],
+      "mai": [
+        "puffer",
+        "auflauf",
+        "tofu",
+        "pastinaken",
+        "suppe",
+        "creme",
+        "gefuellt",
+        "grill"
+      ]
+    },
+    {
+      "voce": "Kartoffeln",
+      "deve": [
+        "kartoffeln"
+      ],
+      "mai": [
+        "marzipan",
+        "chips",
+        "puffer",
+        "pueree",
+        "salat",
+        "kloss",
+        "knoedel",
+        "sticks",
+        "gratin"
+      ]
+    },
+    {
+      "voce": "Zwiebeln",
+      "deve": [
+        "zwiebeln"
+      ],
+      "mai": [
+        "ringe",
+        "geroestet",
+        "suppe",
+        "chips",
+        "kuchen",
+        "pulver",
+        "schmalz"
+      ]
+    },
+    {
+      "voce": "Möhren",
+      "deve": [
+        "moehren"
+      ],
+      "mai": [
+        "saft",
+        "kuchen",
+        "suppe",
+        "brei",
+        "hipp",
+        "baby"
+      ]
+    },
+    {
+      "voce": "Äpfel",
+      "deve": [],
+      "mai": [
+        "saft",
+        "mus",
+        "kuchen",
+        "hipp",
+        "banan",
+        "brei",
+        "essig",
+        "chips",
+        "strudel"
+      ],
+      "unaDi": [
+        "aepfel",
+        "apfel"
+      ],
+      "_nota": "«apfel jonagold» E' una mela: Jonagold e' una varieta'. Il catalogo scrive il singolare «apfel», la regola pretendeva il plurale «aepfel». Etichetta sbagliata da me, corretta."
+    },
+    {
+      "voce": "Bananen",
+      "deve": [
+        "banan"
+      ],
+      "mai": [
+        "chips",
+        "saft",
+        "brot",
+        "milch",
+        "brei",
+        "hipp"
+      ]
+    },
+    {
+      "voce": "Gouda Käse",
+      "deve": [
+        "kaese"
+      ],
+      "unaDi": [
+        "gouda"
+      ],
+      "mai": [
+        "dreamies",
+        "katzen",
+        "hunde",
+        "snack",
+        "chips",
+        "sauce",
+        "creme",
+        "stangen"
+      ]
+    },
+    {
+      "voce": "Geriebener Käse",
+      "deve": [
+        "kaese"
+      ],
+      "unaDi": [
+        "gerieben"
+      ],
+      "mai": [
+        "dreamies",
+        "katzen",
+        "hunde",
+        "snack",
+        "sauce",
+        "chips"
+      ]
+    },
+    {
+      "voce": "Griechischer Joghurt",
+      "deve": [
+        "joghurt"
+      ],
+      "unaDi": [
+        "griechisch"
+      ],
+      "mai": [
+        "erdbeer",
+        "frucht",
+        "honig",
+        "vanille",
+        "schoko",
+        "kirsche",
+        "mango",
+        "drink"
+      ]
+    },
+    {
+      "voce": "Butter",
+      "deve": [
+        "butter"
+      ],
+      "mai": [
+        "erdnuss",
+        "kakao",
+        "milch eier",
+        "keks",
+        "brot",
+        "creme",
+        "gebaeck"
+      ]
+    },
+    {
+      "voce": "Vollkornbrot",
+      "deve": [
+        "brot"
+      ],
+      "unaDi": [
+        "vollkorn"
+      ],
+      "mai": [
+        "ohne mehl",
+        "aufstrich",
+        "chips",
+        "backmischung",
+        "mehl"
+      ]
+    },
+    {
+      "voce": "Weizenmehl",
+      "deve": [
+        "mehl"
+      ],
+      "unaDi": [
+        "weizen",
+        "type 405"
+      ],
+      "mai": [
+        "ohne mehl",
+        "brot",
+        "reis",
+        "mandel",
+        "kokos",
+        "backmischung",
+        "mais"
+      ]
+    },
+    {
+      "voce": "Zucker",
+      "deve": [
+        "zucker"
+      ],
+      "mai": [
+        "tee zucker",
+        "ohne zucker",
+        "suessungsmittel",
+        "ersatz",
+        "watte",
+        "puder",
+        "vanillin"
+      ]
+    },
+    {
+      "voce": "Salz",
+      "deve": [
+        "salz"
+      ],
+      "mai": [
+        "salami",
+        "salat",
+        "salsa",
+        "bade",
+        "streusel",
+        "arm"
+      ]
+    },
+    {
+      "voce": "Kaffee gemahlen",
+      "deve": [
+        "kaffee"
+      ],
+      "unaDi": [
+        "gemahlen",
+        "filter"
+      ],
+      "mai": [
+        "sticks",
+        "likoer",
+        "bonbon",
+        "eis",
+        "kuchen",
+        "maschine",
+        "kapsel",
+        "pad",
+        "tasse",
+        "becher"
+      ]
+    },
+    {
+      "voce": "Schwarzer Tee",
+      "deve": [
+        "tee"
+      ],
+      "unaDi": [
+        "schwarz"
+      ],
+      "mai": [
+        "zucker",
+        "kanne",
+        "tasse",
+        "loeffel",
+        "baum",
+        "kuchen"
+      ]
+    },
+    {
+      "voce": "Linsen",
+      "deve": [
+        "linsen"
+      ],
+      "mai": [
+        "lachs",
+        "suppe",
+        "topf",
+        "eintopf",
+        "fertig",
+        "aufstrich",
+        "kontakt"
+      ]
+    },
+    {
+      "voce": "Kichererbsen",
+      "deve": [
+        "kichererbsen"
+      ],
+      "mai": [
+        "hummus",
+        "mehl",
+        "snack",
+        "geroestet",
+        "aufstrich"
+      ]
+    },
+    {
+      "voce": "Weiße Bohnen",
+      "deve": [
+        "bohnen"
+      ],
+      "unaDi": [
+        "weiss"
+      ],
+      "mai": [
+        "kaffeebohnen",
+        "kakao",
+        "suppe",
+        "eintopf",
+        "vanille"
+      ]
+    },
+    {
+      "voce": "Haferflocken",
+      "deve": [
+        "haferflocken"
+      ],
+      "mai": [
+        "riegel",
+        "keks",
+        "drink",
+        "milch",
+        "cookie"
+      ]
+    },
+    {
+      "voce": "Orangensaft",
+      "deve": [
+        "orangen"
+      ],
+      "unaDi": [
+        "saft"
+      ],
+      "mai": [
+        "limonade",
+        "sirup",
+        "bonbon",
+        "schoko",
+        "aroma"
+      ]
+    },
+    {
+      "voce": "Mineralwasser",
+      "deve": [
+        "wasser"
+      ],
+      "unaDi": [
+        "mineral",
+        "sprudel",
+        "still"
+      ],
+      "mai": [
+        "filter",
+        "kocher",
+        "pistole",
+        "farbe"
+      ]
+    },
+    {
+      "voce": "Speck",
+      "deve": [
+        "speck"
+      ],
+      "mai": [
+        "aroma",
+        "chips",
+        "vegan",
+        "ersatz"
+      ]
+    },
+    {
+      "voce": "Bratwurst",
+      "deve": [
+        "wurst"
+      ],
+      "unaDi": [
+        "brat"
+      ],
+      "mai": [
+        "vegan",
+        "soja",
+        "hunde",
+        "salat",
+        "brot"
+      ]
+    },
+    {
+      "voce": "Paprika rot",
+      "deve": [
+        "paprika"
+      ],
+      "unaDi": [
+        "rot"
+      ],
+      "mai": [
+        "pulver",
+        "gewuerz",
+        "chips",
+        "sauce",
+        "aufstrich"
+      ]
+    },
+    {
+      "voce": "Gurke",
+      "deve": [
+        "gurke"
+      ],
+      "mai": [
+        "essig",
+        "sauer",
+        "glas",
+        "maske"
+      ]
+    },
+    {
+      "voce": "Brokkoli",
+      "deve": [
+        "brokkoli"
+      ],
+      "mai": [
+        "suppe",
+        "creme",
+        "auflauf",
+        "pfanne"
+      ]
+    },
+    {
+      "voce": "Champignons",
+      "deve": [
+        "champignons"
+      ],
+      "mai": [
+        "suppe",
+        "creme",
+        "sauce",
+        "rahm",
+        "pfanne",
+        "gefuellt"
+      ]
+    }
+  ],
+  "ES": [
+    {
+      "voce": "Leche entera",
+      "deve": [
+        "leche"
+      ],
+      "unaDi": [
+        "entera"
+      ],
+      "mai": [
+        "soja",
+        "avena",
+        "almendra",
+        "coco",
+        "arroz",
+        "polvo",
+        "condensada",
+        "batido",
+        "flan"
+      ]
+    },
+    {
+      "voce": "Leche desnatada",
+      "deve": [
+        "leche"
+      ],
+      "unaDi": [
+        "desnatada"
+      ],
+      "mai": [
+        "soja",
+        "avena",
+        "almendra",
+        "coco",
+        "polvo",
+        "condensada"
+      ]
+    },
+    {
+      "voce": "Pasta integral",
+      "deve": [
+        "integral"
+      ],
+      "unaDi": [
+        "pasta",
+        "espagueti",
+        "penne",
+        "macarron"
+      ],
+      "mai": [
+        "salsa",
+        "ensalada",
+        "precocinad",
+        "sopa"
+      ]
+    },
+    {
+      "voce": "Arroz redondo",
+      "deve": [
+        "arroz"
+      ],
+      "mai": [
+        "leche de arroz",
+        "harina",
+        "tortita",
+        "precocinad",
+        "ensalada",
+        "sopa"
+      ]
+    },
+    {
+      "voce": "Tomate triturado",
+      "deve": [
+        "tomate"
+      ],
+      "unaDi": [
+        "triturado",
+        "pelado"
+      ],
+      "mai": [
+        "sopa",
+        "ketchup",
+        "frito",
+        "salsa",
+        "secos"
+      ]
+    },
+    {
+      "voce": "Aceite de oliva virgen extra",
+      "deve": [
+        "aceite"
+      ],
+      "unaDi": [
+        "virgen extra"
+      ],
+      "mai": [
+        "girasol",
+        "spray",
+        "jabon",
+        "atun en",
+        "sardinas"
+      ]
+    },
+    {
+      "voce": "Huevos",
+      "deve": [
+        "huevos"
+      ],
+      "mai": [
+        "lacteos y",
+        "cocidos",
+        "chocolate",
+        "pascua",
+        "hilado",
+        "madera",
+        "sustituto"
+      ]
+    },
+    {
+      "voce": "Pechuga de pollo",
+      "deve": [
+        "pollo"
+      ],
+      "unaDi": [
+        "pechuga"
+      ],
+      "mai": [
+        "empanad",
+        "nuggets",
+        "caldo",
+        "sopa",
+        "gatos",
+        "perros",
+        "fiambre",
+        "loncha"
+      ]
+    },
+    {
+      "voce": "Carne picada de ternera",
+      "deve": [
+        "picada"
+      ],
+      "unaDi": [
+        "ternera",
+        "vacuno"
+      ],
+      "mai": [
+        "cerdo",
+        "pollo",
+        "pavo",
+        "vegetal",
+        "soja",
+        "lasana"
+      ]
+    },
+    {
+      "voce": "Atun en lata",
+      "deve": [
+        "atun"
+      ],
+      "mai": [
+        "pate",
+        "gatos",
+        "perros",
+        "tartar",
+        "ensalada",
+        "pizza",
+        "crema"
+      ]
+    },
+    {
+      "voce": "Salmon ahumado",
+      "deve": [
+        "salmon"
+      ],
+      "unaDi": [
+        "ahumado"
+      ],
+      "mai": [
+        "gatos",
+        "pate",
+        "hamburguesa",
+        "crema",
+        "sopa"
+      ]
+    },
+    {
+      "voce": "Merluza",
+      "deve": [
+        "merluza"
+      ],
+      "mai": [
+        "rebozad",
+        "empanad",
+        "palitos",
+        "gatos",
+        "sopa",
+        "croquetas"
+      ]
+    },
+    {
+      "voce": "Calabacin",
+      "deve": [
+        "calabac"
+      ],
+      "mai": [
+        "crema",
+        "sopa",
+        "relleno",
+        "rebozad",
+        "congelad",
+        "espiral"
+      ]
+    },
+    {
+      "voce": "Patatas",
+      "deve": [
+        "patatas"
+      ],
+      "mai": [
+        "bravas",
+        "fritas",
+        "chips",
+        "pure",
+        "tortilla",
+        "croquetas",
+        "congelad",
+        "ensaladilla"
+      ]
+    },
+    {
+      "voce": "Cebollas",
+      "deve": [
+        "cebolla"
+      ],
+      "mai": [
+        "aros",
+        "frita",
+        "sopa",
+        "crema",
+        "mermelada",
+        "polvo",
+        "encurtid"
+      ]
+    },
+    {
+      "voce": "Zanahorias",
+      "deve": [
+        "zanahoria"
+      ],
+      "mai": [
+        "zumo",
+        "pastel",
+        "crema",
+        "sopa",
+        "potito",
+        "pure"
+      ]
+    },
+    {
+      "voce": "Manzanas Golden",
+      "deve": [
+        "manzana"
+      ],
+      "unaDi": [
+        "golden"
+      ],
+      "mai": [
+        "zumo",
+        "compota",
+        "vinagre",
+        "tarta",
+        "chips",
+        "potito"
+      ]
+    },
+    {
+      "voce": "Platanos",
+      "deve": [
+        "platano"
+      ],
+      "mai": [
+        "chips",
+        "batido",
+        "zumo",
+        "bizcocho",
+        "potito"
+      ]
+    },
+    {
+      "voce": "Naranjas",
+      "deve": [
+        "naranja"
+      ],
+      "mai": [
+        "zumo",
+        "refresco",
+        "mermelada",
+        "caramelo",
+        "aroma"
+      ]
+    },
+    {
+      "voce": "Queso manchego",
+      "deve": [
+        "queso"
+      ],
+      "unaDi": [
+        "manchego"
+      ],
+      "mai": [
+        "panecillo",
+        "snack",
+        "salsa",
+        "crema",
+        "palitos",
+        "sandwich"
+      ]
+    },
+    {
+      "voce": "Queso rallado",
+      "deve": [
+        "queso"
+      ],
+      "unaDi": [
+        "rallado"
+      ],
+      "mai": [
+        "panecillo",
+        "snack",
+        "salsa",
+        "palitos"
+      ]
+    },
+    {
+      "voce": "Yogur griego natural",
+      "deve": [
+        "yogur"
+      ],
+      "unaDi": [
+        "griego"
+      ],
+      "mai": [
+        "fresa",
+        "coco",
+        "frut",
+        "chocolate",
+        "vainilla",
+        "miel",
+        "mango",
+        "bebible"
+      ]
+    },
+    {
+      "voce": "Mantequilla",
+      "deve": [
+        "mantequilla"
+      ],
+      "mai": [
+        "cacahuete",
+        "cacao",
+        "galleta",
+        "bizcocho"
+      ]
+    },
+    {
+      "voce": "Pan integral",
+      "deve": [
+        "pan"
+      ],
+      "unaDi": [
+        "integral"
+      ],
+      "mai": [
+        "rallado",
+        "harina",
+        "mezcla",
+        "tostadas"
+      ]
+    },
+    {
+      "voce": "Harina de trigo",
+      "deve": [
+        "harina"
+      ],
+      "unaDi": [
+        "trigo"
+      ],
+      "mai": [
+        "almorta",
+        "avena",
+        "maiz",
+        "garbanzo",
+        "arroz",
+        "almendra",
+        "preparado"
+      ]
+    },
+    {
+      "voce": "Azucar blanco",
+      "deve": [
+        "azucar"
+      ],
+      "mai": [
+        "edulcorante",
+        "sustitutivo",
+        "sin azucar",
+        "glas",
+        "algodon",
+        "vainillado",
+        "y edulco"
+      ]
+    },
+    {
+      "voce": "Sal fina",
+      "deve": [
+        "sal"
+      ],
+      "unaDi": [
+        "fina"
+      ],
+      "mai": [
+        "salsa",
+        "salchich",
+        "salami",
+        "ensalada",
+        "bano",
+        "gruesa"
+      ]
+    },
+    {
+      "voce": "Cafe molido",
+      "deve": [
+        "cafe"
+      ],
+      "unaDi": [
+        "molido"
+      ],
+      "mai": [
+        "licor",
+        "taza",
+        "flam",
+        "filtro",
+        "capsula",
+        "maquina",
+        "helado",
+        "bombon"
+      ]
+    },
+    {
+      "voce": "Lentejas",
+      "deve": [
+        "lenteja"
+      ],
+      "mai": [
+        "sopa",
+        "crema",
+        "cocinad",
+        "hamburguesa",
+        "coral",
+        "pasta de"
+      ]
+    },
+    {
+      "voce": "Garbanzos",
+      "deve": [
+        "garbanzo"
+      ],
+      "mai": [
+        "harina",
+        "hummus",
+        "snack",
+        "tostad",
+        "cocinad"
+      ]
+    },
+    {
+      "voce": "Alubias blancas",
+      "deve": [
+        "alubia"
+      ],
+      "unaDi": [
+        "blanca"
+      ],
+      "mai": [
+        "sopa",
+        "cocinad",
+        "fabada"
+      ]
+    },
+    {
+      "voce": "Tomates cherry",
+      "deve": [
+        "cherry"
+      ],
+      "mai": [
+        "salsa",
+        "frito",
+        "secos",
+        "conserva"
+      ]
+    },
+    {
+      "voce": "Pimientos rojos",
+      "deve": [
+        "pimiento"
+      ],
+      "unaDi": [
+        "rojo"
+      ],
+      "mai": [
+        "polvo",
+        "asado",
+        "relleno",
+        "salsa"
+      ]
+    },
+    {
+      "voce": "Lechuga",
+      "deve": [
+        "lechuga"
+      ],
+      "mai": [
+        "cesar",
+        "mezcla",
+        "salsa"
+      ]
+    },
+    {
+      "voce": "Champinones",
+      "deve": [
+        "champinon"
+      ],
+      "mai": [
+        "crema",
+        "sopa",
+        "salsa",
+        "rellen",
+        "conserva"
+      ]
+    },
+    {
+      "voce": "Jamon serrano",
+      "deve": [
+        "jamon"
+      ],
+      "unaDi": [
+        "serrano"
+      ],
+      "mai": [
+        "york",
+        "cocido",
+        "sabor",
+        "snack",
+        "croquetas",
+        "sandwich"
+      ]
+    },
+    {
+      "voce": "Chorizo",
+      "deve": [
+        "chorizo"
+      ],
+      "mai": [
+        "sabor",
+        "snack",
+        "pizza",
+        "vegano",
+        "crema"
+      ]
+    },
+    {
+      "voce": "Zumo de naranja",
+      "deve": [
+        "naranja"
+      ],
+      "unaDi": [
+        "zumo"
+      ],
+      "mai": [
+        "refresco",
+        "polvo",
+        "aroma",
+        "caramelo"
+      ]
+    },
+    {
+      "voce": "Agua mineral",
+      "deve": [
+        "agua"
+      ],
+      "unaDi": [
+        "mineral"
+      ],
+      "mai": [
+        "colonia",
+        "oxigenada",
+        "pistola",
+        "filtro",
+        "hervidor"
+      ]
+    },
+    {
+      "voce": "Aceitunas verdes",
+      "deve": [
+        "aceituna"
+      ],
+      "unaDi": [
+        "verde"
+      ],
+      "mai": [
+        "aceite",
+        "pate",
+        "crema",
+        "pizza"
+      ]
+    }
+  ],
+  "FR": [
+    {
+      "voce": "Lait entier",
+      "deve": [
+        "lait"
+      ],
+      "unaDi": [
+        "entier"
+      ],
+      "mai": [
+        "soja",
+        "avoine",
+        "amande",
+        "coco",
+        "riz",
+        "poudre",
+        "concentre",
+        "chocolat",
+        "dessert"
+      ]
+    },
+    {
+      "voce": "Lait demi ecreme",
+      "deve": [
+        "lait"
+      ],
+      "unaDi": [
+        "ecreme"
+      ],
+      "mai": [
+        "soja",
+        "avoine",
+        "amande",
+        "coco",
+        "poudre",
+        "concentre"
+      ]
+    },
+    {
+      "voce": "Pates completes",
+      "deve": [
+        "pates"
+      ],
+      "unaDi": [
+        "complet",
+        "complete"
+      ],
+      "mai": [
+        "sauce",
+        "salade",
+        "plat",
+        "poelee",
+        "farci"
+      ]
+    },
+    {
+      "voce": "Riz basmati",
+      "deve": [
+        "riz"
+      ],
+      "unaDi": [
+        "basmati"
+      ],
+      "mai": [
+        "galette",
+        "gateau",
+        "miso",
+        "lait",
+        "farine",
+        "dessert",
+        "poudre"
+      ]
+    },
+    {
+      "voce": "Tomates concassees",
+      "deve": [
+        "tomates"
+      ],
+      "unaDi": [
+        "concassee",
+        "pelee"
+      ],
+      "mai": [
+        "soupe",
+        "ketchup",
+        "sauce",
+        "seche",
+        "coulis"
+      ]
+    },
+    {
+      "voce": "Huile olive vierge extra",
+      "deve": [
+        "huile"
+      ],
+      "unaDi": [
+        "olive"
+      ],
+      "mai": [
+        "tournesol",
+        "colza",
+        "spray",
+        "savon",
+        "thon",
+        "sardine",
+        "cuisson"
+      ]
+    },
+    {
+      "voce": "Oeufs frais",
+      "deve": [
+        "oeufs"
+      ],
+      "mai": [
+        "bois",
+        "tajarin",
+        "pates",
+        "chocolat",
+        "paques",
+        "liqueur",
+        "poudre",
+        "brouilles"
+      ]
+    },
+    {
+      "voce": "Blanc de poulet",
+      "deve": [
+        "poulet"
+      ],
+      "unaDi": [
+        "blanc",
+        "filet"
+      ],
+      "mai": [
+        "pane",
+        "nugget",
+        "bouillon",
+        "soupe",
+        "chat",
+        "chien",
+        "assaiss",
+        "plat"
+      ]
+    },
+    {
+      "voce": "Steak hache",
+      "deve": [
+        "hache"
+      ],
+      "unaDi": [
+        "boeuf",
+        "steak"
+      ],
+      "mai": [
+        "porc",
+        "dinde",
+        "vegetal",
+        "soja",
+        "lasagne"
+      ]
+    },
+    {
+      "voce": "Thon en boite",
+      "deve": [
+        "thon"
+      ],
+      "mai": [
+        "chat",
+        "chien",
+        "tartare",
+        "salade",
+        "rillettes",
+        "pizza",
+        "longe"
+      ]
+    },
+    {
+      "voce": "Saumon fume",
+      "deve": [
+        "saumon"
+      ],
+      "unaDi": [
+        "fume"
+      ],
+      "mai": [
+        "chat",
+        "rillettes",
+        "terrine",
+        "burger",
+        "soupe"
+      ]
+    },
+    {
+      "voce": "Cabillaud",
+      "deve": [
+        "cabillaud"
+      ],
+      "mai": [
+        "pane",
+        "beignet",
+        "chat",
+        "brandade",
+        "soupe"
+      ]
+    },
+    {
+      "voce": "Courgettes",
+      "deve": [
+        "courgette"
+      ],
+      "mai": [
+        "veloute",
+        "soupe",
+        "bouchee",
+        "feta",
+        "farci",
+        "tarte",
+        "spirale"
+      ]
+    },
+    {
+      "voce": "Pommes de terre",
+      "deve": [
+        "pommes de terre"
+      ],
+      "mai": [
+        "puree",
+        "jus",
+        "duchesse",
+        "chips",
+        "frites",
+        "gratin",
+        "salade",
+        "dauphine"
+      ]
+    },
+    {
+      "voce": "Oignons jaunes",
+      "deve": [
+        "oignons"
+      ],
+      "mai": [
+        "tarallini",
+        "frits",
+        "tarte",
+        "soupe",
+        "confit",
+        "poudre",
+        "panee"
+      ]
+    },
+    {
+      "voce": "Carottes",
+      "deve": [
+        "carotte"
+      ],
+      "mai": [
+        "jus",
+        "gateau",
+        "soupe",
+        "veloute",
+        "puree",
+        "rapees"
+      ]
+    },
+    {
+      "voce": "Pommes Golden",
+      "deve": [
+        "pommes"
+      ],
+      "unaDi": [
+        "golden"
+      ],
+      "mai": [
+        "terre",
+        "puree",
+        "jus",
+        "compote",
+        "tarte",
+        "duchesse",
+        "vinaigre",
+        "chips"
+      ]
+    },
+    {
+      "voce": "Bananes",
+      "deve": [
+        "banane"
+      ],
+      "mai": [
+        "chips",
+        "jus",
+        "gateau",
+        "smoothie",
+        "poudre"
+      ]
+    },
+    {
+      "voce": "Fraises",
+      "deve": [
+        "fraise"
+      ],
+      "mai": [
+        "confiture",
+        "sirop",
+        "yaourt",
+        "bonbon",
+        "arome",
+        "glace"
+      ]
+    },
+    {
+      "voce": "Fromage rape",
+      "deve": [
+        "fromage"
+      ],
+      "unaDi": [
+        "rape"
+      ],
+      "mai": [
+        "gougere",
+        "mini",
+        "sauce",
+        "chips",
+        "croque",
+        "biscuit"
+      ]
+    },
+    {
+      "voce": "Camembert",
+      "deve": [
+        "camembert"
+      ],
+      "mai": [
+        "gougere",
+        "sauce",
+        "pane",
+        "chips",
+        "croque",
+        "biscuit"
+      ]
+    },
+    {
+      "voce": "Yaourt grec nature",
+      "deve": [
+        "grec"
+      ],
+      "unaDi": [
+        "yaourt"
+      ],
+      "mai": [
+        "fraise",
+        "fruit",
+        "miel",
+        "vanille",
+        "chocolat",
+        "mangue",
+        "boire"
+      ]
+    },
+    {
+      "voce": "Beurre doux",
+      "deve": [
+        "beurre"
+      ],
+      "unaDi": [
+        "doux"
+      ],
+      "mai": [
+        "cacahuete",
+        "baratte",
+        "petit beurre",
+        "cacao",
+        "biscuit",
+        "gateau",
+        "karite"
+      ]
+    },
+    {
+      "voce": "Pain complet",
+      "deve": [
+        "pain"
+      ],
+      "unaDi": [
+        "complet"
+      ],
+      "mai": [
+        "chapelure",
+        "farine",
+        "melange",
+        "epice"
+      ]
+    },
+    {
+      "voce": "Farine de ble",
+      "deve": [
+        "farine"
+      ],
+      "unaDi": [
+        "ble",
+        "t45",
+        "t55",
+        "t65"
+      ],
+      "mai": [
+        "mais",
+        "chataigne",
+        "riz",
+        "amande",
+        "coco",
+        "preparation",
+        "force"
+      ]
+    },
+    {
+      "voce": "Sucre en poudre",
+      "deve": [
+        "sucre"
+      ],
+      "mai": [
+        "pince",
+        "ss sucre",
+        "sans sucre",
+        "edulcorant",
+        "glace",
+        "barbe a papa",
+        "fleur de coco",
+        "vanille"
+      ]
+    },
+    {
+      "voce": "Sel fin",
+      "deve": [
+        "sel"
+      ],
+      "unaDi": [
+        "fin"
+      ],
+      "mai": [
+        "salade",
+        "saucisse",
+        "salami",
+        "sauce",
+        "bain",
+        "gros sel"
+      ]
+    },
+    {
+      "voce": "Cafe moulu",
+      "deve": [
+        "cafe"
+      ],
+      "unaDi": [
+        "moulu"
+      ],
+      "mai": [
+        "bioflan",
+        "filtre",
+        "liqueur",
+        "capsule",
+        "dosette",
+        "machine",
+        "glace",
+        "gateau",
+        "tasse"
+      ]
+    },
+    {
+      "voce": "The noir",
+      "deve": [
+        "the"
+      ],
+      "unaDi": [
+        "noir"
+      ],
+      "mai": [
+        "theiere",
+        "tasse",
+        "gateau",
+        "arbre",
+        "torchon",
+        "serviette"
+      ]
+    },
+    {
+      "voce": "Lentilles vertes",
+      "deve": [
+        "lentille"
+      ],
+      "unaDi": [
+        "verte"
+      ],
+      "mai": [
+        "cuisinee",
+        "soupe",
+        "italienne",
+        "plat",
+        "corail"
+      ]
+    },
+    {
+      "voce": "Pois chiches",
+      "deve": [
+        "pois chiche"
+      ],
+      "mai": [
+        "houmous",
+        "farine",
+        "snack",
+        "grille",
+        "cuisine"
+      ]
+    },
+    {
+      "voce": "Haricots blancs",
+      "deve": [
+        "haricot"
+      ],
+      "unaDi": [
+        "blanc"
+      ],
+      "mai": [
+        "vert",
+        "cuisine",
+        "soupe",
+        "cassoulet"
+      ]
+    },
+    {
+      "voce": "Flocons avoine",
+      "deve": [
+        "avoine"
+      ],
+      "unaDi": [
+        "flocon"
+      ],
+      "mai": [
+        "barre",
+        "biscuit",
+        "boisson",
+        "lait",
+        "cookie"
+      ]
+    },
+    {
+      "voce": "Jus orange",
+      "deve": [
+        "orange"
+      ],
+      "unaDi": [
+        "jus"
+      ],
+      "mai": [
+        "sirop",
+        "soda",
+        "bonbon",
+        "arome",
+        "confiture"
+      ]
+    },
+    {
+      "voce": "Eau petillante",
+      "deve": [
+        "eau"
+      ],
+      "unaDi": [
+        "petillante",
+        "gazeuse"
+      ],
+      "mai": [
+        "cologne",
+        "filtre",
+        "bouilloire",
+        "pistolet",
+        "peinture"
+      ]
+    },
+    {
+      "voce": "Lardons fumes",
+      "deve": [
+        "lardon"
+      ],
+      "mai": [
+        "arome",
+        "chips",
+        "vegan",
+        "vegetal",
+        "quiche"
+      ]
+    },
+    {
+      "voce": "Saucisses de Toulouse",
+      "deve": [
+        "saucisse"
+      ],
+      "unaDi": [
+        "toulouse"
+      ],
+      "mai": [
+        "vegan",
+        "soja",
+        "chien",
+        "cassoulet",
+        "roule"
+      ]
+    },
+    {
+      "voce": "Poivrons rouges",
+      "deve": [
+        "poivron"
+      ],
+      "unaDi": [
+        "rouge"
+      ],
+      "mai": [
+        "poudre",
+        "farci",
+        "bocal",
+        "sauce",
+        "tarte"
+      ]
+    },
+    {
+      "voce": "Concombre",
+      "deve": [
+        "concombre"
+      ],
+      "mai": [
+        "vinaigre",
+        "bocal",
+        "preparee",
+        "masque"
+      ]
+    },
+    {
+      "voce": "Champignons de Paris",
+      "deve": [
+        "champignon"
+      ],
+      "mai": [
+        "veloute",
+        "soupe",
+        "sauce",
+        "creme",
+        "farci",
+        "poelee"
+      ]
+    }
+  ],
+  "_nota_DE": "Le voci tedesche si scrivono CON la dieresi, perche' e' cosi' che le digita chi cerca. Il catalogo invece scrive ae/oe/ue, perche' gli indirizzi stanno nell'alfabeto inglese: per questo `deve` e `mai` restano traslitterate. Prima erano scritte alla maniera del catalogo anche le voci, e il metro misurava cosi' la grafia che gia' funzionava invece di quella che serve."
+}
