@@ -142,7 +142,21 @@ function memoryGet(key: string): unknown | undefined {
     memoryCache.delete(key);
     return undefined;
   }
-  return hit;
+  /* `hit.value`, NON `hit`. Qui dentro c'e' l'involucro — il valore piu' la
+     sua scadenza — e restituirlo intero vuol dire consegnare a chi chiama un
+     oggetto che non assomiglia a niente: niente `prodotti`, niente `prezzi`,
+     niente. Chi legge non va in errore, vede solo una risposta vuota.
+
+     E' costato ore. La stessa lista dava ventitre offerte appena calcolata e
+     zero un minuto dopo, e sembrava un motore che si rompe a intermittenza:
+     ho riavviato, svuotato cache, rimisurato, sospettato i negozi. Era questa
+     riga. L'ho scritta io stasera, con una sostituzione fatta troppo larga
+     mentre sistemavo la cache del database.
+
+     Da qui probabilmente venivano anche i «nessun negozio online ha questo
+     prodotto» che Alberto vedeva nell'app: risposta servita dalla memoria,
+     involucro al posto del contenuto, e l'app non aveva modo di accorgersene. */
+  return hit.value;
 }
 
 function memorySet(key: string, value: unknown, durataMs?: number): void {
@@ -1868,4 +1882,55 @@ if (!isDbConfigured()) console.warn("ATTENZIONE: MONGODB_URI assente — account
 if (!isShoppingConfigured()) console.warn("ATTENZIONE: SERPAPI_KEY assente — /product/shopping risponde 503.");
 console.info(`[catalogo] ${paesiConCatalogo().length} paesi con catalogo disponibile`);
 avviaCatalogoNotturno();
+
+/**
+ * Il servizio si tiene sveglio da solo.
+ *
+ * PERCHE'
+ * -------
+ * Render sul piano gratuito spegne un servizio dopo quindici minuti senza
+ * traffico. Riaccenderlo e ricaricare duecentomila prodotti dal database costa
+ * cinquantacinque secondi misurati — e per chi usa l'app cinquantacinque
+ * secondi vuol dire che non funziona niente: la richiesta scade e la lista
+ * torna vuota.
+ *
+ * PERCHE' QUI E NON SU GITHUB
+ * ---------------------------
+ * C'e' anche un lavoro programmato su GitHub che fa la stessa cosa
+ * (`.github/workflows/tieni-sveglio.yml`), ed e' rimasto li' — ma in
+ * ottantaquattro minuti non e' mai partito da solo. E' un comportamento noto:
+ * i cron appena aggiunti su repo poco trafficati finiscono in fondo alla coda.
+ * Su qualcosa che non parte non si costruisce.
+ *
+ * Questo invece dipende solo da noi: finche' il processo e' vivo, si chiama da
+ * solo e resta vivo. Una richiesta al proprio indirizzo pubblico e' traffico
+ * in entrata a tutti gli effetti, e il conto dei quindici minuti riparte.
+ *
+ * COSA NON RISOLVE, E VA DETTO
+ * ----------------------------
+ * Se il servizio si spegne davvero — un deploy, un riavvio di Render, un
+ * momento di rete — non puo' risvegliarsi: un processo spento non chiama
+ * nessuno. Li' serve che arrivi qualcuno da fuori, e il primo che arriva
+ * aspetta il minuto. Per quello l'unica cura vera sono i sette dollari al mese
+ * del piano Starter, che non si spegne affatto.
+ *
+ * Gira solo su Render, che `RENDER_EXTERNAL_URL` la mette lei: in locale non
+ * serve e non parte.
+ */
+const MIO_INDIRIZZO = process.env.RENDER_EXTERNAL_URL;
+if (MIO_INDIRIZZO) {
+  /* Dieci minuti: la finestra di Render e' quindici, e cinque di margine
+     bastano a coprire una risposta lenta senza raddoppiare le richieste. */
+  const OGNI_MS = 10 * 60 * 1000;
+  setInterval(() => {
+    /* `/health` non apre pagine, non legge prezzi, non costa niente: serve
+       solo a far girare il processo. Un errore non si rilancia — se la rete
+       balla si riprova fra dieci minuti, e intanto il servizio fa il suo. */
+    fetch(`${MIO_INDIRIZZO}/health`, { signal: AbortSignal.timeout(20_000) }).catch(
+      (err) => console.warn("[sveglio] il ping a me stesso non e' riuscito:", err?.message ?? err),
+    );
+  }, OGNI_MS).unref();
+  console.info(`[sveglio] mi tengo sveglio da solo ogni 10 minuti (${MIO_INDIRIZZO})`);
+}
+
 app.listen(port);
