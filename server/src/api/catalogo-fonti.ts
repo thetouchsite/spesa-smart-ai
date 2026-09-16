@@ -185,7 +185,14 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "FR", insegna: "Auchan", dominio: "www.auchan.fr", sitemap: "https://www.auchan.fr/sitemap.xml", resa: 1, stimati: 8708 },
   { paese: "FR", insegna: "Kazidomi", dominio: "www.kazidomi.com", sitemap: "https://www.kazidomi.com/sitemap/sitemap.xml", resa: 1, stimati: 8039 },
   { paese: "FR", insegna: "Naturalia", dominio: "www.naturalia.fr", sitemap: "https://www.naturalia.fr/media/sitemap_product.xml", resa: 1, stimati: 6072 },
-  { paese: "FR", insegna: "La Grande Épicerie", dominio: "www.lagrandeepicerie.com", sitemap: "https://www.lagrandeepicerie.com/sitemap_index.xml", resa: 0, stimati: 3956 },
+  /* MISURATA 0 SU 10 DA `resa-veloce.ts` E 12 SU 12 DAL CATALOGO VERO.
+     Vince il catalogo vero, e il perche' conta piu' del numero: `resa-veloce`
+     campiona la sitemap grezza, e l'indice di questa insegna porta a pagine
+     `coup-de-coeur` che hanno la forma di una scheda ma non lo sono. Il
+     catalogo invece le scarta, e quel che resta rende il 100%.
+     Regola: quando le due misure litigano, ha ragione quella che campiona da
+     `daUnaFonte`. L'altra e' veloce, non esatta. */
+  { paese: "FR", insegna: "La Grande Épicerie", dominio: "www.lagrandeepicerie.com", sitemap: "https://www.lagrandeepicerie.com/sitemap_index.xml", resa: 1, stimati: 3956 },
   { paese: "FR", insegna: "Picard", dominio: "www.picard.fr", sitemap: "https://www.picard.fr/sitemap_0.xml", resa: 0.97, stimati: 1569 },
 
   { paese: "GB", insegna: "Morrisons Groceries", dominio: "groceries.morrisons.com", sitemap: "https://groceries.morrisons.com/sitemaps/sitemap_index.xml", resa: 0.93, stimati: 32873 },
