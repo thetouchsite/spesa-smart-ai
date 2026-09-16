@@ -136,8 +136,35 @@ export function porzioneConPrezzi(html: string): string {
 /** Legge prezzo, listino e scadenza dell'offerta dai dati strutturati. */
 export function readPrices(html: string): PagePrice | null {
   const current = firstNumber(html, [
-    // Dati strutturati: la forma che i motori di ricerca chiedono.
-    /"price"\s*:\s*"?([\d.,]+)"?/i,
+    /* IL PREZZO ATTACCATO ALLA SUA VALUTA, PRIMA DI TUTTO.
+       Un prezzo vero sta quasi sempre a fianco di `priceCurrency`, dentro il
+       blocco `Offer`. Cercare quella coppia per prima costa una regex e mette
+       al riparo da tutti i numeri che si chiamano «price» senza esserlo.
+
+       La guardia contro le tabelle di indici (spiegata sotto) vale anche qui:
+       un numero preso da un dizionario non diventa un prezzo solo perche' piu'
+       avanti nella pagina c'e' una valuta. */
+    /"priceCurrency"\s*:\s*"[A-Z]{3}"[\s\S]{0,300}?"price"\s*:\s*"?([\d.,]+)"?/i,
+    /(?<!"[a-zA-Z_]{2,24}"\s*:\s*\d{1,4}\s*,\s*"[a-zA-Z_]{2,24}"\s*:\s*\d{1,4}\s*,\s*)"price"\s*:\s*"?([\d.,]+)"?[\s\S]{0,300}?"priceCurrency"\s*:\s*"[A-Z]{3}"/i,
+
+    /* Dati strutturati: la forma che i motori di ricerca chiedono.
+
+       LA GUARDIA DAVANTI SERVE, E COSTA CARA NON AVERLA.
+       Misurato su Lidl UK, mele Gala: dicevamo 63 sterline. Non era un errore
+       di unita' — quel numero stava dentro una tabella di indici di campi che
+       la pagina si porta dietro:
+
+         "multipack":5,"preventSelling":5,"price":63,"productId":29
+
+       cioe' «il campo price sta alla posizione 63». Il prodotto un prezzo non
+       ce l'ha proprio: il suo `Offer` dice `InStoreOnly`, si compra solo in
+       negozio. La risposta giusta era «nessun prezzo», e noi ne abbiamo
+       inventato uno — la cosa peggiore che un'app di confronto possa fare.
+
+       Due coppie `"nome":numero` di fila non sono un prodotto, sono un
+       dizionario. Ne bastano due perche' un JSON legittimo puo' avere
+       `"id":123,"price":2.49`, e quello va lasciato passare. */
+    /(?<!"[a-zA-Z_]{2,24}"\s*:\s*\d{1,4}\s*,\s*"[a-zA-Z_]{2,24}"\s*:\s*\d{1,4}\s*,\s*)"price"\s*:\s*"?([\d.,]+)"?/i,
     /"lowPrice"\s*:\s*"?([\d.,]+)"?/i,
     /"salePrice"\s*:\s*"?([\d.,]+)"?/i,
     // Microdati, nell'attributo o nel testo.

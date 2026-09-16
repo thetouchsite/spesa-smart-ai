@@ -4,7 +4,7 @@
  * Generato da `scripts/aggiorna-fonti.mjs` — non si scrive a mano, si
  * rigenera dopo una passata di raccolta.
  *
- * 147 insegne · 38 paesi · 2.727.010 prodotti
+ * 144 insegne · 38 paesi · 2.675.799 prodotti
  *
  * I NUMERI SONO CONTATI, NON STIMATI
  * ----------------------------------
@@ -79,7 +79,6 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "CZ", insegna: "Billa CZ", dominio: "www.billa.cz", sitemap: "https://www.billa.cz/sitemap.xml", resa: 1, stimati: 13303 },
 
   { paese: "DE", insegna: "Müller", dominio: "www.mueller.de", sitemap: "https://www.mueller.de/sitemaps/sitemap.xml", resa: 0, stimati: 70589 },
-  { paese: "DE", insegna: "Fressnapf", dominio: "www.fressnapf.de", sitemap: "https://www.fressnapf.de/sitemap.xml", resa: 1, stimati: 34785 },
   { paese: "DE", insegna: "Rossmann", dominio: "www.rossmann.de", sitemap: "https://www.rossmann.de/de/sitemap_index.xml", resa: 0, stimati: 32301 },
   { paese: "DE", insegna: "dm", dominio: "www.dm.de", sitemap: "https://www.dm.de/sitemap.xml", resa: 0, stimati: 20966 },
   { paese: "DE", insegna: "Lidl Deutschland", dominio: "www.lidl.de", sitemap: "https://www.lidl.de/static/sitemap.xml", resa: 0.97, stimati: 12720 },
@@ -118,7 +117,6 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "FR", insegna: "Naturalia", dominio: "www.naturalia.fr", sitemap: "https://www.naturalia.fr/media/sitemap_product.xml", resa: 1, stimati: 6072 },
   { paese: "FR", insegna: "La Grande Épicerie", dominio: "www.lagrandeepicerie.com", sitemap: "https://www.lagrandeepicerie.com/sitemap_index.xml", resa: 0.97, stimati: 3956 },
   { paese: "FR", insegna: "Picard", dominio: "www.picard.fr", sitemap: "https://www.picard.fr/sitemap_0.xml", resa: 0.97, stimati: 1569 },
-  { paese: "FR", insegna: "Zooplus France", dominio: "www.zooplus.fr", sitemap: "https://www.zooplus.fr/sitemap.xml", resa: 1, stimati: 270 },
 
   { paese: "GB", insegna: "Morrisons Groceries", dominio: "groceries.morrisons.com", sitemap: "https://groceries.morrisons.com/sitemaps/sitemap_index.xml", resa: 0.93, stimati: 32873 },
   { paese: "GB", insegna: "Morrisons", dominio: "groceries.morrisons.com", sitemap: "https://groceries.morrisons.com/sitemaps/sitemap_index.xml", resa: 0.93, stimati: 32873 },

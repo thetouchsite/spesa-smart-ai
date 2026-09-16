@@ -106,11 +106,45 @@ export function catalogoDisponibilePer(iso: string): boolean {
   return paesiConCatalogo().includes((iso || "").toUpperCase().slice(0, 2));
 }
 
+/**
+ * Otto pagine insieme, e appena una finisce ne parte un'altra.
+ *
+ * PERCHE' NON A ONDATE
+ * --------------------
+ * Prima si prendevano otto pagine, si aspettava che finissero TUTTE, e solo
+ * allora partivano le otto dopo. Sembra la stessa cosa e non lo e': ogni
+ * ondata costa quanto la sua pagina piu' lenta, e sette connessioni restano
+ * ferme ad aspettare la ottava.
+ *
+ * Misurato su Madrid, dodici voci: 58 pagine, otto ondate, 58 secondi — con
+ * il tetto per pagina a otto secondi, cioe' quasi ogni ondata aveva dentro un
+ * negozio che arrivava al limite mentre gli altri sette avevano gia' finito.
+ *
+ * E 58 secondi sono oltre il muro: l'app molla a 55, perche' iOS chiude ogni
+ * connessione a 60. La richiesta riusciva e l'utente vedeva un errore.
+ *
+ * Con la finestra scorrevole il totale non dipende piu' dalla somma delle
+ * pagine lente, ma dal lavoro diviso per quante ne corrono insieme. Le
+ * connessioni aperte nello stesso momento restano otto: non stiamo chiedendo
+ * di piu' ai negozi, stiamo solo smettendo di stare fermi.
+ *
+ * I risultati tornano nell'ordine di partenza, non di arrivo: chi chiama si
+ * aspetta che la riga `i` sia la pagina `i`.
+ */
 async function aBrani<T, R>(cose: T[], quante: number, lavoro: (c: T) => Promise<R>): Promise<R[]> {
-  const fuori: R[] = [];
-  for (let i = 0; i < cose.length; i += quante) {
-    fuori.push(...(await Promise.all(cose.slice(i, i + quante).map(lavoro))));
-  }
+  const fuori: R[] = new Array(cose.length);
+  let prossima = 0;
+
+  const lavoratore = async (): Promise<void> => {
+    while (prossima < cose.length) {
+      const mio = prossima++;
+      fuori[mio] = await lavoro(cose[mio]);
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(quante, cose.length) }, () => lavoratore()),
+  );
   return fuori;
 }
 
