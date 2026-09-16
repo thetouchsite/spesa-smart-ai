@@ -116,11 +116,201 @@ consegniamo la colonna di destra, e la colonna di sinistra resta nostra.
 
 ---
 
+## Come la usa l'app
+
+L'app non deve sapere niente di come si trovano i prezzi. Chiede e disegna.
+
+```
+  app (React Native)                        l'utente vede
+  └─ chiede al SUO server ──────┐
+                                │
+  app/ (del cliente)            │           il server dell'app
+  └─ tiene la CHIAVE SEGRETA ───┤
+     e chiama l'API             │
+                                ▼
+  api/ (di Touchsite)                       il prodotto
+  └─ risponde con i dati
+```
+
+### Perché non è l'app a tenere la chiave
+
+Questo è il punto da decidere adesso, perché dopo costa caro.
+
+**Una chiave dentro un'app mobile non è segreta.** Sta nel pacchetto che si
+installa, e tirarla fuori da un `.apk` è una riga di comando. Se la chiave di
+MealMint viaggia dentro l'app, chiunque scarichi l'app ha la nostra API
+gratis — e noi paghiamo Mongo e Google per farla funzionare.
+
+Vale per qualunque chiave in un'app: non è un dettaglio nostro, è il motivo per
+cui **nessun fornitore serio dà una chiave segreta a un'app**. Stripe, Google
+Maps, Algolia: tutti hanno due tipi di chiave proprio per questo.
+
+Per fortuna la struttura che stiamo costruendo la risolve da sola: il blocco
+`app/` **è già un server**, ed è quello del cliente. La chiave sta lì.
+
+### Le due chiavi
+
+| | chi la tiene | cosa può fare |
+|---|---|---|
+| **chiave segreta** | il server dell'app, mai il telefono | tutto, con il tetto del contratto |
+| **chiave pubblicabile** | il telefono, se proprio serve | solo le rotte di lettura, tetto stretto, legata al bundle dell'app |
+
+La seconda serve solo se un giorno vogliamo che il telefono chiami l'API
+direttamente per qualcosa di innocuo — la copertura, la ricerca prodotti.
+Per i prezzi si passa dal server: sono la cosa che costa.
+
+### Com'è una chiamata
+
+Quello che l'app — cioè il suo server — manda:
+
+```http
+POST /v1/prezzi
+Authorization: Bearer sk_live_...
+Content-Type: application/json
+
+{ "voci": ["Latte intero", "Pasta integrale"],
+  "paese": "IT", "citta": "Milano", "valuta": "EUR" }
+```
+
+E quello che riceve. **Ogni prezzo dice da dove viene e di quando è**, e ogni
+voce dice cosa le è successo — che è la differenza fra un dato e una diceria:
+
+```json
+{ "voci": [
+    { "voce": "Latte intero",
+      "esito": "trovato",
+      "offerte": [
+        { "insegna": "Carrefour", "nome": "Latte intero UHT 1 l",
+          "prezzo": 1.19, "valuta": "EUR", "quantita": { "valore": 1, "unita": "l" },
+          "prezzoAlLitro": 1.19,
+          "link": "https://...", "letto": "2026-09-16T17:12:00Z" }
+      ] },
+    { "voce": "Pasta integrale",
+      "esito": "nessun-prezzo-pubblicato",
+      "offerte": [ { "insegna": "Esselunga", "nome": "Pasta integrale 500 g",
+                     "prezzo": null, "link": "https://...",
+                     "letto": "2026-09-16T17:12:00Z" } ] }
+  ],
+  "copertura": { "paese": "IT", "insegne": 18 },
+  "secondi": 2.4 }
+```
+
+**`esito` ha quattro valori, non due:**
+
+| valore | vuol dire | l'app scrive |
+|---|---|---|
+| `trovato` | c'è il prodotto e c'è il prezzo | il prezzo |
+| `nessun-prezzo-pubblicato` | il prodotto c'è, il prezzo il negozio non lo espone | «prezzo non pubblicato» + il link |
+| `nessun-prodotto` | in quel paese nessuna insegna ce l'ha | «non disponibile qui» |
+| `non-raggiungibile` | non siamo riusciti a chiedere | «riprova» |
+
+Oggi queste quattro cose arrivano all'app tutte uguali, come una voce senza
+prezzo, e l'app non può che raccontarle nello stesso modo — che è sbagliato in
+tre casi su quattro.
+
+### Cosa sparisce dall'app
+
+Quando questo funziona, dall'app se ne vanno: la scelta della fonte prezzi
+(`EXPO_PUBLIC_PRICE_SOURCE`, che oggi **scavalca il server** ed è già costato
+un «Londra 0 su 16»), ogni ragionamento su quale prodotto corrisponde a cosa, e
+ogni chiamata a un modello per i prezzi.
+
+Restano: chiedere, e disegnare.
+
+---
+
+## Come sta in repo
+
+Per adesso l'API vive nello stesso repo dell'app. Ma ci vive **come un blocco a
+sé**, e la regola che lo rende vero è una sola:
+
+> **`api/` non importa mai niente da `app/`.**
+> Il contrario sì: l'app usa l'API come la userebbe un estraneo.
+
+Se quella regola vale, staccare l'API un giorno è un `git mv` più un
+`package.json`. Se non vale, è un mese di lavoro.
+
+### Quanto siamo lontani: misurato
+
+Trenta file in `server/src`, divisi per quello che sono:
+
+| blocco | file | cosa c'è dentro |
+|---|---|---|
+| **API** | 15 | catalogo, ricerca, prezzi, negozi, magazzini, vocabolario |
+| **app** | 6 | menu, ricette, autenticazione, Amazon, shopping |
+| **base** | 8 | database, http, diario, quota, interruttore |
+
+E i fili che oggi impediscono di staccare — cioè i punti dove l'API importa
+dall'app — sono **tre**:
+
+```
+fallback-link.ts:31      → amazon.ts          il link di ricerca Amazon
+prices-catalogo.ts:47    → plan-grounded.ts   la scelta del modello
+prices-serpapi.ts:30     → shopping.ts        la strada SerpAPI
+```
+
+Tre import. `catalogo-it.ts`, che sono milleduecento righe, non ne ha nessuno.
+
+E il secondo — `plan-grounded` — **sparisce da solo** quando il modello esce
+dalla strada dei prezzi, che è già il piano. Quindi i fili veri da tagliare
+sono due, e tutti e due riguardano strade dei prezzi alternative che oggi non
+usiamo.
+
+### Come sarà
+
+```
+server/src/
+  api/          il blocco. Non importa mai da app/
+    rotte/        /v1/prezzi, /v1/prodotti, /v1/negozi, /v1/copertura, /v1/stato
+    catalogo/     costruire il catalogo dalle sitemap      (Antonio)
+    ricerca/      cercare dentro al catalogo               (Alberto)
+    prezzi/       leggere il prezzo da una pagina
+    negozi/       i punti vendita
+    base/         database, http, diario, quota
+  app/          resta al cliente. Puo' importare da api/
+    menu, ricette, liste salvate, autenticazione
+  index.ts      monta tutt'e due — per ora
+```
+
+### La regola si fa rispettare da sola
+
+Una convenzione scritta in un file la si dimentica in due settimane. Quindi:
+**uno script che legge gli import e fallisce se `api/` ne ha uno verso `app/`**,
+e che gira insieme al build. Il giorno che qualcuno taglia la strada, il build
+si ferma e dice quale riga.
+
+Senza quello, fra tre mesi i fili sono venti invece di tre e nessuno se ne è
+accorto.
+
+### Due cose che «ordinata» vuol dire anche
+
+- **Una sola strada per i prezzi.** Oggi ce ne sono due che fanno la stessa
+  cosa: `catalogo-it.ts` per l'Italia e `prices-catalogo.ts` per tutto il
+  resto. La distanza fra loro è già costata degli errori — una correzione fatta
+  in una e non nell'altra. Un fornitore di dati non ha due implementazioni
+  della stessa risposta.
+- **`catalogo.ts` diviso.** 998 righe con dentro due mestieri: costruire il
+  catalogo (Antonio) e cercarci dentro (Alberto). Vanno in `api/catalogo/` e
+  `api/ricerca/`, con un commit che sposta e basta.
+
+### Lo spostamento si fa in un colpo solo
+
+Un commit che **sposta e rinomina, senza cambiare una riga di logica**. Così il
+diff si legge, e se qualcosa si rompe si sa che è stato lo spostamento.
+
+E si fa **d'accordo con Antonio**, in un momento in cui non ha lavoro aperto:
+un `git mv` di trenta file contro delle modifiche non salvate è il modo più
+veloce di perdere una giornata a entrambi.
+
+---
+
 ## Cosa vuol dire riuscito
 
 1. **Si chiama con una chiave.** Ogni chiamata porta una chiave, la chiave ha
    un tetto di richieste, e chi sfora prende `429` con scritto quando riprovare.
-   Senza chiave: `401`.
+   Senza chiave: `401`. Due specie: **segreta** per i server, **pubblicabile**
+   per il telefono — con la seconda che non può chiedere prezzi. Una chiave
+   segreta dentro un'app mobile non è segreta.
 2. **C'è un contratto.** Tutto sotto `/v1`, forme di risposta scritte, e la
    promessa che dentro `v1` non si rompe niente.
 3. **La stessa domanda dà la stessa risposta.** Due chiamate identiche a
@@ -138,25 +328,32 @@ consegniamo la colonna di destra, e la colonna di sinistra resta nostra.
    quando il modello non lo è.
 9. **C'è una pagina che si legge**, con esempi che partono copiandoli.
 10. **Funziona in cinque paesi**: IT, GB, DE, ES, FR.
-11. **L'app non contiene logica di prezzi.** Se la togliamo dal repo, l'API
-    continua a funzionare identica. È la prova che la linea è tracciata bene.
+11. **`api/` non importa niente da `app/`**, e uno script lo verifica a ogni
+    build. È la prova che la linea è tracciata davvero e non solo scritta.
+12. **L'app non contiene logica di prezzi.** Se la togliamo dal repo, l'API
+    continua a funzionare identica.
 
 ---
 
 ## L'ordine
 
-### Fase 1 — la linea e la chiave
+### Fase 1 — il blocco, la linea e la chiave
 
 Sono la parte che rende l'API *una cosa*, e nessuna dipende dal resto.
 
-1. **Le rotte `/v1`**, con le vecchie che continuano a rispondere e rimandano
+0. **Lo script del confine** — legge gli import e fallisce se `api/` ne ha uno
+   verso `app/`. Si scrive prima dello spostamento: così lo spostamento stesso
+   ha qualcosa che lo verifica, invece di essere «mi sembra a posto».
+1. **Lo spostamento** in `api/` e `app/`, un commit che sposta e basta,
+   d'accordo con Antonio.
+2. **Le rotte `/v1`**, con le vecchie che continuano a rispondere e rimandano
    alle nuove: l'app in preview non si deve accorgere di niente.
-2. **Le chiavi.** Una collezione su Mongo, un tetto di richieste al giorno per
+3. **Le chiavi.** Una collezione su Mongo, un tetto di richieste al giorno per
    chiave, `401` senza e `429` oltre. La chiave dell'app di MealMint è la
    prima.
-3. **CORS chiuso** a una lista, invece di `*`.
-4. **`/v1/stato` che non mente** — a partire da `aiConfigured`.
-5. **Gli errori che distinguono le tre cause.**
+4. **CORS chiuso** a una lista, invece di `*`.
+5. **`/v1/stato` che non mente** — a partire da `aiConfigured`.
+6. **Gli errori che distinguono le tre cause.**
 
 ### Fase 2 — il metro di misura
 
