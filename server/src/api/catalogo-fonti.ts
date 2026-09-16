@@ -72,6 +72,15 @@ export interface FonteCatalogo {
   resa: number;
   /** Indirizzi di prodotto pubblicati, contati. */
   stimati: number;
+  /**
+   * Perche' questa insegna e' tenuta FUORI dal catalogo.
+   *
+   * Presente solo in `SENZA_PREZZO`. E' una frase, non un codice, perche' chi
+   * la legge fra sei mesi deve capire se la situazione e' cambiata senza
+   * rifare le prove: «serve accedere» invita a riguardare ogni tanto, «il loro
+   * robots.txt vieta l'API» invita a scrivere un'email.
+   */
+  escusa?: string;
 }
 
 export const FONTI: FonteCatalogo[] = [
@@ -208,46 +217,11 @@ export const FONTI: FonteCatalogo[] = [
 
   { paese: "IN", insegna: "JioMart", dominio: "www.jiomart.com", sitemap: "https://www.jiomart.com/sitemap.xml", resa: 0, stimati: 9332 },
 
-  /* LE ITALIANE CHE IL PREZZO NON LO DANNO, E PERCHE'. VERIFICATO A MANO
-     APRENDO LE PAGINE, IL 16 SETTEMBRE 2026. NON RIFARE QUESTO LAVORO.
-
-     Sei insegne, 114.911 prodotti, `resa: 0`. Cinque girano sulla stessa
-     piattaforma — EBSN — e all'inizio sembravano un caso solo. Non lo sono:
-
-       CoopShop    la scheda si apre e mostra tutto tranne la cifra. Serve
-                   accedere. L'API `/ebsn/api/products` e' CONSENTITA e
-                   risponde, ma il campo `price` nella risposta non c'e'.
-       Basko       identico, e la pagina apre proprio la finestra di accesso.
-                   Nessun robots.txt, quindi l'API e' consentita: e' inutile.
-       Esselunga   serve accedere.
-       Ali'        IL PREZZO SULLA PAGINA SI VEDE — 18,90 euro, e pure il
-                   prezzo al chilo. Ma l'HTML e' un guscio da 16 KB: la cifra
-                   la prende il browser da `/ebsn/api/`, che il loro
-                   robots.txt vieta per nome. Decisione commerciale, non
-                   tecnica: se un giorno si vuole trattare con loro, sono
-                   17.550 prodotti che aspettano un permesso.
-       Tigros      `Disallow: /ebsn/`. Stessa risposta.
-       Pam         guscio JavaScript, nessuna API pubblica trovata.
-
-     Per confronto, due della stessa famiglia che invece rendono:
-       Iperal      il prezzo sta nell'HTML. Era scritta `resa: 0` per un
-                   difetto nostro, e sono 23.255 prodotti.
-       Naturasi    l'API EBSN risponde con `price` e il robots.txt la
-                   consente. Vedi il lettore in `prezzi-api.ts`.
-
-     La morale, che costa piu' di quanto sembri: «e' EBSN, quindi e' muta»
-     sarebbe stata una deduzione ragionevole e sbagliata quattro volte su
-     otto. Queste cose si guardano una per una. */
-  { paese: "IT", insegna: "CoopShop", dominio: "coopshop.it", sitemap: "https://coopshop.it/sitemap.xml", resa: 0, stimati: 54576 },
   { paese: "IT", insegna: "Carrefour Italia", dominio: "www.carrefour.it", sitemap: "https://www.carrefour.it/sitemap_index.xml", resa: 0.8, stimati: 28352 },
   { paese: "IT", insegna: "Iperal Spesa Online", dominio: "www.iperalspesaonline.it", sitemap: "https://www.iperalspesaonline.it/sitemap.xml", resa: 0.7, stimati: 23255 },
   { paese: "IT", insegna: "Bennet", dominio: "www.bennet.com", sitemap: "https://www.bennet.com/sitemap.xml", resa: 1, stimati: 20709 },
-  { paese: "IT", insegna: "Esselunga a Casa", dominio: "spesaonline.esselunga.it", sitemap: "https://spesaonline.esselunga.it/sitemap_index.xml", resa: 0, stimati: 17716 },
-  { paese: "IT", insegna: "Alì Supermercati", dominio: "www.alisupermercati.it", sitemap: "https://www.alisupermercati.it/sitemap.xml", resa: 0, stimati: 17696 },
   { paese: "IT", insegna: "Unes", dominio: "www.spesaonline.unes.it", sitemap: "https://www.spesaonline.unes.it/sitemap.xml", resa: 0.93, stimati: 15363 },
-  { paese: "IT", insegna: "Tigros", dominio: "www.tigros.it", sitemap: "https://www.tigros.it/sitemap.xml", resa: 0, stimati: 11835 },
-  { paese: "IT", insegna: "Basko", dominio: "www.basko.it", sitemap: "https://www.basko.it/sitemap.xml", resa: 0, stimati: 9028 },
-  { paese: "IT", insegna: "Naturasi", dominio: "www.naturasi.it", sitemap: "https://www.naturasi.it/sitemap.xml", resa: 0, stimati: 7711 },
+  { paese: "IT", insegna: "Naturasi", dominio: "www.naturasi.it", sitemap: "https://www.naturasi.it/sitemap.xml", resa: 0.6, stimati: 7711 },
   // Trovata provando trenta insegne italiane e spagnole: e' l'unica delle
   // trenta che pubblichi un catalogo con i prezzi dentro. Il nome del file e'
   // scritto male da loro, `stemap`, e va copiato cosi' com'e'.
@@ -322,6 +296,57 @@ export const FONTI: FonteCatalogo[] = [
 export function paesiConCatalogo(): string[] {
   return [...new Set(FONTI.map((f) => f.paese))].sort();
 }
+
+
+/**
+ * LE INSEGNE TENUTE FUORI, E PERCHE'. NON RIFARE QUESTO LAVORO.
+ *
+ * Non sono cancellate: sono qui. Cancellarle significherebbe che fra sei mesi
+ * qualcuno le ritrova, le rimette, e rifa' una sera di prove per riscoprire
+ * che CoopShop vuole che uno acceda.
+ *
+ * Stanno fuori da `FONTI`, quindi non entrano nel catalogo e non consumano il
+ * tetto di 200.000 voci per paese — che in Italia era pieno, e con dentro
+ * centodiecimila prodotti senza prezzo.
+ *
+ * COSA CAMBIA A TOGLIERLE, MISURATO
+ *   Italia, quota di catalogo con prezzo leggibile:  42% -> 77%
+ *   Italia, spesa vera di sedici voci:               16/16 prima, 16/16 dopo
+ *
+ * La seconda riga e' quella importante: NON SI PERDE NIENTE. Quelle insegne
+ * non davano un prezzo a nessuna delle sedici voci, perche' non ne danno a
+ * nessuno. Davano solo un nome e un indirizzo, e per ogni voce c'erano gia'
+ * almeno quattro alternative che il prezzo ce l'hanno.
+ *
+ * QUANDO RIMETTERNE UNA DENTRO
+ * Quando la sua riga qui sotto smette di essere vera. Vale la pena ricontrollare
+ * chi dice «serve accedere»: un negozio che apre la vetrina cambia idea da un
+ * giorno all'altro. Chi invece vieta l'API nel `robots.txt` non cambia da solo:
+ * li' serve chiedere il permesso, ed e' una decisione commerciale.
+ */
+export const SENZA_PREZZO: FonteCatalogo[] = [
+  /* CoopShop, Esselunga e Basko: la scheda si apre e mostra tutto tranne la
+     cifra. Verificato aprendo le pagine con gli occhi, il 16 settembre 2026.
+     Su CoopShop e Basko l'API `/ebsn/api/products` e' pure CONSENTITA e
+     risponde — ma il campo `price` nella risposta non c'e' proprio. */
+  { paese: "IT", insegna: "CoopShop", dominio: "coopshop.it", sitemap: "https://coopshop.it/sitemap.xml", resa: 0, stimati: 54576,
+    escusa: "serve accedere per vedere il prezzo; l'API e' consentita ma non ha il campo price" },
+  { paese: "IT", insegna: "Esselunga a Casa", dominio: "spesaonline.esselunga.it", sitemap: "https://spesaonline.esselunga.it/sitemap_index.xml", resa: 0, stimati: 17716,
+    escusa: "serve accedere per vedere il prezzo" },
+  { paese: "IT", insegna: "Basko", dominio: "www.basko.it", sitemap: "https://www.basko.it/sitemap.xml", resa: 0, stimati: 9028,
+    escusa: "la scheda apre la finestra di accesso; l'API e' consentita ma non ha il campo price" },
+
+  /* ALI' E' UN CASO DIVERSO, E VA RILETTO SE MAI SI PARLA CON LORO.
+     Il prezzo sulla pagina SI VEDE — 18,90 euro, e pure il prezzo al chilo.
+     Ma l'HTML e' un guscio da 16 KB: la cifra la prende il browser da
+     `/ebsn/api/`, che il loro robots.txt vieta per nome. Non c'e' niente di
+     rotto da riparare: c'e' un permesso da chiedere, per 29.531 prodotti fra
+     le due. */
+  { paese: "IT", insegna: "Alì Supermercati", dominio: "www.alisupermercati.it", sitemap: "https://www.alisupermercati.it/sitemap.xml", resa: 0, stimati: 17696,
+    escusa: "il prezzo si vede in pagina ma arriva da /ebsn/api/, che il loro robots.txt vieta" },
+  { paese: "IT", insegna: "Tigros", dominio: "www.tigros.it", sitemap: "https://www.tigros.it/sitemap.xml", resa: 0, stimati: 11835,
+    escusa: "Disallow: /ebsn/ nel loro robots.txt" },
+];
 
 /** Le fonti di un paese, le piu' generose per prime. */
 export function fontiDi(paese: string): FonteCatalogo[] {
