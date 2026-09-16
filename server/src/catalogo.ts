@@ -79,6 +79,16 @@ const PAESI_IN_MEMORIA = 3;
 const SCADENZA_MS = 26 * 60 * 60 * 1000;
 
 /**
+ * Quanto si aspetta il primo caricamento di un paese.
+ *
+ * Trentacinque secondi: la fase prezzi ne ha una cinquantina prima che l'app
+ * molli — iOS chiude ogni connessione a sessanta — e un paese si carica fra i
+ * tre e i venticinque. Il margine che resta serve ad aprire le schede e
+ * leggere i prezzi.
+ */
+const ATTESA_CARICAMENTO_MS = 35_000;
+
+/**
  * Tetto per insegna.
  *
  * Alcampo ne dichiara 86.773 e Checkers 98.424: senza un limite un paese solo
@@ -97,14 +107,19 @@ const SCADENZA_MS = 26 * 60 * 60 * 1000;
 const MAX_PER_INSEGNA = 50_000;
 
 /**
- * Quante sitemap figlie si aprono quando la prima e' un indice.
+ * Quante sitemap figlie aprire per ogni indice.
  *
- * Duecento coprono le insegne viste — Sainsbury's ne ha 165, Tesco 8 — e
- * fermano un indice malformato prima che tenga occupato il lavoro notturno per
- * ore. Chi ne ha di piu' viene troncato, e il troncamento si dichiara come
- * tutti gli altri.
+ * I cataloghi veri sono spezzati in decine di file — Alcampo ne ha una
+ * ventina — e fermarsi a poche significa caricare un frammento.
+ *
+ * DUECENTO E NON QUARANTA, E IL MOTIVO E' UN'INSEGNA PRECISA. Sainsbury's non
+ * spezza il catalogo in decine di file ma in CENTOSESSANTACINQUE, da sessanta
+ * prodotti l'uno: con un tetto di quaranta ne entrerebbero 2.400 sui 9.898 che
+ * pubblica, e l'insegna sembrerebbe piccola invece che tagliata. Duecento
+ * coprono tutte quelle viste e fermano comunque un indice malformato prima che
+ * tenga occupato il lavoro notturno per ore.
  */
-const FIGLIE_MAX = 200;
+const MAX_FIGLIE = 200;
 
 /** Chi e' stato tagliato dal tetto, e di quanto. Solo per dirlo, non per usarlo. */
 const troncati = new Map<string, { insegna: string; tenuti: number; visteAlmeno: number }>();
@@ -113,16 +128,45 @@ const caricati = new Map<string, CatalogoPaese>();
 /** Chi sta gia' scaricando un paese: due richieste insieme non lo scaricano due volte. */
 const inCorso = new Map<string, Promise<CatalogoPaese | null>>();
 
-const UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-  "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+/**
+ * Gli header di un browser vero, non solo il suo nome.
+ *
+ * Mandare il solo `User-Agent` non basta: i sistemi anti-bot guardano TUTTA
+ * l'intestazione, e `fetch` di Node ne manda molti meno di un browser.
+ * Misurato su `mercado.carrefour.com.br`:
+ *
+ *     curl con lo stesso User-Agent   →  200, sitemap intera
+ *     fetch di Node                   →  403
+ *
+ * Stessa identita' dichiarata, esito opposto. Mancavano `Accept`,
+ * `Accept-Language` e i `Sec-Fetch-*`, che un browser manda sempre — e la loro
+ * assenza e' l'impronta che tradisce un programma.
+ *
+ * Non e' un travestimento per entrare dove non si potrebbe: `robots.txt` lo
+ * leggiamo e lo rispettiamo, e queste sono le stesse richieste che farebbe
+ * una persona. E' per non misurare il nostro difetto al posto del loro sito.
+ */
+const INTESTAZIONE = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+  "Cache-Control": "no-cache",
+} as const;
 
 /* ─────────────────────────── Scaricare ─────────────────────────── */
 
 async function scarica(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, {
-      headers: { "User-Agent": UA, "Accept-Encoding": "gzip, deflate" },
+      headers: INTESTAZIONE,
       redirect: "follow",
       signal: AbortSignal.timeout(45_000),
     });
@@ -403,43 +447,43 @@ export async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> 
   let schedeViste = 0;
   let tagliato = false;
 
-  // La prima parte, poi le successive finche' rispondono: molte sitemap sono
-  // spezzate, e fermarsi alla prima significa perdere il grosso del catalogo.
-  const daProvare = [fonte.sitemap, ...partiSuccessive(fonte.sitemap)];
+  /* SI SEGUE L'INDICE, NON SI PRENDE UN FILE SOLO.
+     Prima si apriva la sitemap indicata e si leggevano i suoi indirizzi come
+     se fossero prodotti. Quando quella sitemap e' un INDICE — cioe' punta ad
+     altre sitemap — dentro non ci sono prodotti ma altri file, che il filtro
+     scartava: il catalogo veniva su vuoto o quasi.
 
-  for (const url of daProvare) {
-    if (tagliato) break;
+     Misurato: Migros Turchia caricava 70 prodotti sui 338 trovati dalla
+     scansione, e quei settanta erano bicchieri e shampoo; Barbora Estonia
+     otto, tutti elettrodomestici. Non era il catalogo a essere magro, era il
+     nostro modo di leggerlo.
+
+     Ora: se e' un indice si aprono le figlie, una per una, fino al tetto per
+     insegna. Se e' piatta si legge com'e', e si tentano comunque le parti
+     successive — `...part2.xml`, `-1.xml` — perche' i cataloghi grossi sono
+     spezzati e fermarsi al primo file ne darebbe un decimo. */
+  const daAprire: string[] = [fonte.sitemap];
+  const gia = new Set<string>();
+
+  while (daAprire.length > 0 && voci.length < MAX_PER_INSEGNA) {
+    const url = daAprire.shift()!;
+    if (gia.has(url)) continue;
+    gia.add(url);
+
     const xml = await scarica(url);
-    if (!xml) {
-      // La prima deve rispondere; se cade una delle successive, e' finita.
-      if (url === fonte.sitemap) break;
-      break;
-    }
+    if (!xml) continue;
 
-    /* UN INDICE NON E' UN ELENCO DI PRODOTTI, E FINORA LO TRATTAVAMO COSI'.
-       Parecchie insegne non pubblicano un file solo: pubblicano un
-       `<sitemapindex>` che elenca altri file. Sainsbury's ne ha 165, Tesco 8.
-       Letti come se fossero prodotti, quei 165 indirizzi vengono scartati da
-       `paScheda` — giustamente, non sono schede — e l'insegna risulta con zero
-       prodotti mentre ne pubblica quasi diecimila.
-
-       Si scende di un livello solo: e' quanto basta per tutte le insegne viste,
-       e un secondo livello moltiplicherebbe le richieste senza aggiungere
-       niente. Il tetto `FIGLIE_MAX` c'e' perche' un indice sbagliato o enorme
-       non deve poter tenere occupato il lavoro notturno per ore. */
-    const figlie = /<sitemapindex/i.test(xml) ? indirizzi(xml).slice(0, FIGLIE_MAX) : [];
-    const pagine: string[] = [];
-    if (figlie.length) {
-      for (const f of figlie) {
-        if (voci.length >= MAX_PER_INSEGNA) break;
-        const sotto = await scarica(f);
-        if (sotto) pagine.push(...indirizzi(sotto));
+    /* Un indice: le sue voci sono altre sitemap, non prodotti. Si rimettono in
+       coda invece di aprirle qui, cosi' un indice che ne contiene un altro —
+       e capita — viene seguito senza scrivere una discesa ricorsiva. */
+    if (/<sitemapindex/i.test(xml)) {
+      for (const figlia of indirizzi(xml).slice(0, MAX_FIGLIE)) {
+        if (!gia.has(figlia)) daAprire.push(figlia);
       }
-    } else {
-      pagine.push(...indirizzi(xml));
+      continue;
     }
 
-    for (const u of pagine) {
+    for (const u of indirizzi(xml)) {
       if (visti.has(u)) continue;
       visti.add(u);
       if (!paScheda(u)) continue;
@@ -453,6 +497,14 @@ export async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> 
       const p = parole(nome);
       if (p.length === 0) continue;
       voci.push({ nome, url: u, insegna: fonte.insegna, parole: p });
+    }
+
+    // Se questa era la sitemap dichiarata ed era piatta, si prova a chiedere
+    // anche le sue parti successive.
+    if (url === fonte.sitemap) {
+      for (const parte of partiSuccessive(fonte.sitemap)) {
+        if (!gia.has(parte)) daAprire.push(parte);
+      }
     }
   }
 
@@ -474,6 +526,7 @@ export async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> 
 
   return voci;
 }
+
 
 async function costruisci(paese: string): Promise<CatalogoPaese | null> {
   const fonti = fontiDi(paese);
@@ -610,11 +663,30 @@ export async function cercaNelCatalogo(
      Quindi se il catalogo non c'e' ancora si comincia a scaricarlo e si
      risponde subito vuoto: questa richiesta usa le altre strade, e la
      prossima trovera' il catalogo pronto. */
-  const pronto = catalogoGiaPronto(paese);
-  if (!pronto) {
-    void catalogoDi(paese);
-    console.info(`[catalogo] ${paese} non ancora pronto: lo carico per la prossima volta`);
-    return [];
+  /* SI ASPETTA, MA NON ALL'INFINITO.
+     Prima si rispondeva subito vuoto quando il catalogo non era in memoria,
+     per non far aspettare nessuno. Aveva senso finche' dietro c'era il motore
+     con la ricerca a coprire il buco. Da quando i prezzi vengono SOLO da qui,
+     rispondere vuoto significa consegnare una lista senza un prezzo — ed e'
+     successo davvero, in produzione: Polonia 0 su 17, Spagna 0 su 16,
+     Portogallo 0 su 18, con `secondiPrezzi: 0`. Il catalogo non partiva mai,
+     perche' su Render ogni richiesta lo trovava freddo.
+
+     Ora si aspetta il caricamento, con un tetto: la fase prezzi ha una
+     cinquantina di secondi prima che l'app molli, e un paese si carica in tre
+     o venti. Se non ce la fa entro il tetto si risponde con quello che c'e' —
+     una lista magra e onesta — e il caricamento prosegue per la volta dopo. */
+  if (!catalogoGiaPronto(paese)) {
+    const atteso = await Promise.race([
+      catalogoDi(paese),
+      new Promise<null>((r) => setTimeout(() => r(null), ATTESA_CARICAMENTO_MS)),
+    ]);
+    if (!atteso) {
+      console.info(
+        `[catalogo] ${paese} non pronto entro ${ATTESA_CARICAMENTO_MS / 1000}s: ` +
+          `rispondo con quello che c'e', il caricamento prosegue`,
+      );
+    }
   }
 
   const cat = await catalogoDi(paese);
