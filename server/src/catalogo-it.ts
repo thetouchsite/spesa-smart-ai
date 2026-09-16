@@ -324,7 +324,7 @@ function alimentarePlausibile(slug: string): boolean {
  * il prodotto non e' quello che serve per cucinare.
  */
 const PREPARAZIONI =
-  /\b(frollin|biscott|merendin|brioche|briochin|croissant|cornett|snack|gelat[oi]|budin|torta|tortin|crostat|wafer|crackers|grissin|pandoro|panettone|colomba|ripien[oi]|farcit|arrost|affettat|precott|impanat|affumicat|stagionat|al forno)/i;
+  /\b(frollin|biscott|merendin|brioche|briochin|croissant|cornett|snack|gelat[oi]|budin|torta|tortin|crostat|wafer|crackers|grissin|pandoro|panettone|colomba|ripien[oi]|farcit|arrost|affettat|precott|impanat|affumicat|stagionat|al forno|sfoglia|insalat|salad|pronto in|gia' pronto|gia pronto|monoporzion|condit|saltat|grigliat|marinat|panat)/i;
 
 function parole(s: string): string[] {
   let t = s;

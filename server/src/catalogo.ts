@@ -411,7 +411,7 @@ function alimentarePlausibile(nome: string): boolean {
  * serve per cucinare.
  */
 const PREPARAZIONI =
-  /\b(frollin|biscott|merendin|brioche|briochin|croissant|cornett|snack|gelat[oi]|budin|torta|tortin|crostat|wafer|crackers|grissin|pandoro|panettone|colomba|ripien[oi]|farcit|arrost|affettat|precott|impanat|affumicat|stagionat|al forno)/i;
+  /\b(frollin|biscott|merendin|brioche|briochin|croissant|cornett|snack|gelat[oi]|budin|torta|tortin|crostat|wafer|crackers|grissin|pandoro|panettone|colomba|ripien[oi]|farcit|arrost|affettat|precott|impanat|affumicat|stagionat|al forno|sfoglia|insalat|condit|saltat|grigliat|marinat|panat|pronto in|gia' pronto|monoporzion)/i;
 
 /**
  * La stessa trappola, in inglese.
