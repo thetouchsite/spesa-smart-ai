@@ -4,7 +4,7 @@
  * Generato da `scripts/aggiorna-fonti.mjs` — non si scrive a mano, si
  * rigenera dopo una passata di raccolta.
  *
- * 145 insegne · 38 paesi · 2.718.692 prodotti
+ * 147 insegne · 38 paesi · 2.727.010 prodotti
  *
  * I NUMERI SONO CONTATI, NON STIMATI
  * ----------------------------------
@@ -138,6 +138,7 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "HR", insegna: "Konzum", dominio: "www.konzum.hr", sitemap: "https://www.konzum.hr/sitemap_products.xml", resa: 0.97, stimati: 11153 },
 
   { paese: "HU", insegna: "Aldi HU", dominio: "www.aldi.hu", sitemap: "https://www.aldi.hu/sitemap_products.xml", resa: 1, stimati: 806 },
+  { paese: "HU", insegna: "Spar HU", dominio: "www.spar.at", sitemap: "https://www.spar.at/index.sitemap-index.xml", resa: 0, stimati: 459 },
   { paese: "HU", insegna: "Auchan Online", dominio: "auchan.hu", sitemap: "https://auchan.hu/sitemap.xml", resa: 1, stimati: 249 },
   { paese: "HU", insegna: "Auchan HU", dominio: "auchan.hu", sitemap: "https://auchan.hu/sitemap.xml", resa: 1, stimati: 249 },
   { paese: "HU", insegna: "Kifli.hu", dominio: "kifli.hu", sitemap: "https://www.kifli.hu/sitemap_products.xml", resa: 0.5, stimati: 28 },
@@ -202,6 +203,7 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "PT", insegna: "Auchan Portugal", dominio: "www.auchan.pt", sitemap: "https://www.auchan.pt/sitemap_index.xml", resa: 0.97, stimati: 44039 },
   { paese: "PT", insegna: "Recheio", dominio: "www.recheio.pt", sitemap: "https://www.recheio.pt/portal/sitemap.xml", resa: 0, stimati: 20283 },
   { paese: "PT", insegna: "Pingo Doce", dominio: "www.pingodoce.pt", sitemap: "https://www.pingodoce.pt/home/sitemap_index.xml", resa: 0, stimati: 12441 },
+  { paese: "PT", insegna: "Wells", dominio: "www.wells.pt", sitemap: "https://www.wells.pt/sitemap_index.xml", resa: 0.97, stimati: 7859 },
   { paese: "PT", insegna: "Garrafeira Nacional", dominio: "www.garrafeiranacional.com", sitemap: "https://www.garrafeiranacional.com/pub/sitemap.xml", resa: 0, stimati: 413 },
   { paese: "PT", insegna: "Lidl Portugal", dominio: "www.lidl.pt", sitemap: "https://www.lidl.pt/static/sitemap.xml", resa: 1, stimati: 333 },
 
