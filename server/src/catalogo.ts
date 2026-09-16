@@ -157,7 +157,7 @@ const MAX_FIGLIE = 200;
  * «item», e senza toglierla combacerebbe con qualunque file al mondo.
  */
 const NON_E_UN_ELENCO_PRODOTTI =
-  /(categor|kategor|categoria|rubrique|recipe|ricett|rezept|receta|collection|store|negoz|filial|content|contenut|page|pagina|brand|marca|blog|news|article|author|tag)/i;
+  /(categor|kategor|categoria|rubrique|recipe|ricett|rezept|receta|collection|store|negoz|filial|content|contenut|page|pagina|brand|marca|blog|news|article|author|tag|promo|offer|oferta|offerte|angebot|folleto|volantino)/i;
 
 function percorsoDi(u: string): string {
   try {
@@ -517,8 +517,14 @@ function paPreparazione(nome: string): boolean {
  * crollare era solo la cosa che nessuno guardava: quante di quelle voci si
  * aprivano davvero.
  */
-function paScheda(u: string): boolean {
+/*
+ * Esportata perche' la misura della resa deve guardare le STESSE pagine che il
+ * catalogo terra'. Campionando la sitemap grezza, Carrefour Italia risultava a
+ * zero: le pagine aperte erano categorie, che un prezzo non ce l'hanno.
+ */
+export function paScheda(u: string): boolean {
   if (NON_E_UNA_PAGINA.test(u)) return false;
+  if (E_UNA_VETRINA.test(u)) return false;
   if (
     /\/(p|product|products|producto|productos|produkt|produkte|prodotto|prodotti|produit|produits|artikel|item|items|urun|proizvod|pdp|dp)\//i.test(u)
   ) {
@@ -559,6 +565,29 @@ function paScheda(u: string): boolean {
  * una scheda.
  */
 const NON_E_UNA_PAGINA = /\/medias\/|\.(xml|jpe?g|png|gif|pdf|webp|svg|css|js|zip|mp4)(\?|$)/i;
+
+/**
+ * Le vetrine: una pagina sola con dentro venti prodotti.
+ *
+ * E' PEGGIO DI UNA PAGINA VUOTA, E VA CAPITO PERCHE'.
+ * Una categoria senza prezzi si scarta da se': non si legge niente e l'insegna
+ * va in fondo alla fila. Una vetrina di volantino invece i prezzi ce li ha —
+ * venti, uno per riquadro — e noi ne leggiamo uno.
+ *
+ * Il nome pero' lo ricaviamo dall'indirizzo, che su Alcampo dice
+ * `producto-en-folleto-13-08-26-20-09-26`. Quindi si finisce per scrivere in
+ * magazzino un prezzo vero, preso da un prodotto qualunque, sotto un nome che
+ * non e' di nessun prodotto. Guardato con gli occhi: quella pagina vendeva
+ * Play-Doh, contenitori e borracce, e a noi ne risultava «4 su 10 con prezzo».
+ *
+ * Un numero sbagliato che sembra giusto e' il difetto che costa di piu', ed e'
+ * lo stesso delle mele Lidl a 63 sterline: nessun errore, nessun registro,
+ * solo un prezzo assurdo davanti al cliente.
+ *
+ * Alcampo e Bonpreu Esclat girano sulla stessa piattaforma e hanno la stessa
+ * cartella; da soli valevano 108.047 voci dichiarate.
+ */
+const E_UNA_VETRINA = /\/(offers|ofertas|offerte|promociones|promozioni|folleto|volantino|angebote|promotions)\//i;
 
 /**
  * Le voci di UNA sola insegna.

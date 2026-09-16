@@ -83,13 +83,6 @@ function sensato(n: unknown): number | null {
   return Number.isFinite(x) && x > 0.01 && x < 1000 ? x : null;
 }
 
-/** Le parole dello slug: `/p/leche-entera-brik/12559` → «leche entera brik». */
-function slug(url: string): string {
-  const pezzi = new URL(url).pathname.split("/").filter(Boolean);
-  const buono = pezzi.filter((p) => !/^\d+$/.test(p)).pop() ?? "";
-  return decodeURIComponent(buono).replace(/[-_]+/g, " ").trim();
-}
-
 interface Lettore {
   insegna: string;
   /** A quali indirizzi si applica. */
@@ -103,27 +96,50 @@ interface Lettore {
 
 const LETTORI: Lettore[] = [
   {
-    /* CONSUM — 18.385 prodotti, Spagna, che e' il paese messo peggio.
-       L'identificativo nell'indirizzo NON e' quello dell'API: `12559` per
-       l'API e' una colonia, non il latte. Quindi si cerca per nome, e si
-       controlla che il nome tornato somigli a quello chiesto — altrimenti si
-       finirebbe per attaccare il prezzo di un prodotto a un altro, che e'
-       peggio di non avere il prezzo. */
+    /* CONSUM - 18.385 prodotti, in Spagna, che e' il paese messo peggio.
+
+       SI CERCA PER CODICE, E SI PRETENDE CHE COMBACI.
+       La prima versione cercava per nome, ricavato dallo slug, e accettava il
+       risultato se il nome tornato somigliava abbastanza. Funzionava sugli
+       indirizzi spagnoli e falliva su tutti gli altri: la sitemap di Consum
+       pubblica anche il valenzano, e
+       `/vl/p/melmelada-maduixa-0-sucres-afegits/7185288` cercato per nome non
+       trova niente, perche' l'API risponde in spagnolo — «Mermelada Fresa».
+       Misurato: dieci schede aperte, zero prezzi letti.
+
+       Il numero in fondo all'indirizzo invece e' lo stesso nelle due lingue, e
+       l'API lo restituisce nel campo `code`. Chiedendo quello si ottiene un
+       solo risultato e si puo' CONTROLLARE che sia lui, invece di valutare
+       quanto si somigliano due nomi. Un confronto esatto al posto di una
+       stima: sparisce il rischio di attaccare il prezzo di un prodotto a un
+       altro, che e' il danno peggiore che questo file possa fare.
+
+       Nota per chi legge la versione precedente: diceva che il codice
+       dell'indirizzo non e' quello dell'API, «12559 per l'API e' una colonia,
+       non il latte». Non e' cosi'. Chiedendo `q=12559` torna un risultato
+       solo, codice 12559, «Leche Entera Brik», 1,39 euro. Quella conclusione
+       veniva dal prendere il primo prodotto dell'elenco senza guardare il
+       codice. */
     insegna: "Consum",
     host: /(^|\.)consum\.es$/i,
     async leggi(url) {
-      const cercato = slug(url);
-      if (cercato.length < 3) return null;
+      /* Ultimo pezzo dell'indirizzo: `/xx/p/<nome>/<codice>`. */
+      const codice = /\/(\d{3,})\/?$/.exec(new URL(url).pathname)?.[1];
+      if (!codice) return null;
+
       const d = (await json(
-        `https://tienda.consum.es/api/rest/V1.0/catalog/product?q=${encodeURIComponent(cercato)}&limit=5`,
+        `https://tienda.consum.es/api/rest/V1.0/catalog/product?q=${codice}&limit=5`,
         "es-ES,es;q=0.9",
       )) as { products?: Array<Record<string, any>> } | null;
 
       for (const p of d?.products ?? []) {
-        const nome = String(p?.productData?.name ?? "");
-        if (!somigliano(cercato, nome)) continue;
+        /* Solo il prodotto giusto: una ricerca per numero puo' riportare
+           anche chi quel numero ce l'ha nella descrizione. */
+        if (String(p?.code ?? "") !== codice) continue;
         const v = sensato(p?.priceData?.prices?.[0]?.value?.centAmount);
-        if (v !== null) return { prezzo: v, valuta: "EUR", nome };
+        if (v !== null) {
+          return { prezzo: v, valuta: "EUR", nome: String(p?.productData?.name ?? "") };
+        }
       }
       return null;
     },
@@ -156,32 +172,6 @@ const LETTORI: Lettore[] = [
     },
   },
 ];
-
-/**
- * Due nomi parlano dello stesso prodotto?
- *
- * Serve solo dove la corrispondenza non e' per identificativo. Si chiede che
- * meta' delle parole significative combacino: piu' severo taglierebbe via
- * «Leche Entera Brik 1 L» contro «leche entera brik», piu' largo attaccherebbe
- * il prezzo del latte scremato a quello intero.
- */
-function somigliano(cercato: string, trovato: string): boolean {
-  const pulisci = (s: string) =>
-    new Set(
-      s
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
-        .split(/[^a-z0-9]+/)
-        .filter((w) => w.length > 2),
-    );
-  const a = pulisci(cercato);
-  const b = pulisci(trovato);
-  if (a.size === 0) return false;
-  let insieme = 0;
-  for (const w of a) if (b.has(w)) insieme++;
-  return insieme >= Math.ceil(a.size / 2);
-}
 
 /**
  * Il prezzo di questa scheda, chiesto all'API del suo negozio.

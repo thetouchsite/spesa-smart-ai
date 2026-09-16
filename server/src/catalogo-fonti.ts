@@ -119,7 +119,7 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "DE", insegna: "Lidl Deutschland", dominio: "www.lidl.de", sitemap: "https://www.lidl.de/static/sitemap.xml", resa: 0.97, stimati: 12720 },
   { paese: "DE", insegna: "Mytime", dominio: "www.mytime.de", sitemap: "https://www.mytime.de/sitemaps/mytime/sitemap.produkte.xml", resa: 1, stimati: 12265 },
   { paese: "DE", insegna: "Aldi Süd", dominio: "www.aldi-sued.de", sitemap: "https://www.aldi-sued.de/sitemap_products.xml", resa: 1, stimati: 4786 },
-  { paese: "DE", insegna: "Aldi Nord", dominio: "www.aldi-nord.de", sitemap: "https://www.aldi-nord.de/.aldi-nord-sitemap.xml", resa: 0, stimati: 3241 },
+  { paese: "DE", insegna: "Aldi Nord", dominio: "www.aldi-nord.de", sitemap: "https://www.aldi-nord.de/sitemaps/.aldi-nord-sitemap-products.xml", resa: 0, stimati: 2337 },
   { paese: "DE", insegna: "Alnatura", dominio: "www.alnatura.de", sitemap: "https://www.alnatura.de/sitemap.xml", resa: 0.4, stimati: 3115 },
   { paese: "DE", insegna: "Netto", dominio: "www.netto-online.de", sitemap: "https://www.netto-online.de/sitemap.xml", resa: 1, stimati: 1803 },
 
@@ -131,14 +131,21 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "EE", insegna: "Rimi Estonia", dominio: "www.rimi.ee", sitemap: "https://www.rimi.ee/epood/sitemap.xml", resa: 1, stimati: 58320 },
   { paese: "EE", insegna: "Barbora Estonia", dominio: "barbora.ee", sitemap: "https://barbora.ee/sitemap.xml", resa: 1, stimati: 18595 },
 
+  // La resa resta 1 e NON si abbassa: misurata a ritmo nostro da 4 pagine su
+  // 10, ma tutte e quattro col prezzo. Le altre sei non erano senza prezzo,
+  // erano richieste rifiutate perche' andavamo troppo in fretta. Il rimedio e'
+  // rallentare la raccolta, non mandare in fondo alla fila centomila schede
+  // che il prezzo ce l'hanno. Verificato a mano: 10,16 EUR a schermo e in
+  // `og:price`, sulla stessa scheda che la misura non era riuscita ad aprire.
   { paese: "ES", insegna: "Naturitas", dominio: "www.naturitas.es", sitemap: "https://www.naturitas.es/sitemap.xml", resa: 1, stimati: 108646 },
-  { paese: "ES", insegna: "Alcampo", dominio: "compraonline.alcampo.es", sitemap: "https://compraonline.alcampo.es/sitemaps/sitemap_index.xml", resa: 0, stimati: 86773 },
-  { paese: "ES", insegna: "Alcampo Online", dominio: "www.compraonline.alcampo.es", sitemap: "https://www.compraonline.alcampo.es/sitemaps/sitemap-products-part1.xml", resa: 0.23, stimati: 50000 },
-  { paese: "ES", insegna: "Bonpreu Esclat", dominio: "www.compraonline.bonpreuesclat.cat", sitemap: "https://www.compraonline.bonpreuesclat.cat/sitemaps/sitemap_index.xml", resa: 0.2, stimati: 21274 },
-  { paese: "ES", insegna: "Consum", dominio: "tienda.consum.es", sitemap: "https://tienda.consum.es/sitemap.xml", resa: 0, stimati: 18385 },
+  // Una riga sola: le due di prima erano lo stesso negozio contato due volte.
+  // 50.000 prodotti stanno in part1 e 36.555 in part2; puntando all'indice si
+  // prendono entrambe, e `paScheda` scarta volantini, ricette e categorie.
+  { paese: "ES", insegna: "Alcampo", dominio: "www.compraonline.alcampo.es", sitemap: "https://www.compraonline.alcampo.es/sitemaps/sitemap_index.xml", resa: 0.6, stimati: 86555 },
+  { paese: "ES", insegna: "Bonpreu Esclat", dominio: "www.compraonline.bonpreuesclat.cat", sitemap: "https://www.compraonline.bonpreuesclat.cat/sitemaps/sitemap-products-part1.xml", resa: 0.6, stimati: 21126 },
+  { paese: "ES", insegna: "Consum", dominio: "tienda.consum.es", sitemap: "https://tienda.consum.es/sitemap.xml", resa: 1, stimati: 18385 },
   { paese: "ES", insegna: "Mercadona Online", dominio: "tienda.mercadona.es", sitemap: "https://tienda.mercadona.es/sitemap.xml", resa: 0, stimati: 4320 },
-  { paese: "ES", insegna: "Aldi España", dominio: "www.aldi.es", sitemap: "https://www.aldi.es/.aldi-nord-sitemap.xml", resa: 0, stimati: 2483 },
-  { paese: "ES", insegna: "El Corte Inglés", dominio: "www.elcorteingles.es", sitemap: "https://www.elcorteingles.es/entradas/sitemaps/sitemap.xml", resa: 0, stimati: 1370 },
+  { paese: "ES", insegna: "Aldi España", dominio: "www.aldi.es", sitemap: "https://www.aldi.es/sitemaps/.aldi-nord-sitemap-products.xml", resa: 0, stimati: 2072 },
 
   { paese: "FI", insegna: "Lidl Suomi", dominio: "www.lidl.fi", sitemap: "https://www.lidl.fi/static/sitemap.xml", resa: 1, stimati: 439 },
 
@@ -203,7 +210,7 @@ export const FONTI: FonteCatalogo[] = [
 
   { paese: "IT", insegna: "CoopShop", dominio: "coopshop.it", sitemap: "https://coopshop.it/sitemap.xml", resa: 0, stimati: 54576 },
   { paese: "IT", insegna: "Carrefour Italia", dominio: "www.carrefour.it", sitemap: "https://www.carrefour.it/sitemap_index.xml", resa: 0.97, stimati: 28352 },
-  { paese: "IT", insegna: "Iperal Spesa Online", dominio: "www.iperalspesaonline.it", sitemap: "https://www.iperalspesaonline.it/sitemap.xml", resa: 0, stimati: 23373 },
+  { paese: "IT", insegna: "Iperal Spesa Online", dominio: "www.iperalspesaonline.it", sitemap: "https://www.iperalspesaonline.it/sitemap.xml", resa: 0.7, stimati: 23255 },
   { paese: "IT", insegna: "Bennet", dominio: "www.bennet.com", sitemap: "https://www.bennet.com/sitemap.xml", resa: 1, stimati: 20709 },
   { paese: "IT", insegna: "Esselunga a Casa", dominio: "spesaonline.esselunga.it", sitemap: "https://spesaonline.esselunga.it/sitemap_index.xml", resa: 0, stimati: 17716 },
   { paese: "IT", insegna: "Alì Supermercati", dominio: "www.alisupermercati.it", sitemap: "https://www.alisupermercati.it/sitemap.xml", resa: 0, stimati: 17696 },
@@ -211,14 +218,21 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "IT", insegna: "Tigros", dominio: "www.tigros.it", sitemap: "https://www.tigros.it/sitemap.xml", resa: 0, stimati: 11835 },
   { paese: "IT", insegna: "Basko", dominio: "www.basko.it", sitemap: "https://www.basko.it/sitemap.xml", resa: 0, stimati: 9028 },
   { paese: "IT", insegna: "Naturasi", dominio: "www.naturasi.it", sitemap: "https://www.naturasi.it/sitemap.xml", resa: 0, stimati: 7711 },
+  // Trovata provando trenta insegne italiane e spagnole: e' l'unica delle
+  // trenta che pubblichi un catalogo con i prezzi dentro. Il nome del file e'
+  // scritto male da loro, `stemap`, e va copiato cosi' com'e'.
+  // Dichiara 7.590 indirizzi ma ne teniamo 722: solo quelli portano il codice
+  // articolo in fondo. Gli altri sono `/it/<nome>.html` senza numero, e una
+  // forma cosi' generica non si puo' accettare senza far entrare mezzo sito.
+  { paese: "IT", insegna: "Prezzemolo e Vitale", dominio: "www.prezzemoloevitale.it", sitemap: "https://www.prezzemoloevitale.it/media/sitemap/stemap_www_it_product.xml", resa: 0.9, stimati: 722 },
   { paese: "IT", insegna: "Coop", dominio: "www.easycoop.com", sitemap: "https://www.easycoop.com/sitemap/sitemap.xml", resa: 1, stimati: 6636 },
   { paese: "IT", insegna: "Cortilia", dominio: "www.cortilia.it", sitemap: "https://www.cortilia.it/sitemap.xml", resa: 1, stimati: 6536 },
   { paese: "IT", insegna: "Pam", dominio: "www.pampanorama.it", sitemap: "https://www.pampanorama.it/sitemap.xml", resa: 0, stimati: 6165 },
   { paese: "IT", insegna: "Conad Spesa Online", dominio: "spesaonline.conad.it", sitemap: "https://spesaonline.conad.it/sitemap/products.xml", resa: 0.17, stimati: 5433 },
   { paese: "IT", insegna: "Eataly", dominio: "www.eataly.net", sitemap: "https://www.eataly.net/sitemap.xml", resa: 1, stimati: 5073 },
-  { paese: "IT", insegna: "Unicoop Tirreno", dominio: "coopacasa.coopetruria.coop.it", sitemap: "https://coopacasa.coopetruria.coop.it/sitemap_index.xml", resa: 0.7, stimati: 2033 },
+  { paese: "IT", insegna: "Unicoop Tirreno", dominio: "coopacasa.coopetruria.coop.it", sitemap: "https://coopacasa.coopetruria.coop.it/sitemap_index.xml", resa: 0.4, stimati: 2033 },
   { paese: "IT", insegna: "Aldi", dominio: "www.aldi.it", sitemap: "https://www.aldi.it/sitemap_products.xml", resa: 1, stimati: 678 },
-  { paese: "IT", insegna: "Lidl Italia", dominio: "www.lidl.it", sitemap: "https://www.lidl.it/static/sitemap.xml", resa: 1, stimati: 445 },
+  { paese: "IT", insegna: "Lidl Italia", dominio: "www.lidl.it", sitemap: "https://www.lidl.it/static/sitemap.xml", resa: 0.7, stimati: 445 },
 
   { paese: "KR", insegna: "Emart Mall", dominio: "emart.ssg.com", sitemap: "https://emart.ssg.com/sitemap/best.xml", resa: 0, stimati: 498 },
 
