@@ -569,6 +569,12 @@ async function prezzaLista(
   currency: string,
   fonte: FontePrezzi,
 ) {
+  /* Le voci che un candidato ce l'avevano e di cui non si e' aperta nessuna
+     pagina. Serve a non dire «nessun negozio ha questo prodotto» quando la
+     verita' e' «non siamo riusciti ad aprirlo»: sono due cose diverse e si
+     rimediano in due modi — la prima e' definitiva, la seconda invita a
+     riprovare. */
+  let nonRaggiungibili: string[] = [];
   let prezziGrezzi: Array<{
     prodotto?: string;
     nome: string;
@@ -652,6 +658,7 @@ async function prezzaLista(
       ]);
 
       prezziGrezzi = cat?.prezzi ?? [];
+      nonRaggiungibili = cat?.nonRaggiungibili ?? [];
 
       /* QUELLO ITALIANO AGGIUNGE, NON RIFA'.
          Le sue righe servono al confronto fra insegne — Eurospin, Cortilia,
@@ -928,6 +935,7 @@ async function prezzaLista(
   return {
     prezzi: migliori,
     prodotti,
+    nonRaggiungibili,
     catene: confronto.catene,
     vincitore: confronto.vincitore,
     risparmioVsPiuCara: confronto.risparmio,

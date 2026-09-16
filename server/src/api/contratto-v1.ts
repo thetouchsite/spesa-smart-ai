@@ -172,6 +172,8 @@ interface Dentro {
       prezzoListino?: number | null;
     }>;
   }>;
+  /** Voci che avevano candidati ma di cui nessuna pagina si e' aperta. */
+  nonRaggiungibili?: string[];
   catene?: Array<{
     negozio: string;
     totale: number;
@@ -192,8 +194,20 @@ interface Dentro {
  * resto non importa, e se non c'e' nessun candidato non ha senso chiedersi
  * perche' le pagine non si siano aperte.
  */
-function esitoDi(offerte: Dentro["prodotti"][number]["offerte"]): Esito {
-  if (offerte.length === 0) return "nessun-prodotto";
+function esitoDi(
+  offerte: Dentro["prodotti"][number]["offerte"],
+  cadutaAprendo: boolean,
+): Esito {
+  /* SENZA OFFERTE, MA NON SEMPRE PER LO STESSO MOTIVO.
+     «Nessun negozio ha questo prodotto» e «il prodotto c'e' ma non siamo
+     riusciti ad aprirlo» arrivavano uguali a chi legge, e la prima e' una
+     bugia che si vede: misurato, Aldi Nord ha «Tomatenmark» a catalogo con due
+     schede, e siccome le sue pagine non si aprono spariva in silenzio.
+
+     Se una voce aveva dei candidati e nessuna pagina ha risposto, l'esito e'
+     `non-raggiungibile` — che invita a riprovare — non `nessun-prodotto`, che
+     chiude la questione. */
+  if (offerte.length === 0) return cadutaAprendo ? "non-raggiungibile" : "nessun-prodotto";
   if (offerte.some((o) => typeof o.prezzo === "number")) return "trovato";
 
   /* Nessun prezzo, ma delle schede c'erano. Le due cause si raccontano in modo
@@ -255,9 +269,11 @@ export function rispostaPrezziV1(
   const perVoce = new Map<string, Dentro["prodotti"][number]>();
   for (const p of dentro.prodotti ?? []) perVoce.set(p.prodotto, p);
 
+  const caduteAprendo = new Set(dentro.nonRaggiungibili ?? []);
+
   const voci: VoceV1[] = chieste.map((voce) => {
     const offerte = perVoce.get(voce)?.offerte ?? [];
-    const esito = esitoDi(offerte);
+    const esito = esitoDi(offerte, caduteAprendo.has(voce));
     return {
       voce,
       esito,
