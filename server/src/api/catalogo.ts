@@ -99,20 +99,36 @@ const SCADENZA_MS = 26 * 60 * 60 * 1000;
 const ATTESA_CARICAMENTO_MS = 35_000;
 
 /**
- * Tetto per insegna.
+ * DUE TETTI, PERCHE' SONO DUE MESTIERI DIVERSI.
  *
- * Alcampo ne dichiara 86.773 e Checkers 98.424: senza un limite un paese solo
- * riempirebbe la memoria. Cinquantamila per insegna coprono abbondantemente
- * una lista della spesa, che di voci ne ha diciotto.
+ * Ce n'era uno solo, e confondeva due cose che non c'entrano niente fra loro:
+ * quanto catalogo SALVIAMO e quanto ne TENIAMO IN MEMORIA.
  *
- * MA IL TAGLIO VA DETTO, E PRIMA NON LO DICEVA NESSUNO. Quattro cataloghi lo
- * superano — Checkers, Alcampo, Auchan Portogallo, Voila — e insieme perdono
- * 136.481 indirizzi che non entrano mai in memoria. Non e' un errore: e' una
- * scelta, e finche' la memoria e' quella del piano gratuito resta giusta. Ma
- * un conteggio che dice «50.000» senza aggiungere «su 98.424» descrive il
- * limite, non il catalogo, e chi legge crede di avere tutto.
+ *   RACCOLTA  quante schede si prendono da un negozio e si scrivono su Mongo.
+ *             Costa spazio su disco, e lo spazio e' poco caro: misurato, un
+ *             indirizzo compresso pesa 39 byte, quindi tre milioni di link
+ *             stanno in 116 MB dei 512 del piano.
+ *   MEMORIA   quante di quelle schede si caricano per rispondere a un utente.
+ *             Costa RAM, e la RAM e' cara: ventidue cataloghi italiani interi
+ *             hanno fatto cadere Render con un 502.
  *
- * Da qui in poi il troncamento si registra e si vede in `/catalogo/stato`.
+ * Con un tetto solo a 50.000 si buttavano via schede PRIMA di salvarle, per
+ * paura di una memoria che nemmeno le avrebbe viste. Dodici insegne ci
+ * sbattevano contro — Checkers 98.307, Naturitas 100.000, Continente 89.297 —
+ * e quel che restava fuori era perso per sempre, non rimandato.
+ *
+ * Adesso si raccoglie largo e si serve stretto. Il taglio in memoria c'e'
+ * ancora ed e' giusto; quello alla raccolta non serviva a nessuno.
+ */
+const MAX_RACCOLTI_PER_INSEGNA = Number(process.env.CATALOGO_MAX_INSEGNA ?? 250_000);
+
+/**
+ * Quante voci di una singola insegna si tengono in MEMORIA.
+ *
+ * Cinquantamila coprono abbondantemente una lista della spesa, che di voci ne
+ * ha diciotto. Il taglio si registra e si vede in `/catalogo/stato`: un
+ * conteggio che dice «50.000» senza aggiungere «su 98.424» descrive il limite,
+ * non il catalogo, e chi legge crede di avere tutto.
  */
 const MAX_PER_INSEGNA = 50_000;
 
@@ -730,7 +746,7 @@ export async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> 
   const daAprire: string[] = [fonte.sitemap];
   const gia = new Set<string>();
 
-  while (daAprire.length > 0 && voci.length < MAX_PER_INSEGNA) {
+  while (daAprire.length > 0 && voci.length < MAX_RACCOLTI_PER_INSEGNA) {
     const url = daAprire.shift()!;
     if (gia.has(url)) continue;
     gia.add(url);
@@ -761,7 +777,7 @@ export async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> 
       visti.add(u);
       if (!paScheda(u)) continue;
       schedeViste++;
-      if (voci.length >= MAX_PER_INSEGNA) {
+      if (voci.length >= MAX_RACCOLTI_PER_INSEGNA) {
         tagliato = true;
         continue;
       }
@@ -779,7 +795,7 @@ export async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> 
         parole: conSinonimi(p, fonte.paese),
         resa: fonte.resa ?? 0.5,
       });
-      if (voci.length >= MAX_PER_INSEGNA) break;
+      if (voci.length >= MAX_RACCOLTI_PER_INSEGNA) break;
     }
 
     // Se questa era la sitemap dichiarata ed era piatta, si prova a chiedere
@@ -803,7 +819,7 @@ export async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> 
     });
     console.warn(
       `[catalogo] ${fonte.paese} ${fonte.insegna}: tenute ${voci.length} schede su almeno ` +
-        `${schedeViste} viste — il tetto di ${MAX_PER_INSEGNA} ha tagliato il resto`,
+        `${schedeViste} viste — il tetto di ${MAX_RACCOLTI_PER_INSEGNA} ha tagliato il resto`,
     );
   }
 

@@ -226,9 +226,19 @@ const html = `<title>Cruscotto dati MealMint</title>
     <div class="cifra male"><b>${alBuio.length}</b><span>paesi senza prezzi</span></div>
   </div>
 
+  <p class="nota"><b>Come leggere le cinque cifre qui sopra.</b>
+  <b>Link servibili</b>: indirizzi di prodotto salvati, di insegne ancora in elenco — quel che l&#39;API pu&ograve; dare subito.
+  <b>Insegne in elenco</b>: le catene attive nella collezione <code>fonti</code> su Mongo.
+  <b>Prezzi validi</b>: indirizzi con una cifra letta nelle ultime ventiquattro ore.
+  <b>Paesi senza prezzi</b>: hanno il catalogo e nessuna cifra.</p>
+
   <h2>Paese per paese, dal database</h2>
+  <p class="nota"><b>Due numeri per riga, e non si sommano.</b>
+  <b>Link salvati</b> sono gli indirizzi di prodotto che il magazzino conosce: l&#39;API li serve senza aprire una pagina. Valgono trenta ore e li riscrive il lavoro notturno.
+  <b>Con prezzo</b> sono quanti di quegli indirizzi hanno una cifra letta e ancora valida: valgono ventiquattro ore, poi la riga resta ma non si mostra e la pagina si riapre.
+  La barra dice solo quanto pesa quel paese rispetto al piu&#39; grande.</p>
   <div class="paesi">
-    <div class="riga intestazione"><span>Paese</span><span>Link</span><span>Indirizzi</span><span>Prezzi</span></div>
+    <div class="riga intestazione"><span>Paese</span><span>quanto pesa</span><span>link salvati</span><span>con prezzo</span></div>
 ${righeTabella}
   </div>
 

@@ -166,6 +166,18 @@ const orologio = (s: number) =>
  * extravergine di oliva» e' piu' preciso di «olio» — quindi dove c'e' vince
  * lei. Questa e' la rete, non la regola.
  */
+/**
+ * Le parole con cui cercare nelle API a blocchi.
+ *
+ * Sono le stesse voci della spesa: quel che la gente compra. Cercarle una per
+ * una in un'API che torna cento risultati copre migliaia di prodotti con
+ * poche decine di richieste — e copre proprio quelli giusti, invece di un
+ * campione qualunque del catalogo.
+ */
+export function paroleDellaSpesa(paese: string): string[] {
+  return listaDellaSpesa(paese).voci;
+}
+
 function listaDellaSpesa(paese: string): { voci: string[]; come: string } {
   const aMano = SPESA[paese];
   if (aMano?.length) return { voci: aMano, come: "scritta a mano" };

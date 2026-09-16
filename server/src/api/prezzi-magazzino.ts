@@ -72,14 +72,30 @@ export interface PrezzoSalvato {
 }
 
 /**
- * Quanto vale un prezzo salvato.
+ * Quanto vale un prezzo salvato. Settantadue ore.
  *
- * Ventiquattro ore: vedi l'intestazione. Si cambia da `PREZZI_FRESCHI_ORE`
- * senza toccare il codice, perche' e' un compromesso commerciale e non una
- * costante tecnica — il giorno che il cliente vuole prezzi piu' recenti, la
- * leva e' questa e costa solo piu' richieste ai negozi.
+ * ERA VENTIQUATTRO, E QUEL NUMERO SI MANGIAVA IL MAGAZZINO.
+ * Un magazzino che si svuota ogni giorno non puo' essere piu' grande di quanto
+ * riesci a riempirlo in un giorno. Con 1,8 milioni di indirizzi e dodici
+ * pagine al secondo, in ventiquattro ore se ne aprono un milione: il resto era
+ * perennemente scaduto, e ogni notte si rifacevano gli stessi prodotti senza
+ * mai arrivare agli altri.
+ *
+ * A settantadue ore il conto diventa 3,6 milioni, cioe' il doppio di quanti ne
+ * abbiamo: la freschezza smette di essere il collo di bottiglia e resta solo lo
+ * spazio sul database.
+ *
+ * E' ONESTO? Per la spesa si': il prezzo di base di un litro di latte non
+ * cambia in tre giorni. Cambiano le promozioni, che durano una settimana — e
+ * una promozione letta tre giorni fa e' ancora valida quattro giorni su sette.
+ * Chi mostra il prezzo ha `visto` e puo' dirne l'eta'.
+ *
+ * Si cambia da `PREZZI_FRESCHI_ORE` senza toccare il codice, perche' e' un
+ * compromesso commerciale e non una costante tecnica: il giorno che il cliente
+ * vuole prezzi piu' recenti la leva e' questa, e costa piu' richieste ai negozi
+ * e un magazzino piu' piccolo.
  */
-export const FRESCHEZZA_MS = Number(process.env.PREZZI_FRESCHI_ORE ?? 24) * 3_600_000;
+export const FRESCHEZZA_MS = Number(process.env.PREZZI_FRESCHI_ORE ?? 72) * 3_600_000;
 
 /**
  * Per quanto si tiene una riga prima di buttarla.
