@@ -303,7 +303,8 @@ export async function statoMagazzino(): Promise<{
       const soglia = new Date(Date.now() - FRESCHEZZA_MS);
       const [righe, fresche] = await Promise.all([
         c.countDocuments(),
-        c.countDocuments({ visto: { $gte: soglia } }),
+        // `t`, non `visto`: nella forma stretta il campo ha un nome di una lettera.
+        c.countDocuments({ t: { $gte: soglia } } as never),
       ]);
       return { interruttore: statoInterruttore("magazzino-prezzi"), attivo: true, righe, fresche };
     },

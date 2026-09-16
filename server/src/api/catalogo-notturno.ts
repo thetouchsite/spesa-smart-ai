@@ -51,6 +51,7 @@
 import { catalogoDi, statoCatalogo } from "./catalogo.js";
 import { caricaFontiDalDb, paesiConCatalogo, statoFonti } from "./catalogo-fonti.js";
 import { riempiPrezzi } from "./prezzi-notturni.js";
+import { giroContinuo } from "./prezzi-continuo.js";
 
 /**
  * Quante voci della spesa di base prezzare per paese, ogni notte.
@@ -61,6 +62,25 @@ import { riempiPrezzi } from "./prezzi-notturni.js";
  * lista su venti.
  */
 const VOCI_PER_PAESE = Number(process.env.PREZZI_VOCI_PER_PAESE ?? 60);
+
+/**
+ * Quanti minuti dare al giro continuo, dopo il lavoro mirato.
+ *
+ * Il lavoro mirato prezza le voci della spesa di base: poche centinaia di
+ * pagine per paese, ed e' quel che serve alle richieste vere. Il giro continuo
+ * riempie il resto del catalogo, e a differenza del primo NON FINISCE MAI —
+ * c'e' un milione e ottocentomila indirizzi. Percio' si da' un tempo, non un
+ * obiettivo: quel che non fa stanotte lo fa domani, perche' riprende sempre da
+ * cio' che manca.
+ *
+ * Quarantacinque minuti e' un valore prudente per il piano gratuito di Render,
+ * dove la macchina si spegne dopo un quarto d'ora di silenzio e la tiene sveglia
+ * solo un ping esterno. Su una macchina che non dorme si puo' alzare molto: a
+ * ventuno pagine al secondo, quattro ore fanno trecentomila prezzi.
+ *
+ * A `0` il giro continuo non parte: resta solo il lavoro mirato.
+ */
+const MINUTI_GIRO_CONTINUO = Number(process.env.PREZZI_MINUTI_GIRO ?? 45);
 
 /**
  * I paesi da tenere sempre pronti.
@@ -164,6 +184,25 @@ export async function aggiornaCatalogo(motivo: string): Promise<void> {
         console.warn(`[catalogo] ${p} fallito:`, err);
       }
     }
+    /* IL GIRO CONTINUO VIENE DOPO, E SOLO SE C'E' TEMPO.
+       Prima si prezza quel che la gente chiede — la spesa di base, paese per
+       paese — perche' se la notte viene interrotta e' quello che deve esserci.
+       Il resto del catalogo e' un di piu' che si accumula col tempo. */
+    if (MINUTI_GIRO_CONTINUO > 0) {
+      try {
+        const e = await giroContinuo(paesi, MINUTI_GIRO_CONTINUO, (fatte, con) => {
+          if (fatte % 500 === 0) console.info(`[prezzi] giro continuo: ${fatte} aperte, ${con} con prezzo`);
+        });
+        console.info(
+          `[prezzi] giro continuo: ${e.aperte} aperte, ${e.conPrezzo} con prezzo, ` +
+            `${e.saltate} gia' fresche, in ${e.secondi.toFixed(0)}s` +
+            (e.finito ? " — catalogo finito" : " — tempo scaduto, riprende domani"),
+        );
+      } catch (err) {
+        console.warn("[prezzi] giro continuo fallito:", err);
+      }
+    }
+
     const s = statoCatalogo();
     const sf = statoFonti();
     console.info(`[fonti] ${sf.quante} insegne in memoria`);

@@ -215,7 +215,8 @@ const html = `<title>Cruscotto dati MealMint</title>
   <div class="allarme">
     <p><b>Il catalogo &egrave; pieno, il magazzino dei prezzi &egrave; vuoto.</b> ${n(q.totale.link)} indirizzi di prodotto contro <b>${n(q.totale.cifre)} prezzi</b> ancora validi. &Egrave; lo ${(q.totale.cifre / q.totale.link * 100).toFixed(2).replace(".", ",")}% del catalogo.</p>
     <p><b>${alBuio.length} paesi su ${q.paesi.length} hanno il catalogo e nessun prezzo</b>, per ${n(linkAlBuio)} indirizzi. Per quei paesi l&#39;app apre le pagine dal vivo mentre l&#39;utente aspetta: &egrave; il comportamento che il magazzino doveva togliere.</p>
-    <p><b>Perch&eacute;.</b> Il lavoro notturno prezza le voci di una lista della spesa, e le liste scritte a mano sono sei. Dal 16 settembre, dove la lista manca si prezza <b>a tappeto</b>: si prendono le schede dal catalogo a passo costante, un giro per insegna prima di tornare sulla stessa. Misurato sulla Lituania: 240 schede aperte, 236 con prezzo, 27 secondi. Il primo giro completo su tutti i paesi &egrave; in corso, e questa pagina lo segue.</p>
+    <p><b>Il magazzino e&#39; stato svuotato apposta, e si sta riempiendo adesso.</b> La riga di prezzo pesava 443 byte e il prezzo ne occupava dodici: tutto il resto — l&#39;indirizzo per esteso, il nome, l&#39;insegna, la parola &laquo;verificato&raquo; — era gi&agrave; scritto nel catalogo. A quel peso, nei 440 MB liberi del piano ci stavano un milione di prezzi, e il progetto si fermava l&igrave;. Adesso la riga pesa <b>77 byte</b>, e le trentunomila vecchie sono state buttate perch&eacute; incompatibili: si rifanno in venticinque minuti.</p>
+    <p><b>Il giro continuo</b> apre le schede che mancano o sono scadute, le insegne pi&ugrave; generose per prime, e riprende ogni notte da dove si era fermato. Misurato: <b>21 pagine al secondo, 99,9% con prezzo</b> — il catalogo intero si prezza in tre notti, lo stesso ritmo della freschezza.</p>
   </div>
 
   <div class="cifre">
@@ -229,13 +230,13 @@ const html = `<title>Cruscotto dati MealMint</title>
   <p class="nota"><b>Come leggere le cinque cifre qui sopra.</b>
   <b>Link servibili</b>: indirizzi di prodotto salvati, di insegne ancora in elenco — quel che l&#39;API pu&ograve; dare subito.
   <b>Insegne in elenco</b>: le catene attive nella collezione <code>fonti</code> su Mongo.
-  <b>Prezzi validi</b>: indirizzi con una cifra letta nelle ultime ventiquattro ore.
+  <b>Prezzi validi</b>: indirizzi con una cifra letta nelle ultime <b>settantadue</b> ore.
   <b>Paesi senza prezzi</b>: hanno il catalogo e nessuna cifra.</p>
 
   <h2>Paese per paese, dal database</h2>
   <p class="nota"><b>Due numeri per riga, e non si sommano.</b>
   <b>Link salvati</b> sono gli indirizzi di prodotto che il magazzino conosce: l&#39;API li serve senza aprire una pagina. Valgono trenta ore e li riscrive il lavoro notturno.
-  <b>Con prezzo</b> sono quanti di quegli indirizzi hanno una cifra letta e ancora valida: valgono ventiquattro ore, poi la riga resta ma non si mostra e la pagina si riapre.
+  <b>Con prezzo</b> sono quanti di quegli indirizzi hanno una cifra letta e ancora valida: valgono settantadue ore, poi la riga resta ma non si mostra e la pagina si riapre. Tre giorni, non uno: un magazzino che si svuota ogni giorno non pu&ograve; essere pi&ugrave; grande di quanto riesci a riempirlo in un giorno.
   La barra dice solo quanto pesa quel paese rispetto al piu&#39; grande.</p>
   <div class="paesi">
     <div class="riga intestazione"><span>Paese</span><span>quanto pesa</span><span>link salvati</span><span>con prezzo</span></div>

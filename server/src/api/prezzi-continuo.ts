@@ -54,12 +54,33 @@ import {
 import { tutteLeFonti } from "./catalogo-fonti.js";
 import { gunzipSync } from "node:zlib";
 
-/** Quante pagine insieme. Lo stesso numero del lavoro mirato: di notte non si corre. */
-const INSIEME = 8;
+/**
+ * Quante pagine insieme.
+ *
+ * Erano otto quando si apriva un'insegna alla volta, e otto era il massimo
+ * educato: erano otto richieste allo STESSO negozio. Adesso la coda alterna le
+ * insegne, quindi sedici richieste insieme vanno quasi sempre a sedici negozi
+ * diversi — e ognuno ne riceve una alla volta, cioe' meno di prima.
+ */
+const INSIEME = Number(process.env.GIRO_INSIEME ?? 16);
 /** Una pausa fra una pagina e l'altra: siamo ospiti, anche alle tre di notte. */
 const PAUSA_MS = 120;
 /** Ogni quante righe si salva. Se il giro si ferma a meta', quel che e' fatto resta. */
 const BLOCCO = 200;
+
+/**
+ * Quante schede al massimo per insegna, in una passata.
+ *
+ * Senza questo tetto la rotazione fra i paesi non ruota: Naturitas ha centomila
+ * indirizzi, e li aprirebbe tutti prima di lasciare il turno al paese dopo.
+ * Il giro finirebbe con un paese pieno e trenta a zero — esattamente cio' che
+ * la rotazione doveva evitare.
+ *
+ * Cinquecento e' abbastanza per fare differenza in un paese e poco abbastanza
+ * per tornare presto. Chi ne ha di piu' li fa nella passata successiva: il
+ * giro riprende sempre da quel che manca.
+ */
+const MAX_PER_INSEGNA_A_GIRO = Number(process.env.GIRO_PER_INSEGNA ?? 2_000);
 
 const attendi = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -72,8 +93,62 @@ async function aBrani<T>(cose: T[], quante: number, lavoro: (c: T) => Promise<vo
   await Promise.all(Array.from({ length: Math.min(quante, cose.length) }, lavoratore));
 }
 
-/** Gli indirizzi di un'insegna, dal catalogo salvato. */
+/**
+ * Gli indirizzi di un'insegna, tenuti da parte dopo la prima lettura.
+ *
+ * Un catalogo salvato e' un pacchetto compresso da decine di migliaia di
+ * righe: leggerlo e decomprimerlo costa. Finche' si faceva un'insegna alla
+ * volta fino in fondo si pagava una volta sola, ma da quando il giro ruota fra
+ * i paesi ogni insegna torna ogni passata — e senza questa memoria si pagava
+ * quel prezzo ogni volta.
+ *
+ * Misurato: il giro era sceso da ventuno pagine al secondo a una e mezza, e
+ * non era la rete — era il gunzip.
+ */
+const cataloghiLetti = new Map<string, Array<{ url: string; nome: string }>>();
+
+/**
+ * Quante voci di catalogo si tengono in memoria, in tutto.
+ *
+ * Su Render ci sono 512 MB per tutto, e un milione e ottocentomila voci non ci
+ * stanno. Quando si supera il tetto si butta via il catalogo letto per primo:
+ * alla prossima passata si rilegge, e costa un gunzip invece di un 502.
+ */
+const MAX_VOCI_IN_MEMORIA = Number(process.env.GIRO_MAX_VOCI ?? 400_000);
+let vociInMemoria = 0;
+
+function faiPosto(quante: number): void {
+  while (vociInMemoria + quante > MAX_VOCI_IN_MEMORIA && cataloghiLetti.size > 0) {
+    const primo = cataloghiLetti.keys().next().value as string;
+    vociInMemoria -= cataloghiLetti.get(primo)?.length ?? 0;
+    cataloghiLetti.delete(primo);
+  }
+}
+
+/**
+ * Quel che questo giro ha gia' fatto, insegna per insegna.
+ *
+ * La domanda «di questa insegna, cosa e' gia' fresco?» costa un viaggio al
+ * database e puo' tornare centomila identificativi. Farla a ogni passata, per
+ * centoventitre insegne, e' la seconda meta' del rallentamento.
+ *
+ * Si chiede una volta per giro, e poi si aggiunge quel che si prezza: dentro
+ * un giro nessun altro scrive in quella collezione.
+ */
+const gia = new Map<string, Set<string>>();
+
 async function indirizziDi(paese: string, insegna: string): Promise<Array<{ url: string; nome: string }>> {
+  const chiave = `${paese}|${insegna}`;
+  const gia = cataloghiLetti.get(chiave);
+  if (gia) return gia;
+  const letti = await leggiCatalogo(paese, insegna);
+  faiPosto(letti.length);
+  cataloghiLetti.set(chiave, letti);
+  vociInMemoria += letti.length;
+  return letti;
+}
+
+async function leggiCatalogo(paese: string, insegna: string): Promise<Array<{ url: string; nome: string }>> {
   const doc = await (await cataloghi()).findOne({ _id: `${paese}|${insegna}` });
   if (!doc?.dati) return [];
   try {
@@ -113,46 +188,92 @@ export async function giroContinuo(
   let aperte = 0;
   let conPrezzo = 0;
   let saltate = 0;
-  let finito = true;
 
-  const insegne = tutteLeFonti().filter((f) => paesi.includes(f.paese) && f.resa > 0);
+  /* UNA CODA SOLA, MESCOLATA FRA I NEGOZI.
+     La versione di prima faceva un'insegna alla volta e apriva otto pagine
+     insieme dello STESSO negozio: se quel negozio era lento, otto lavoratori
+     aspettavano lui. Misurato, il giro era sceso da ventuno pagine al secondo
+     a una e tre quarti.
 
-  /* LE PIU' GENEROSE PER PRIME.
-     Se il tempo finisce a meta', e' meglio che sia finito su un'insegna che il
-     prezzo lo da' nove volte su dieci che su una che lo da' una volta su tre. */
-  insegne.sort((a, b) => b.resa - a.resa);
+     Adesso si prepara una coda in cui le schede si alternano fra le insegne, e
+     otto lavoratori ci pescano: ogni richiesta che parte va quasi sempre a un
+     negozio diverso da quella prima. E' piu' veloce per noi — un negozio lento
+     non ferma gli altri sette — ed e' piu' LEGGERO PER LORO, perche' ognuno
+     riceve una richiesta alla volta invece di otto.
 
-  const raccolte: PrezzoSalvato[] = [];
+     E l'ordine della coda tiene insieme le due cose che servono: si alternano i
+     PAESI, cosi' crescono tutti insieme invece che uno alla volta, e dentro
+     ogni paese si parte dall'insegna piu' generosa. */
+  const insegneTutte = tutteLeFonti().filter((f) => paesi.includes(f.paese) && f.resa > 0);
+  const perPaese = new Map<string, typeof insegneTutte>();
+  for (const f of insegneTutte) {
+    const sue = perPaese.get(f.paese) ?? [];
+    sue.push(f);
+    perPaese.set(f.paese, sue);
+  }
+  for (const sue of perPaese.values()) sue.sort((a, b) => b.resa - a.resa);
 
-  for (const f of insegne) {
-    if (Date.now() >= scadenza) {
-      finito = false;
-      break;
+  const insegne: typeof insegneTutte = [];
+  for (let giro = 0; ; giro++) {
+    let aggiunta = false;
+    for (const sue of perPaese.values()) {
+      if (giro >= sue.length) continue;
+      insegne.push(sue[giro]);
+      aggiunta = true;
     }
+    if (!aggiunta) break;
+  }
 
+  /* Si costruisce la coda: da ogni insegna la sua quota, poi si mescola
+     alternando le insegne fra loro. */
+  const mazzi: Array<Array<{ url: string; nome: string; insegna: string }>> = [];
+  for (const f of insegne) {
+    if (Date.now() >= scadenza) break;
     const tutti = await indirizziDi(f.paese, f.insegna);
     if (tutti.length === 0) continue;
 
-    /* QUEL CHE E' GIA' FRESCO NON SI RIAPRE.
-       E' il punto di tutto: la seconda notte si aprono solo le schede che la
-       prima non ha fatto in tempo a fare, piu' quelle nel frattempo scadute. */
-    const soglia = new Date(Date.now() - FRESCHEZZA_MS);
-    /* Si chiede per NUMERO dell'insegna e si confrontano IMPRONTE: nella forma
-       stretta la riga non porta piu' ne' il nome ne' l'indirizzo. */
-    const gia = new Set(
-      (
-        await (await collezionePrezzi())
-          .find({ c: numeroInsegna(f.insegna), t: { $gte: soglia } }, { projection: { _id: 1 } })
-          .toArray()
-      ).map((r) => r._id),
-    );
+    let sue = gia.get(f.insegna);
+    if (!sue) {
+      const soglia = new Date(Date.now() - FRESCHEZZA_MS);
+      sue = new Set(
+        (
+          await (await collezionePrezzi())
+            .find({ c: numeroInsegna(f.insegna), t: { $gte: soglia } }, { projection: { _id: 1 } })
+            .toArray()
+        ).map((r) => r._id),
+      );
+      gia.set(f.insegna, sue);
+    }
 
-    const daFare = tutti.filter((x) => !gia.has(improntaUrl(x.url)));
+    const daFare = tutti.filter((x) => !sue.has(improntaUrl(x.url)));
     saltate += tutti.length - daFare.length;
     if (daFare.length === 0) continue;
+    /* Solo la sua quota: senza questo tetto la coda terrebbe in memoria un
+       milione e ottocentomila voci. Il resto alla prossima passata — quel che
+       manca si ritrova, perche' il confronto e' sempre col magazzino. */
+    mazzi.push(
+      daFare.slice(0, MAX_PER_INSEGNA_A_GIRO).map((x) => ({ ...x, insegna: f.insegna })),
+    );
+  }
 
-    await aBrani(daFare, INSIEME, async (c) => {
-      if (Date.now() >= scadenza) return;
+  const coda: Array<{ url: string; nome: string; insegna: string }> = [];
+  for (let i = 0; ; i++) {
+    let aggiunta = false;
+    for (const m of mazzi) {
+      if (i >= m.length) continue;
+      coda.push(m[i]);
+      aggiunta = true;
+    }
+    if (!aggiunta) break;
+  }
+
+  const finito = coda.length === 0;
+  const raccolte: PrezzoSalvato[] = [];
+  let prossima = 0;
+
+  const lavoratore = async () => {
+    while (prossima < coda.length && Date.now() < scadenza) {
+      const c = coda[prossima++];
       const v = await verifyProductPage(c.url);
       aperte++;
       raccolte.push({
@@ -160,7 +281,7 @@ export async function giroContinuo(
         prezzo: v.page?.current ?? null,
         valuta: v.page?.currency ?? "",
         nome: c.nome.charAt(0).toUpperCase() + c.nome.slice(1),
-        insegna: f.insegna,
+        insegna: c.insegna,
         verifica: v.status,
         visto: new Date(),
       });
@@ -168,12 +289,18 @@ export async function giroContinuo(
       if (raccolte.length >= BLOCCO) await salvaPrezzi(raccolte.splice(0, raccolte.length));
       if (aperte % 50 === 0) onAvanzamento?.(aperte, conPrezzo);
       await attendi(PAUSA_MS);
-    });
+    }
+  };
 
-    if (Date.now() >= scadenza) finito = false;
-  }
+  await Promise.all(Array.from({ length: Math.min(INSIEME, coda.length) }, lavoratore));
 
   if (raccolte.length > 0) await salvaPrezzi(raccolte);
 
-  return { aperte, conPrezzo, saltate, secondi: (Date.now() - inizio) / 1000, finito };
+  return {
+    aperte,
+    conPrezzo,
+    saltate,
+    secondi: (Date.now() - inizio) / 1000,
+    finito: finito || prossima >= coda.length,
+  };
 }
