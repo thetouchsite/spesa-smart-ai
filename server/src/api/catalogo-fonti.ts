@@ -101,14 +101,19 @@ export const FONTI: FonteCatalogo[] = [
 
   { paese: "AT", insegna: "Interspar", dominio: "www.interspar.at", sitemap: "https://www.interspar.at/shop/lebensmittel/sitemap.xml", resa: 0, stimati: 22489 },
   { paese: "AT", insegna: "Bipa", dominio: "www.bipa.at", sitemap: "https://www.bipa.at/main-sitemap.xml", resa: 1, stimati: 15317 },
-  { paese: "AT", insegna: "dm Austria", dominio: "www.dm.at", sitemap: "https://www.dm.at/sitemap.xml", resa: 0, stimati: 13577 },
+  /* dm Austria era a zero, e un lettore per la sua API ce l'abbiamo da giorni:
+     e' la stessa trappola di Naturasi, un lettore scritto e mai chiamato.
+     Puntava all'indice invece che a `product-sitemap.xml`. Misurata 3 su 8.
+     DA DECIDERE: e' una drogheria, e la regola dice «solo roba da mangiare» —
+     su otto schede aperte sei erano cosmetici. In Germania dm era gia' stata
+     tolta per questo. Qui resta finche' non lo si decide. */
+  { paese: "AT", insegna: "dm Austria", dominio: "www.dm.at", sitemap: "https://www.dm.at/product-sitemap.xml", resa: 0.4, stimati: 13577 },
   { paese: "AT", insegna: "MPreis", dominio: "www.mpreis.at", sitemap: "https://www.mpreis.at/sitemap.xml", resa: 0.97, stimati: 12793 },
   { paese: "AT", insegna: "BILLA Online Shop", dominio: "shop.billa.at", sitemap: "https://shop.billa.at/sitemap.xml", resa: 1, stimati: 12536 },
   { paese: "AT", insegna: "Hofer", dominio: "www.hofer.at", sitemap: "https://www.hofer.at/sitemap_products.xml", resa: 0.9, stimati: 1157 },
 
   { paese: "BA", insegna: "Glovo Sarajevo - Spesa", dominio: "glovoapp.com", sitemap: "https://glovoapp.com/sitemap-index.xml", resa: 0, stimati: 373 },
 
-  { paese: "BE", insegna: "Delhaize Online", dominio: "www.delhaize.be", sitemap: "https://www.delhaize.be/sitemap/delhaizesitemap-0.xml.gz", resa: 0, stimati: 14668 },
   { paese: "BE", insegna: "Delhaize", dominio: "www.delhaize.be", sitemap: "https://www.delhaize.be/sitemap/delhaizesitemapindex.xml", resa: 0, stimati: 14668 },
   { paese: "BE", insegna: "Okay", dominio: "www.okay.be", sitemap: "https://www.okay.be/sitemap.xml", resa: 0, stimati: 8126 },
   { paese: "BE", insegna: "Intermarché BE", dominio: "www.intermarche.be", sitemap: "https://www.intermarche.be/sitemap_index.xml", resa: 0, stimati: 214 },
@@ -272,7 +277,6 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "RO", insegna: "Freshful", dominio: "www.freshful.ro", sitemap: "https://www.freshful.ro/sitemap_index.xml", resa: 1, stimati: 46531 },
 
   { paese: "RS", insegna: "IDEA Online", dominio: "online.idea.rs", sitemap: "https://online.idea.rs/sitemap.xml", resa: 0, stimati: 10762 },
-  { paese: "RS", insegna: "Maxi Online", dominio: "www.maxi.rs", sitemap: "https://www.maxi.rs/sitemap/delhaizesitemap-0.xml.gz", resa: 0, stimati: 9955 },
   { paese: "RS", insegna: "Maxi", dominio: "www.maxi.rs", sitemap: "https://www.maxi.rs/sitemap/delhaizesitemapindex.xml", resa: 0, stimati: 9955 },
 
   { paese: "SE", insegna: "ICA Handla Online", dominio: "ica.se", sitemap: "https://www.ica.se/recept/sitemaps/", resa: 0.5, stimati: 16539 },

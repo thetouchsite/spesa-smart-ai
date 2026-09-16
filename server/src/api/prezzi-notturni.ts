@@ -34,6 +34,7 @@ import { catalogoDi, cercaNelCatalogo } from "./catalogo.js";
 import { FONTI } from "./catalogo-fonti.js";
 import { verifyProductPage } from "./price-page.js";
 import { prezziGiaVisti, salvaPrezzi, statoMagazzino, type PrezzoSalvato } from "./prezzi-magazzino.js";
+import { LINGUA_DEL_PAESE, traduciVoce } from "./vocabolario.js";
 /**
  * La spesa di base, nella lingua di chi la compra.
  *
@@ -142,12 +143,55 @@ async function aBrani<T>(cose: T[], quante: number, lavoro: (c: T) => Promise<vo
 const orologio = (s: number) =>
   `${Math.floor(s / 60)}m ${String(Math.floor(s % 60)).padStart(2, "0")}s`;
 
+/**
+ * La lista della spesa di un paese, scritta a mano o ricavata.
+ *
+ * QUINDICI PAESI AVEVANO IL CATALOGO E ZERO PREZZI.
+ * Le liste qui sopra sono sei, scritte a mano. Per tutti gli altri questa
+ * funzione rispondeva «nessuna lista» e il lavoro notturno se ne andava —
+ * catalogo pieno, magazzino dei prezzi vuoto. Irlanda, Austria, Belgio,
+ * Sudafrica, Brasile, Svizzera: cataloghi buoni, mai un prezzo salvato.
+ *
+ * Il dizionario della spesa pero' copre sei LINGUE e le mappa su ventidue
+ * PAESI — un irlandese compra in inglese, un austriaco in tedesco. Quindi
+ * dove la lista scritta a mano non c'e' si traduce quella italiana, voce per
+ * voce, con lo stesso dizionario che usa la ricerca.
+ *
+ * SI BUTTANO LE VOCI CHE NON SI SANNO TRADURRE, E NON E' UNA PERDITA.
+ * Meglio sessanta voci di cui quaranta giuste che sessanta di cui venti
+ * cercate con parole italiane in un catalogo tedesco: quelle non trovano
+ * niente, e intanto aprono pagine.
+ *
+ * Una lista scritta a mano resta sempre meglio di una tradotta — «olio
+ * extravergine di oliva» e' piu' preciso di «olio» — quindi dove c'e' vince
+ * lei. Questa e' la rete, non la regola.
+ */
+function listaDellaSpesa(paese: string): { voci: string[]; come: string } {
+  const aMano = SPESA[paese];
+  if (aMano?.length) return { voci: aMano, come: "scritta a mano" };
+
+  const lingua = LINGUA_DEL_PAESE[paese];
+  if (!lingua) return { voci: [], come: "nessuna lingua nota" };
+
+  const base = SPESA.IT ?? [];
+  const tradotte: string[] = [];
+  for (const voce of base) {
+    const { tradotta, sconosciute } = traduciVoce(voce, lingua);
+    if (sconosciute.length > 0) continue;
+    const pulita = tradotta.trim();
+    if (pulita.length >= 3 && !tradotte.includes(pulita)) tradotte.push(pulita);
+  }
+  return { voci: tradotte, come: `tradotta in ${lingua} dal dizionario` };
+}
+
 export async function riempiPrezzi(paese: string, quanteVoci: number): Promise<void> {
-  const voci = (SPESA[paese] ?? []).slice(0, quanteVoci);
+  const { voci: tutte, come } = listaDellaSpesa(paese);
+  const voci = tutte.slice(0, quanteVoci);
   if (voci.length === 0) {
-    console.log(`${paese}  nessuna lista della spesa scritta per questo paese`);
+    console.log(`${paese}  nessuna lista della spesa: ${come}`);
     return;
   }
+  console.log(`${paese}  lista ${come}: ${voci.length} voci`);
 
   const inizio = Date.now();
   const cat = await catalogoDi(paese);
