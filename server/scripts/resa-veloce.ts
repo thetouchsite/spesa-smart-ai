@@ -54,9 +54,9 @@
 
 import { writeFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
-import { FONTI } from "../src/catalogo-fonti.js";
-import { paScheda } from "../src/catalogo.js";
-import { verifyProductPage } from "../src/price-page.js";
+import { FONTI } from "../src/api/catalogo-fonti.js";
+import { paScheda } from "../src/api/catalogo.js";
+import { verifyProductPage } from "../src/api/price-page.js";
 
 const INTESTAZIONE = {
   "User-Agent":

@@ -209,7 +209,7 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "IN", insegna: "JioMart", dominio: "www.jiomart.com", sitemap: "https://www.jiomart.com/sitemap.xml", resa: 0, stimati: 9332 },
 
   { paese: "IT", insegna: "CoopShop", dominio: "coopshop.it", sitemap: "https://coopshop.it/sitemap.xml", resa: 0, stimati: 54576 },
-  { paese: "IT", insegna: "Carrefour Italia", dominio: "www.carrefour.it", sitemap: "https://www.carrefour.it/sitemap_index.xml", resa: 0.97, stimati: 28352 },
+  { paese: "IT", insegna: "Carrefour Italia", dominio: "www.carrefour.it", sitemap: "https://www.carrefour.it/sitemap_index.xml", resa: 0.8, stimati: 28352 },
   { paese: "IT", insegna: "Iperal Spesa Online", dominio: "www.iperalspesaonline.it", sitemap: "https://www.iperalspesaonline.it/sitemap.xml", resa: 0.7, stimati: 23255 },
   { paese: "IT", insegna: "Bennet", dominio: "www.bennet.com", sitemap: "https://www.bennet.com/sitemap.xml", resa: 1, stimati: 20709 },
   { paese: "IT", insegna: "Esselunga a Casa", dominio: "spesaonline.esselunga.it", sitemap: "https://spesaonline.esselunga.it/sitemap_index.xml", resa: 0, stimati: 17716 },
@@ -224,11 +224,11 @@ export const FONTI: FonteCatalogo[] = [
   // Dichiara 7.590 indirizzi ma ne teniamo 722: solo quelli portano il codice
   // articolo in fondo. Gli altri sono `/it/<nome>.html` senza numero, e una
   // forma cosi' generica non si puo' accettare senza far entrare mezzo sito.
-  { paese: "IT", insegna: "Prezzemolo e Vitale", dominio: "www.prezzemoloevitale.it", sitemap: "https://www.prezzemoloevitale.it/media/sitemap/stemap_www_it_product.xml", resa: 0.9, stimati: 722 },
+  { paese: "IT", insegna: "Prezzemolo e Vitale", dominio: "www.prezzemoloevitale.it", sitemap: "https://www.prezzemoloevitale.it/media/sitemap/stemap_www_it_product.xml", resa: 1, stimati: 722 },
   { paese: "IT", insegna: "Coop", dominio: "www.easycoop.com", sitemap: "https://www.easycoop.com/sitemap/sitemap.xml", resa: 1, stimati: 6636 },
   { paese: "IT", insegna: "Cortilia", dominio: "www.cortilia.it", sitemap: "https://www.cortilia.it/sitemap.xml", resa: 1, stimati: 6536 },
   { paese: "IT", insegna: "Pam", dominio: "www.pampanorama.it", sitemap: "https://www.pampanorama.it/sitemap.xml", resa: 0, stimati: 6165 },
-  { paese: "IT", insegna: "Conad Spesa Online", dominio: "spesaonline.conad.it", sitemap: "https://spesaonline.conad.it/sitemap/products.xml", resa: 0.17, stimati: 5433 },
+  { paese: "IT", insegna: "Conad Spesa Online", dominio: "spesaonline.conad.it", sitemap: "https://spesaonline.conad.it/sitemap/products.xml", resa: 0.1, stimati: 5433 },
   { paese: "IT", insegna: "Eataly", dominio: "www.eataly.net", sitemap: "https://www.eataly.net/sitemap.xml", resa: 1, stimati: 5073 },
   { paese: "IT", insegna: "Unicoop Tirreno", dominio: "coopacasa.coopetruria.coop.it", sitemap: "https://coopacasa.coopetruria.coop.it/sitemap_index.xml", resa: 0.4, stimati: 2033 },
   { paese: "IT", insegna: "Aldi", dominio: "www.aldi.it", sitemap: "https://www.aldi.it/sitemap_products.xml", resa: 1, stimati: 678 },
