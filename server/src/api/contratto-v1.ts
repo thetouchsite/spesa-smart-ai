@@ -62,6 +62,21 @@ export interface OffertaV1 {
   /** Quando quella pagina e' stata guardata, in ISO. Un prezzo senza data e' una diceria. */
   letto: string | null;
   /**
+   * Quanto ci si puo' fidare di questo prezzo.
+   *
+   *   `verificato`  la pagina si e' aperta e il prezzo e' stato letto li' dentro
+   *   `pagina-ok`   la pagina si e' aperta, il prezzo non era leggibile dal
+   *                 codice — succede quando il negozio lo disegna con
+   *                 JavaScript. Il prodotto e il link valgono lo stesso
+   *   `bloccato`    il sito rifiuta le richieste automatiche: la pagina esiste
+   *                 e da un telefono si apre, ma il prezzo non e' confermato
+   *
+   * Non e' la stessa cosa di `esito`, che parla della VOCE. Questo parla della
+   * singola offerta, e serve a chi vuole mostrare due prezzi con due gradi di
+   * fiducia diversi senza far finta che siano uguali.
+   */
+  fiducia: "verificato" | "pagina-ok" | "bloccato" | null;
+  /**
    * Quanto ce n'e' dentro, letto dal nome: grammi, millilitri o pezzi.
    * `null` per la roba sfusa, che un peso non ce l'ha.
    */
@@ -214,6 +229,10 @@ function offertaDi(
           : null,
     link: o.link || null,
     letto: o.letto ?? null,
+    fiducia:
+      o.verifica === "verificato" || o.verifica === "pagina-ok" || o.verifica === "bloccato"
+        ? o.verifica
+        : null,
     quantita,
     prezzoNormalizzato: prezzoNormalizzato(prezzo, quantita),
   };

@@ -122,6 +122,23 @@ async function request<T>(
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
+  /* LA CHIAVE DELL'API, che e' un'altra cosa dal token dell'utente.
+     `Authorization` porta il token di chi ha fatto l'accesso e serve alle liste
+     salvate; la chiave dice invece CHI E' L'APPLICAZIONE, e le rotte /v1 la
+     pretendono.
+
+     Va in un'intestazione sua perche' le due cose convivono: se si dividessero
+     lo stesso posto, una delle due dovrebbe sloggiare, e a perderci sarebbe
+     l'utente.
+
+     UNA COSA DA SAPERE. Questa chiave sta dentro il pacchetto che si installa,
+     quindi non e' segreta: chi vuole la tira fuori. E' voluto e non e' un
+     rischio finche' ha un tetto stretto e si puo' revocare. Il giorno che ci
+     sara' un server dell'app, la chiave si sposta li' e da qui sparisce — e'
+     scritto in server/API.md. */
+  const chiave = process.env.EXPO_PUBLIC_API_KEY;
+  if (chiave) headers["X-Api-Key"] = chiave;
+
   let res: Response;
   try {
     res = await fetch(`${baseUrl()}${path}`, {

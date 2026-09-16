@@ -1597,9 +1597,18 @@ async function apriLaPorta(
   /** Lo stato non pesa sul tetto: serve proprio a chi il tetto l'ha finito. */
   pesaSulTetto = true,
 ): Promise<void> {
-  const intestazione = (req as { headers?: Record<string, unknown> })?.headers?.authorization;
+  /* DUE POSTI DOVE GUARDARE, e non e' un vezzo.
+     `Authorization` nell'app di MealMint porta gia' il token dell'UTENTE, che
+     serve alle liste salvate. Se ci mettesse anche la chiave dell'API una
+     delle due dovrebbe sloggiare, e sarebbe l'utente a perderci.
+
+     Quindi la chiave si accetta anche da `X-Api-Key`. Chi chiama da un server
+     — che utenti non ne ha — continua a usare `Authorization: Bearer`, che e'
+     la forma che si aspetta chiunque. */
+  const h = (req as { headers?: Record<string, unknown> })?.headers ?? {};
+  const daHeader = (nome: string) => (typeof h[nome] === "string" ? (h[nome] as string) : undefined);
   const esito = await controllaChiave(
-    typeof intestazione === "string" ? intestazione : undefined,
+    daHeader("x-api-key") ?? daHeader("authorization"),
     costa,
     pesaSulTetto,
   );
