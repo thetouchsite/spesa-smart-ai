@@ -1160,7 +1160,20 @@ async function prezziDiLista(data: z.infer<typeof PricesInput>) {
      promette prezzi veri e' la bugia peggiore, perche' e' invisibile: la
      risposta e' ben formata, i link funzionano, solo le cifre sono di un'altra
      settimana. Ora scade insieme ai prezzi. */
-  const key = cacheKey("prices", { ...data, priceSource: fonte });
+  /* NELLA CHIAVE VA ANCHE COME E' STATA CALCOLATA.
+     Senza, la stessa lista chiesta con la scelta del modello accesa e spenta
+     divide la stessa voce di cache — e la seconda riceve la risposta della
+     prima. Si e' visto misurando: due servizi identici tranne
+     `SCELTA_MODELLO` davano risultati identici su tutte e ottanta le prove,
+     errore per errore. Sembrava una scoperta, ed era la cache.
+
+     In produzione e' peggio che in una prova: vuol dire servire sotto
+     un'impostazione una risposta calcolata sotto un'altra. */
+  const key = cacheKey("prices", {
+    ...data,
+    priceSource: fonte,
+    sceltaModello: process.env.SCELTA_MODELLO !== "no",
+  });
   const local = memoryGet(key);
   if (local !== undefined) {
     console.info(`[cache] HIT memoria ${key}`);
@@ -1170,6 +1183,14 @@ async function prezziDiLista(data: z.infer<typeof PricesInput>) {
     try {
       const hit = await (await cache()).findOne({ _id: key });
       if (hit) {
+        /* SI DICE ANCHE QUANDO ARRIVA DAL DATABASE.
+           Questa riga non c'era, e quella di memoria si': una risposta che
+           arriva dal database non lasciava traccia. Misurando due strade
+           diverse sembravano dare lo stesso risultato ottanta volte su
+           ottanta — ed era la cache che rispondeva per tutte e due, senza
+           dirlo. Una cache silenziosa e' il modo piu' facile di misurare
+           una cosa e crederne un'altra. */
+        console.info(`[cache] HIT database ${key}`);
         memorySet(key, hit.value);
         return hit.value;
       }
