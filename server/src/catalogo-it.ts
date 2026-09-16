@@ -464,6 +464,17 @@ async function nomiDalleImmagini(sitemapIndice: string): Promise<Map<string, str
   return nomi;
 }
 
+/**
+ * Esportata per il conteggio: quante voci tiene DAVVERO questo indice.
+ *
+ * Serve perche' l'API ne ha due, e leggerne uno solo racconta meta' storia:
+ * un'insegna a zero qui puo' essere piena nell'altro, e viceversa.
+ */
+export async function contaIndice(cat: Catalogo): Promise<number> {
+  const i = await costruisci(cat);
+  return i ? i.voci.length : 0;
+}
+
 async function costruisci(cat: Catalogo): Promise<Indice | null> {
   try {
     const urls = await indirizzi(cat.sitemap, cat.slug);

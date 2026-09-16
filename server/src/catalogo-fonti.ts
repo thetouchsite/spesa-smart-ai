@@ -85,6 +85,79 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "ES", insegna: "Mercadona Online", dominio: "tienda.mercadona.es", sitemap: "https://tienda.mercadona.es/sitemap.xml", stimati: 4320 },
   { paese: "GB", insegna: "Morrisons Groceries", dominio: "groceries.morrisons.com", sitemap: "https://groceries.morrisons.com/sitemaps/sitemap-products-part1.xml", stimati: 31023 },
   { paese: "GB", insegna: "Waitrose", dominio: "waitrose.com", sitemap: "https://www.waitrose.com/sitemaps/products_sitemap_0.xml", stimati: 18182 },
+
+  /* REGNO UNITO, SECONDA TORNATA — 16 settembre.
+     Trovate con `scripts/censimento-sitemap.mjs`, che interroga un sito alla
+     volta con una pausa fra le richieste. La fretta era il vero ostacolo: la
+     caccia precedente faceva ventisei richieste insieme per marchio e si
+     prendeva 403 da mezza Gran Bretagna — Sainsbury's e Tesco compresi — e
+     quei 403 erano stati scambiati per divieti. Non lo erano: erano limiti di
+     frequenza. Andando piano rispondono. */
+  { paese: "GB", insegna: "Sainsbury's", dominio: "sainsburys.co.uk", sitemap: "https://www.sainsburys.co.uk/product-sitemap.xml", stimati: 9900 },
+  /* Aldi UK dichiara `sitemap_products.xml` nel suo robots, e lo ha sempre
+     fatto. Le prime volte rispondeva 403 a tutto — anche a sitemap che un
+     minuto prima aveva servito — e l'avevo scambiato per un rifiuto. Era un
+     limite di frequenza: a una richiesta ogni tre secondi risponde 200. */
+  { paese: "GB", insegna: "Aldi UK", dominio: "aldi.co.uk", sitemap: "https://www.aldi.co.uk/sitemap_products.xml", stimati: 4989 },
+  { paese: "GB", insegna: "Co-op", dominio: "coop.co.uk", sitemap: "https://www.coop.co.uk/products/sitemap.xml", stimati: 3642 },
+  { paese: "GB", insegna: "Lidl UK", dominio: "lidl.co.uk", sitemap: "https://www.lidl.co.uk/p/export/GB/en/product_sitemap.xml.gz", stimati: 1820 },
+  { paese: "GB", insegna: "Planet Organic", dominio: "planetorganic.com", sitemap: "https://www.planetorganic.com/sitemap.xml", stimati: 4000 },
+
+  /* HOLLAND & BARRETT E' STATA TOLTA DOPO AVERLA MISURATA.
+     La sua sitemap da' ventunmila schede — piu' del doppio di quante ne
+     dichiarasse la sonda — e sembrava l'acquisto migliore della giornata. Poi
+     si guardano i nomi: spazzole per il viso, mascherine di seta, profumi,
+     dischetti struccanti. E' una catena di salute e bellezza che vende anche
+     qualche alimento, non un negozio di spesa.
+     Ventunmila righe cosi' non aggiungono copertura: peggiorano la ricerca,
+     perche' ogni voce della lista trova un concorrente in piu' che non e'
+     cibo. Il conteggio dei link sarebbe salito di un quarto e la qualita'
+     delle risposte sarebbe scesa — lo scambio che un'app di spesa non deve
+     fare. Vale lo stesso per M&S (maglioni) e B&M (casalinghi), sondate e
+     scartate per la stessa ragione. */
+  { paese: "GB", insegna: "Heron Foods", dominio: "heronfoods.com", sitemap: "https://heronfoods.com/sitemap.xml", stimati: 256 },
+  { paese: "GB", insegna: "MuscleFood", dominio: "musclefood.com", sitemap: "https://www.musclefood.com/sitemap.xml", stimati: 318 },
+  /* Poundland entra dove B&M e Holland & Barrett sono state scartate, e la
+     differenza e' misurata, non di gusto: sui suoi 1.487 prodotti il 30% e'
+     riconoscibilmente cibo e il 15% riconoscibilmente altro — il cibo batte il
+     resto due a uno. Da B&M uscivano casalinghi e da Holland & Barrett
+     cosmetica, con il rapporto rovesciato.
+     Quel che resta di non alimentare lo tolgono i filtri al momento della
+     ricerca, che ora funzionano davvero: prima contenevano un carattere di
+     controllo al posto di `\b` e non filtravano niente. */
+  { paese: "GB", insegna: "Poundland", dominio: "poundland.co.uk", sitemap: "https://www.poundland.co.uk/sitemap.xml", stimati: 1487 },
+
+  /* ICELAND NON C'E', E NON PER UN DIVIETO NE' PER UN BLOCCO.
+     I suoi prezzi si leggono — 1,00 £ su un cetriolo, misurato — e il robots
+     non vieta niente. Semplicemente non pubblica un indice dei prodotti: il
+     suo `/sitemap.xml` elenca tre figli (categorie, contenuti, negozi) e
+     qualunque altro percorso restituisce gli stessi tre, perche' il sito
+     risponde a tutto con la stessa pagina.
+     I 1.503 indirizzi di categoria ci sono, e da li' si arriverebbe ai
+     prodotti aprendo una pagina per categoria. Sono millecinquecento richieste
+     per un catalogo solo, contro UNA per ogni altra insegna: si riapre il
+     giorno che Iceland pubblica una sitemap prodotti, o che il costo valga la
+     copertura. */
+  { paese: "GB", insegna: "Milk & More", dominio: "milkandmore.co.uk", sitemap: "https://www.milkandmore.co.uk/sitemap.xml", stimati: 270 },
+
+  /* TESCO NON C'E', E IL MOTIVO NON E' UN DIVIETO.
+     Le sue sitemap si leggono benissimo: quarantamila prodotti alimentari piu'
+     diecimila promozioni, tutti indirizzi veri. Ma sono fatti cosi':
+     `https://www.tesco.com/shop/en-GB/products/303837900`. Un numero. Nessun
+     nome.
+     Il catalogo abbina una voce della spesa a un prodotto confrontando le
+     PAROLE del nome, e quel nome si ricava dall'indirizzo. Da un identificativo
+     numerico non si ricava niente: quarantamila righe entrerebbero senza una
+     sola parola, invisibili a qualunque ricerca. Il nome starebbe nella scheda,
+     che pero' risponde 403 a ogni richiesta da programma — provata con
+     l'intestazione di produzione, con `Accept-Language` britannico e con un
+     user-agent che dichiara onestamente chi siamo; stesso esito sulle pagine
+     promozione e sul percorso `/groceries/en-GB/products/`. E nella sitemap il
+     prezzo non c'e': solo `<loc>`.
+     Quindi non e' «entra solo per il link» come CoopShop e Iperal, dove il nome
+     c'e' e manca il prezzo. Qui manca proprio la cosa che rende un link
+     utilizzabile. Si riapre il giorno che Tesco pubblica gli slug, o che una
+     partnership dia accesso alle schede. */
   { paese: "HR", insegna: "Konzum Online", dominio: "konzum.hr", sitemap: "https://www.konzum.hr/sitemap_products.xml", stimati: 11153 },
   { paese: "HU", insegna: "Auchan Online", dominio: "auchan.hu", sitemap: "https://auchan.hu/sitemaps/product-sitemap-0.xml", stimati: 52 },
   { paese: "IE", insegna: "SuperValu Online", dominio: "shop.supervalu.ie", sitemap: "https://shop.supervalu.ie/sitemap.xml", stimati: 11807 },

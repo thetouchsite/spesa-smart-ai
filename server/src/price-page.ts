@@ -104,14 +104,33 @@ function firstNumber(html: string, patterns: RegExp[]): number | null {
  * finiva scartata come «prodotto senza prezzo», che e' una bugia comoda.
  *
  * Quindi non si taglia alla cieca: si tiene la testa, dove stanno microdata e
- * meta og, PIU' la finestra intorno al primo blocco di dati strutturati,
- * ovunque si trovi.
+ * meta og, PIU' la finestra intorno ai blocchi di dati strutturati che cadono
+ * fuori dalla testa.
+ *
+ * IL PRIMO BLOCCO NON E' SEMPRE QUELLO DEL PRODOTTO, E CI COSTAVA UN'INSEGNA.
+ * La versione precedente cercava il PRIMO `ld+json` e, se cadeva dentro la
+ * testa, si fermava li'. Ma un blocco in cima non e' per forza il prodotto:
+ * quasi sempre e' l'`Organization` o il `WebSite` del sito, che prezzi non ne
+ * ha. Heron Foods ne ha due — uno a 3.501 e uno a 139.856 — e il prezzo sta
+ * nel secondo. Trovato il primo dentro la testa, il codice tornava la sola
+ * testa e il prezzo restava fuori: l'insegna dichiarava zero prezzi su quattro
+ * pagine su quattro, tutte con il prezzo scritto dentro.
+ *
+ * Ora si tiene la testa e si aggiungono le finestre attorno ai blocchi
+ * successivi, fino a due: piu' di cosi' non serve a nessuna pagina vista, e il
+ * testo da esaminare resta limitato.
  */
 export function porzioneConPrezzi(html: string): string {
   const testa = html.slice(0, 120_000);
-  const i = html.search(/application\/ld\+json/i);
-  if (i < 0 || i < 120_000) return testa;
-  return `${testa}\n${html.slice(i, i + 160_000)}`;
+  if (html.length <= 120_000) return testa;
+
+  const fuori = [...html.matchAll(/application\/ld\+json/gi)]
+    .map((m) => m.index ?? 0)
+    .filter((i) => i >= 120_000)
+    .slice(0, 2);
+  if (!fuori.length) return testa;
+
+  return [testa, ...fuori.map((i) => html.slice(i, i + 160_000))].join("\n");
 }
 
 /** Legge prezzo, listino e scadenza dell'offerta dai dati strutturati. */
@@ -154,10 +173,38 @@ export function readPrices(html: string): PagePrice | null {
     /"regularPrice"\s*:\s*"?([\d.,]+)"?/i,
     /"originalPrice"\s*:\s*"?([\d.,]+)"?/i,
     /"strikePrice"\s*:\s*"?([\d.,]+)"?/i,
+    /"(?:wasPrice|previousPrice|priceBeforeDiscount|rrp)"\s*:\s*"?([\d.,]+)"?/i,
+    /* IL PREZZO BARRATO SCRITTO NELLA PAGINA, NON NEI DATI STRUTTURATI.
+       Tutte le espressioni qui sopra cercano un campo JSON, e in Italia
+       bastavano. In UK no: Aldi scrive
+       `<del aria-label="Original price: £1.45">£1.45</del>` e Lidl
+       `<span>Regular price £18.99</span>`, e nei loro dati strutturati il
+       listino non c'e' affatto. Il risultato era un prezzo giusto senza la sua
+       promozione: l'utente vedeva 1,39 £ senza sapere che erano 1,45 £
+       scontati, cioe' proprio l'informazione per cui usa l'app.
+       Stanno DOPO i campi JSON di proposito: i dati strutturati restano la
+       fonte migliore, e queste entrano solo quando quelli tacciono. */
+    /* I RIEMPITIVI NON DEVONO POTER MANGIARE CIFRE, E QUI E' SUCCESSO.
+       Scritto `[^"']{0,8}` fra «price» e il numero, su
+       `aria-label="Original price: £1.45"` il quantificatore goloso si e'
+       preso «: £1.4» e ha catturato il `5` rimasto: listino 5 £ su un prodotto
+       da 1,39, cioe' uno sconto del 72% inventato di sana pianta. Nemmeno il
+       limite di plausibilita' lo fermava — 5 sta dentro sei volte 1,39.
+       Con `[^"'\d]` il riempitivo si ferma alla prima cifra, che e' l'inizio
+       del numero che stiamo cercando. */
+    /aria-label=["'](?:original|was|regular|previous)[^"'\d]{0,10}price[^"'\d]{0,8}([\d.,]+)/i,
+    /(?:regular|original|previous|was) price[^\d<]{0,10}([\d.,]+)/i,
+    /<(?:del|s|strike)\b[^>]*>\s*[^\d<]{0,4}([\d.,]+)/i,
   ]);
 
   let list: number | undefined;
-  if (listed !== null && listed > current) list = listed;
+  /* Il listino dev'essere PLAUSIBILE, non solo piu' alto. Le espressioni sul
+     testo della pagina sono piu' larghe di quelle sui campi JSON, quindi
+     possono pescare un prezzo al chilo — la trappola di Cortilia, con 13,68
+     preso per listino di un prodotto da 3,42. Oltre sei volte il prezzo pagato
+     non e' una promozione, e' un'altra unita' di misura: e uno sconto
+     dell'83% inventato fa piu' danno di nessuno sconto. */
+  if (listed !== null && listed > current && listed <= current * 6) list = listed;
   else if (discountAmount !== null && discountAmount > 0) {
     const computed = Math.round((current + discountAmount) * 100) / 100;
     if (sane(computed) && computed > current) list = computed;
@@ -218,6 +265,26 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
         return { status: "bloccato", reason: `HTTP ${res.status}` };
       }
       return { status: "non-raggiungibile", reason: `HTTP ${res.status}` };
+    }
+
+    /* UN 202 NON E' MAI UNA SCHEDA PRODOTTO.
+       `202 Accepted` vuol dire «ho preso in carico la richiesta», non «ecco la
+       pagina»: nessun negozio serve un prodotto cosi'. Chi risponde 202 sta
+       facendo una difesa anti-bot che finge cortesia.
+
+       Il guard sul corpo vuoto qui sotto non bastava, e Ocado lo dimostra: con
+       `Accept: text/html` risponde 202 e un guscio di 2.490 byte — titolo
+       vuoto, nessun dato strutturato, nessun prezzo — che passa i duemila
+       caratteri e veniva dichiarato `pagina-ok`, cioe' «la pagina c'e', manca
+       solo il prezzo». Non c'era niente. Cambiando una sola intestazione lo
+       stesso indirizzo torna 202 con ZERO byte: e' la stessa difesa, vestita
+       in due modi.
+
+       Non riguarda un solo negozio: nel campione del 16 settembre rispondevano
+       202 anche Voila (Canada), Alcampo (Spagna) e Auchan (Polonia), e tutti e
+       tre finivano nell'elenco dell'utente come verificati. */
+    if (res.status === 202) {
+      return { status: "bloccato", reason: "HTTP 202: difesa anti-bot, non una pagina" };
     }
     // Le pagine prodotto sono grandi: i dati strutturati stanno in alto,
     // quindi non serve tenerne più di così in memoria.

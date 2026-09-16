@@ -150,6 +150,74 @@ export const INSEGNE_CON_NEGOZI: InsegnaConNegozi[] = [
     // /punti-vendita/coop-torino-belgio: il prefisso "coop-" non e' la citta'.
     schema: /\/punti-vendita\/(?:coop-)?([^/?#]+)$/i,
   },
+
+  /* ─────────────────────── REGNO UNITO ───────────────────────
+     Le prime insegne fuori dall'Italia. Tutte e tre per sitemap: nessuna
+     espone un cercanegozi in JSON, ma pubblica una pagina per punto vendita
+     con la citta' nell'indirizzo, che e' quanto serve alla domanda vera —
+     quali insegne ci sono dove sei.
+
+     Trovate allargando `scripts/caccia-negozi.mjs`, che cercava solo i nomi
+     italiani: `/api/negozi`, `/punti-vendita`. Un'insegna britannica non li
+     usa mai, quindi lo strumento rispondeva «niente» su tutte e sette quelle
+     provate. Aggiunto il vocabolario britannico — `branch`, `store-finder`,
+     `find-a-store`, `locations` — ne sono uscite tre al primo colpo. */
+  {
+    insegna: "Lidl UK",
+    paese: "GB",
+    base: "https://www.lidl.co.uk",
+    via: "sitemap",
+    /* DUE LIVELLI, E PRIMA NE PRENDEVAMO UNO SOLO.
+       Lidl pubblica `/store-finder/aberdeen/` — la pagina della citta', 121 in
+       tutto — e sotto di essa `/store-finder/aberdeen/hutcheon-street/`, che e'
+       il negozio vero: quelli sono 1.021. Uno schema che pretendeva un
+       segmento solo prendeva le citta' e buttava i negozi, cioe' il novanta per
+       cento di Lidl nel Regno Unito.
+       Il segmento della via e' facoltativo: cosi' combaciano tutte e due le
+       forme e la citta' si legge sempre dal primo. */
+    schema: /\/store-finder\/([^/?#]+)(?:\/[^/?#]+)?\/?$/i,
+  },
+  {
+    insegna: "Waitrose",
+    paese: "GB",
+    base: "https://www.waitrose.com",
+    via: "sitemap",
+    /* /find-a-store/<citta>, ma nella stessa cartella stanno anche quattro
+       pagine che negozi non sono — la rubrica e gli orari di Natale e Pasqua.
+       Senza l'esclusione finirebbero in elenco come se fossero comuni
+       britannici, e un utente a «Christmas Opening Hours» non ci abita. */
+    schema: /\/find-a-store\/(?!directory$|seasonal$|[^/?#]*opening-hours$)([^/?#]+)$/i,
+  },
+  {
+    insegna: "Booths",
+    paese: "GB",
+    base: "https://www.booths.co.uk",
+    via: "sitemap",
+    // /store/carnforth/ — ventisei negozi nel nord-ovest, pochi ma tutti veri.
+    schema: /\/store\/([^/?#]+)\/?$/i,
+  },
+  {
+    insegna: "Aldi UK",
+    paese: "GB",
+    base: "https://www.aldi.co.uk",
+    via: "sitemap",
+    /* /store-finder/l/wimbledon — la `l` in mezzo e' un segmento di servizio
+       del loro cercanegozi, non una citta'. Milleottocentoquarantaquattro
+       punti vendita: da sola quasi raddoppia la copertura britannica. */
+    schema: /\/store-finder\/l\/([^/?#]+)\/?$/i,
+  },
+  {
+    insegna: "Budgens",
+    paese: "GB",
+    base: "https://www.budgens.co.uk",
+    via: "sitemap",
+    /* Il suo `robots.txt` non dichiara sitemap, ma `/sitemap.xml` c'e' e
+       contiene 442 negozi: e' il ripiego che `daSitemap` prova gia' da solo.
+       Gli slug sono in prevalenza nomi di luogo — Peterborough, Trowbridge,
+       Broadstairs — con qualche via e qualche «budgens-» davanti, che si toglie
+       o la citta' diventa «Budgens Holt». */
+    schema: /\/our-stores\/(?:budgens-)?([^/?#]+)\/?$/i,
+  },
 ];
 
 /** Lo specchio in memoria: evita di interrogare il database a ogni richiesta. */
@@ -249,8 +317,21 @@ async function daSitemap(ins: InsegnaConNegozi): Promise<Negozio[]> {
   const dichiarate = [...testo.matchAll(/^\s*Sitemap:\s*(\S+)/gim)].map((m) => m[1].trim());
   const candidate = dichiarate.length ? dichiarate : [ins.base + "/sitemap.xml"];
 
+  /* PRIMA QUELLE CHE PARLANO DI NEGOZI, POI LE ALTRE — E NON SOLO LE PRIME TRE.
+     Aldi UK dichiara quattro sitemap e quella dei punti vendita e' la QUARTA:
+     `sitemap.xml`, `sitemap_categories.xml`, `sitemap_products.xml`,
+     `sitemap_stores.xml`. Fermandosi a tre si scaricavano due cataloghi di
+     prodotti per non trovare nessun negozio, e l'insegna risultava a zero
+     mentre ne pubblica milleottocentoquarantaquattro.
+     Riordinare costa niente e di solito fa bastare la prima richiesta. */
+  const ordinate = [...candidate].sort(
+    (a, b) =>
+      (/negoz|punti|store|shop|branch|location/i.test(a) ? 0 : 1) -
+      (/negoz|punti|store|shop|branch|location/i.test(b) ? 0 : 1),
+  );
+
   const visti = new Map<string, Negozio>();
-  for (const sm of candidate.slice(0, 3)) {
+  for (const sm of ordinate.slice(0, 6)) {
     const x = await fetch(sm, { signal: AbortSignal.timeout(30_000), headers: { "User-Agent": UA } });
     if (!x.ok) continue;
     const xml = await x.text();
@@ -289,7 +370,14 @@ async function daSitemap(ins: InsegnaConNegozi): Promise<Negozio[]> {
         cap: "",
       });
     }
-    if (visti.size > 100) break;
+    /* CENTO ERANO POCHI, E IL TETTO SI VEDEVA SOLO A CONTARE.
+       Il taglio scatta dopo aver finito un file, quindi non tronca a meta': si
+       ferma appena UN file ha gia' portato oltre cento negozi, e gli altri non
+       si aprono. Va bene per un'insegna italiana di provincia, non per Lidl UK,
+       che di punti vendita ne pubblica millequarantaquattro.
+       Tremila e' abbondante per qualunque insegna nazionale e continua a
+       fermare una sitemap malformata prima che riempia la memoria. */
+    if (visti.size > 3000) break;
   }
   return [...visti.values()];
 }

@@ -84,8 +84,30 @@ const SCADENZA_MS = 26 * 60 * 60 * 1000;
  * Alcampo ne dichiara 86.773 e Checkers 98.424: senza un limite un paese solo
  * riempirebbe la memoria. Cinquantamila per insegna coprono abbondantemente
  * una lista della spesa, che di voci ne ha diciotto.
+ *
+ * MA IL TAGLIO VA DETTO, E PRIMA NON LO DICEVA NESSUNO. Quattro cataloghi lo
+ * superano — Checkers, Alcampo, Auchan Portogallo, Voila — e insieme perdono
+ * 136.481 indirizzi che non entrano mai in memoria. Non e' un errore: e' una
+ * scelta, e finche' la memoria e' quella del piano gratuito resta giusta. Ma
+ * un conteggio che dice «50.000» senza aggiungere «su 98.424» descrive il
+ * limite, non il catalogo, e chi legge crede di avere tutto.
+ *
+ * Da qui in poi il troncamento si registra e si vede in `/catalogo/stato`.
  */
 const MAX_PER_INSEGNA = 50_000;
+
+/**
+ * Quante sitemap figlie si aprono quando la prima e' un indice.
+ *
+ * Duecento coprono le insegne viste — Sainsbury's ne ha 165, Tesco 8 — e
+ * fermano un indice malformato prima che tenga occupato il lavoro notturno per
+ * ore. Chi ne ha di piu' viene troncato, e il troncamento si dichiara come
+ * tutti gli altri.
+ */
+const FIGLIE_MAX = 200;
+
+/** Chi e' stato tagliato dal tetto, e di quanto. Solo per dirlo, non per usarlo. */
+const troncati = new Map<string, { insegna: string; tenuti: number; visteAlmeno: number }>();
 
 const caricati = new Map<string, CatalogoPaese>();
 /** Chi sta gia' scaricando un paese: due richieste insieme non lo scaricano due volte. */
@@ -118,8 +140,25 @@ async function scarica(url: string): Promise<string | null> {
   }
 }
 
+/**
+ * Gli indirizzi dentro una sitemap, con le entita' XML rimesse a posto.
+ *
+ * DENTRO UN FILE XML LA `&` SI SCRIVE `&amp;`, E NOI LA LEGGEVAMO COSI'.
+ * Finche' gli indirizzi non hanno parametri non si nota. Planet Organic pero'
+ * spezza il catalogo con `sitemap_products_1.xml?from=5755746812061&amp;to=…`:
+ * lasciato com'e', quell'indirizzo non e' quello vero, il server risponde
+ * male e l'insegna risulta con zero prodotti. Stessa sorte a chiunque metta
+ * due parametri in una sitemap.
+ */
 const indirizzi = (xml: string): string[] =>
-  [...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)].map((m) => m[1]);
+  [...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)].map((m) =>
+    m[1]
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&quot;/gi, '"')
+      .replace(/&#0?39;|&apos;/gi, "'"),
+  );
 
 /* ─────────────────────── Dal link al nome ──────────────────────── */
 
@@ -191,14 +230,44 @@ export function parole(testo: string): string[] {
  * Misurato: vincevano pure, perche' costano meno.
  */
 const NON_ALIMENTARI = [
-  /(crocchett|croccantin|gatt[oi]?|cane|cani|cucciol|cuccioli|mangim)/i,
-  /(detersiv|detergent|ammorbid|candeggi|sgrassat|anticalcar|shampoo|balsamo|bagnoschiuma|sapone|dentifric|deodorant|assorbent|pannolin|salviett|tovagliol|carta igienic|polish|insettic)/i,
-  /(haribo|caramell|gommos|liquiriz|chewing|lecca lecca)/i,
-  /(quaderno|portamine|matite|penna a sfera|astuccio|pila|batteri)/i,
+  /\b(crocchett|croccantin|gatt[oi]?|cane|cani|cucciol|cuccioli|mangim)/i,
+  /\b(detersiv|detergent|ammorbid|candeggi|sgrassat|anticalcar|shampoo|balsamo|bagnoschiuma|sapone|dentifric|deodorant|assorbent|pannolin|salviett|tovagliol|carta igienic|polish|insettic)/i,
+  /\b(haribo|caramell|gommos|liquiriz|chewing|lecca lecca)/i,
+  /\b(quaderno|portamine|matite|penna a sfera|astuccio|pila|batteri)/i,
+];
+
+/**
+ * Le stesse categorie, in inglese.
+ *
+ * SONO UN ELENCO A PARTE E NON UN AMPLIAMENTO DI QUELLO SOPRA, per una ragione
+ * pratica: le due lingue hanno trappole diverse e si romperebbero a vicenda.
+ * «cane» in italiano e' l'animale; in inglese `cane` e' la canna da zucchero,
+ * e `cane sugar` finirebbe fra i mangimi. Tenendole separate, ciascuna lista
+ * resta leggibile e nessuna va indebolita per far posto all'altra.
+ *
+ * Senza queste righe il Regno Unito rispondeva «Cadbury Dairy Milk» — che e'
+ * cioccolato — a chi cercava `milk`, e «cheddar cheese muffins» a chi cercava
+ * del formaggio. Misurato il 16 settembre: circa meta' delle voci sbagliate.
+ */
+const NON_ALIMENTARI_EN = [
+  /\b(dog|cat|puppy|kitten|pet|catnip|kibble)s?\b/i,
+  /\b(detergent|washing up|laundry|bleach|softener|descal|shampoo|body wash|toothpaste|deodorant|nappies|nappy|wipes|kitchen roll|toilet roll|toilet tissue|polish|insect|air freshener|scented|fragrance)s?\b/i,
+  /\b(sweet|candy|gummy|gummies|liquorice|licorice|lollipop|chewing gum|marshmallow)s?\b/i,
+  /\b(notebook|pencil|biro|stationery|batteries|lightbulb)s?\b/i,
+  /\b(chocolate|choc)s?\b/i,
+  /* Le marche di dolciumi, come `haribo` nell'elenco italiano: il loro nome non
+     dice mai «cioccolato», quindi a parole non si distinguono da un alimento.
+     «Lion milk duo» e «Bounty milk duo» vincevano la ricerca di `milk` perche'
+     contengono quella parola e costano poco — lo stesso meccanismo per cui in
+     Italia le caramelle a forma di uovo battevano le uova. */
+  /\b(dairy milk|milkybar|milky way|galaxy|bounty|snickers|twix|kitkat|kit kat|maltesers|aero|wispa|yorkie|curly wurly|freddo|toblerone|ferrero|kinder)s?\b/i,
+  /\b(lion|mars|twirl|ripple|flake)\s+(bar|duo|milk|choc)/i,
 ];
 
 function alimentarePlausibile(nome: string): boolean {
-  return !NON_ALIMENTARI.some((re) => re.test(nome));
+  return (
+    !NON_ALIMENTARI.some((re) => re.test(nome)) && !NON_ALIMENTARI_EN.some((re) => re.test(nome))
+  );
 }
 
 /**
@@ -211,7 +280,57 @@ function alimentarePlausibile(nome: string): boolean {
  * serve per cucinare.
  */
 const PREPARAZIONI =
-  /(frollin|biscott|merendin|brioche|briochin|croissant|cornett|snack|gelat[oi]|budin|torta|tortin|crostat|wafer|crackers|grissin|pandoro|panettone|colomba|ripien[oi]|farcit|arrost|affettat|precott|impanat|affumicat|stagionat|al forno)/i;
+  /\b(frollin|biscott|merendin|brioche|briochin|croissant|cornett|snack|gelat[oi]|budin|torta|tortin|crostat|wafer|crackers|grissin|pandoro|panettone|colomba|ripien[oi]|farcit|arrost|affettat|precott|impanat|affumicat|stagionat|al forno)/i;
+
+/**
+ * La stessa trappola, in inglese.
+ *
+ * «cheddar cheese muffins» contiene `cheddar cheese` ed e' un muffin;
+ * «bread sauce mix» contiene `bread` ed e' una bustina di preparato. In una
+ * lista della spesa nata da una ricetta nessuna delle due e' mai la risposta.
+ *
+ * Nota su `flavour` e `mix`: dicono entrambe «io imito quell'ingrediente, non
+ * lo sono». Un `cheese flavour snack` non e' formaggio, e chi cucina se ne
+ * accorgerebbe solo davanti ai fornelli.
+ */
+const PREPARAZIONI_EN =
+  /\b(muffin|cupcake|cake|biscuit|cookie|pastry|pie|tart|crumble|doughnut|donut|brownie|flapjack|cereal bar|gravy|seasoning|stuffing|nugget|goujon|crisp|twist|mash|dip|chutney|pickle|mayo|mayonnaise|ketchup|dressing|sauce|drink|smoothie|squash|cordial)s?\b|\b(flavou?r(ed|s)?|breaded|crumbed|battered|smoked|cured|roast(ed)?|fried|marinated|instant|ready meal)\b|\b\w+ mix\b/i;
+
+/**
+ * I piatti, che sono un'altra cosa ancora.
+ *
+ * «Bombay potatoes» contiene `potatoes` ed e' un contorno indiano gia' pronto;
+ * «minced beef onion» e' una scatoletta; «yoghurt mint raita» e' una salsa. Chi
+ * scrive `potatoes` nella lista della spesa vuole le patate crude, e un piatto
+ * pronto che le contiene non le sostituisce ai fornelli.
+ *
+ * Stanno separati dalle preparazioni perche' rispondono a una domanda diversa:
+ * quelle sono «l'ingrediente e' dentro una lavorazione», questi sono «e' gia'
+ * una ricetta». Tenerli distinti serve il giorno che si vorra' ammettere i
+ * secondi e non le prime, o viceversa.
+ */
+const PIATTI_EN =
+  /\b(curry|raita|korma|tikka|masala|bhaji|biryani|chow mein|risotto|paella|lasagne|lasagna|bolognese|casserole|stew|soup|salad|sandwich|wrap|pizza|bombay|szechuan|katsu|jalfrezi|madras|rogan josh)\b/i;
+
+/**
+ * Gli stessi piatti, in italiano.
+ *
+ * Mancavano, e si vedeva: cercando `cipolle` vinceva «zuppa di cipolle», e
+ * cercando `pasta` vinceva «pasta e fagioli». Nessuna delle due si compra per
+ * cucinare qualcos'altro.
+ */
+const PIATTI_IT =
+  /\b(zuppa|minestr|vellutata|passato di|sugo|rag[uù]|risotto|lasagn|cannellon|tortell|raviol|insalat|panin|tramezzin|piadin|pizza|polpett|parmigiana|cotolett|spiedin|hamburger)/i;
+
+/** Una preparazione o un piatto, in una qualunque delle lingue che copriamo. */
+function paPreparazione(nome: string): boolean {
+  return (
+    PREPARAZIONI.test(nome) ||
+    PREPARAZIONI_EN.test(nome) ||
+    PIATTI_EN.test(nome) ||
+    PIATTI_IT.test(nome)
+  );
+}
 
 /* ──────────────────────── Costruire un paese ───────────────────── */
 
@@ -233,8 +352,22 @@ const PREPARAZIONI =
  *
  * Nel dubbio si scarta: una scheda in meno non si nota, una categoria spacciata
  * per prodotto manda l'utente nel posto sbagliato.
+ *
+ * PRIMA PERO' SI BUTTA VIA CIO' CHE NON E' NEMMENO UNA PAGINA, ED E' UNA
+ * LEZIONE COSTATA TRENTACINQUEMILA PRODOTTI. La seconda forma qui sotto —
+ * nome lungo piu' numero — descrive anche
+ * `/medias/ProductSolr-it-EUR-19-16093393329043507599.xml`, che non e' una
+ * scheda: e' un file interno del motore di ricerca, e per giunta protetto.
+ * Bennet e Unes pubblicano migliaia di quegli indirizzi nella stessa sitemap
+ * dei prodotti, e il catalogo se ne riempiva: Bennet 20.446 voci dichiarate,
+ * 18 vere e tutte inservibili; Unes 15.363 contro 4.
+ *
+ * L'errore non dava errore. Le voci c'erano, il conteggio era alto, e a
+ * crollare era solo la cosa che nessuno guardava: quante di quelle voci si
+ * aprivano davvero.
  */
 function paScheda(u: string): boolean {
+  if (NON_E_UNA_PAGINA.test(u)) return false;
   if (
     /\/(p|product|products|producto|productos|produkt|produkte|prodotto|prodotti|produit|produits|artikel|item|items|urun|proizvod|pdp|dp)\//i.test(u)
   ) {
@@ -243,34 +376,100 @@ function paScheda(u: string): boolean {
   return /[a-z]{3,}(?:-[a-z0-9]{2,}){2,}[/-]\d{6,}/i.test(u);
 }
 
-async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> {
+/**
+ * Quello che una scheda prodotto non e' mai.
+ *
+ * `/medias/` e' la cartella degli allegati di SAP Commerce, su cui girano
+ * parecchie insegne europee: dentro ci sono immagini, fogli di stile e gli
+ * indici del motore di ricerca. Le estensioni servono per lo stesso motivo —
+ * una sitemap puo' elencare un PDF o un XML, e nessuno dei due si apre come
+ * una scheda.
+ */
+const NON_E_UNA_PAGINA = /\/medias\/|\.(xml|jpe?g|png|gif|pdf|webp|svg|css|js|zip|mp4)(\?|$)/i;
+
+/**
+ * Le voci di UNA sola insegna.
+ *
+ * Esportata perche' il conteggio per insegna deve passare da qui e non da una
+ * copia: un numero misurato con codice diverso da quello che gira non descrive
+ * l'API, descrive lo script che lo ha misurato.
+ */
+export async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> {
   const voci: VoceCatalogo[] = [];
   const visti = new Set<string>();
+  /* Quante schede la sitemap ne DICHIARA, tenute o no. E' il denominatore
+     della completezza: senza, «abbiamo 5.000 prodotti» non dice se sono tutti
+     o un dodicesimo. */
+  let schedeViste = 0;
+  let tagliato = false;
 
   // La prima parte, poi le successive finche' rispondono: molte sitemap sono
   // spezzate, e fermarsi alla prima significa perdere il grosso del catalogo.
   const daProvare = [fonte.sitemap, ...partiSuccessive(fonte.sitemap)];
 
   for (const url of daProvare) {
-    if (voci.length >= MAX_PER_INSEGNA) break;
+    if (tagliato) break;
     const xml = await scarica(url);
     if (!xml) {
       // La prima deve rispondere; se cade una delle successive, e' finita.
-      if (url === fonte.sitemap) return voci;
+      if (url === fonte.sitemap) break;
       break;
     }
 
-    for (const u of indirizzi(xml)) {
+    /* UN INDICE NON E' UN ELENCO DI PRODOTTI, E FINORA LO TRATTAVAMO COSI'.
+       Parecchie insegne non pubblicano un file solo: pubblicano un
+       `<sitemapindex>` che elenca altri file. Sainsbury's ne ha 165, Tesco 8.
+       Letti come se fossero prodotti, quei 165 indirizzi vengono scartati da
+       `paScheda` — giustamente, non sono schede — e l'insegna risulta con zero
+       prodotti mentre ne pubblica quasi diecimila.
+
+       Si scende di un livello solo: e' quanto basta per tutte le insegne viste,
+       e un secondo livello moltiplicherebbe le richieste senza aggiungere
+       niente. Il tetto `FIGLIE_MAX` c'e' perche' un indice sbagliato o enorme
+       non deve poter tenere occupato il lavoro notturno per ore. */
+    const figlie = /<sitemapindex/i.test(xml) ? indirizzi(xml).slice(0, FIGLIE_MAX) : [];
+    const pagine: string[] = [];
+    if (figlie.length) {
+      for (const f of figlie) {
+        if (voci.length >= MAX_PER_INSEGNA) break;
+        const sotto = await scarica(f);
+        if (sotto) pagine.push(...indirizzi(sotto));
+      }
+    } else {
+      pagine.push(...indirizzi(xml));
+    }
+
+    for (const u of pagine) {
       if (visti.has(u)) continue;
       visti.add(u);
       if (!paScheda(u)) continue;
+      schedeViste++;
+      if (voci.length >= MAX_PER_INSEGNA) {
+        tagliato = true;
+        continue;
+      }
       const nome = nomeDaUrl(u);
       if (!nome) continue;
       const p = parole(nome);
       if (p.length === 0) continue;
       voci.push({ nome, url: u, insegna: fonte.insegna, parole: p });
-      if (voci.length >= MAX_PER_INSEGNA) break;
     }
+  }
+
+  if (tagliato) {
+    /* `visteAlmeno` e non «dichiarate»: appena scatta il tetto si smette di
+       scaricare le parti successive, quindi il vero totale e' questo O PIU'.
+       Un numero che finge di essere esatto quando non lo e' sarebbe peggio di
+       un numero dichiarato approssimativo. */
+    troncati.set(`${fonte.paese}|${fonte.insegna}`, {
+      insegna: fonte.insegna,
+      tenuti: voci.length,
+      visteAlmeno: schedeViste,
+    });
+    console.warn(
+      `[catalogo] ${fonte.paese} ${fonte.insegna}: tenute ${voci.length} schede su almeno ` +
+        `${schedeViste} viste — il tetto di ${MAX_PER_INSEGNA} ha tagliato il resto`,
+    );
   }
 
   return voci;
@@ -375,10 +574,26 @@ export interface RisultatoCatalogo {
  * Confronta le parole, non il testo: «passata di pomodoro» trova «Mutti
  * passata di pomodoro 700 g» anche se le parole in mezzo non coincidono.
  *
- * A parita' di parole trovate vince il nome PIU' CORTO, e non e' un dettaglio:
- * fra «Pomodori pelati» e «Pomodori pelati bio in confezione da 12 con
- * basilico», per una voce che dice «pomodori pelati» il primo e' quello
- * giusto. Il nome lungo di solito e' un formato particolare.
+ * A parita' di parole trovate vince il nome in cui la cosa cercata PESA DI
+ * PIU', cioe' occupa la quota maggiore delle parole del prodotto. Fra
+ * «Pomodori pelati» e «Pomodori pelati bio in confezione da 12 con basilico»,
+ * per una voce che dice «pomodori pelati» il primo e' quello giusto: il nome
+ * lungo di solito e' un formato particolare.
+ *
+ * PERCHE' LA QUOTA E NON LA LUNGHEZZA IN CARATTERI, CHE C'ERA PRIMA
+ * -----------------------------------------------------------------
+ * Contare i caratteri e' un'approssimazione che si rompe appena le parole in
+ * piu' sono corte. Cercando `cheddar cheese` vinceva «vintage cheddar cheese
+ * twist» — quattro parole, di cui due sono un biscotto salato — su «morrisons
+ * cheddar cheese», che e' del formaggio: il secondo ha piu' caratteri ma meno
+ * parole estranee.
+ *
+ * La quota funziona in tutte e due le lingue che il catalogo copre, e non ha
+ * bisogno di sapere quale sia. In inglese la testa del sintagma sta in fondo
+ * («cheddar CHEESE»), in italiano in testa («LATTE di cocco»): una regola
+ * basata sulla posizione andrebbe scritta due volte e sbaglierebbe sui
+ * cataloghi misti. Quante parole del nome sono quella che cerchi, invece, si
+ * misura uguale ovunque.
  */
 export async function cercaNelCatalogo(
   paese: string,
@@ -435,7 +650,7 @@ export async function cercaNelCatalogo(
   const ammesso = (i: number): boolean => {
     const nome = cat.voci[i].nome;
     if (!alimentarePlausibile(nome)) return false;
-    if (PREPARAZIONI.test(nome) && !cercate.some((w) => PREPARAZIONI.test(w))) return false;
+    if (paPreparazione(nome) && !cercate.some((w) => paPreparazione(w))) return false;
     return true;
   };
 
@@ -443,8 +658,19 @@ export async function cercaNelCatalogo(
   const complete = validi.filter(([, punti]) => punti === cercate.length);
   const usati = complete.length ? complete : validi;
 
+  /** Quanta parte del nome e' la cosa cercata: 2 parole su 3 batte 2 su 5. */
+  const quota = (i: number, punti: number): number => {
+    const quante = cat.voci[i].parole.length || 1;
+    return punti / quante;
+  };
+
   return usati
-    .sort((a, b) => b[1] - a[1] || cat.voci[a[0]].nome.length - cat.voci[b[0]].nome.length)
+    .sort(
+      (a, b) =>
+        b[1] - a[1] ||
+        quota(b[0], b[1]) - quota(a[0], a[1]) ||
+        cat.voci[a[0]].nome.length - cat.voci[b[0]].nome.length,
+    )
     .slice(0, quanti)
     .map(([i, punti]) => ({
       nome: cat.voci[i].nome,
@@ -465,6 +691,16 @@ export function statoCatalogo() {
       aggiornato: new Date(c.aggiornato).toISOString(),
     })),
     inCaricamento: [...inCorso.keys()],
+    /* Chi e' stato tagliato dal tetto. Un elenco vuoto significa «niente
+       troncato», non «non lo sappiamo»: e' la differenza fra un silenzio e
+       una risposta. */
+    troncatiDalTetto: [...troncati.entries()].map(([chiave, t]) => ({
+      paese: chiave.split("|")[0],
+      insegna: t.insegna,
+      tenuti: t.tenuti,
+      visteAlmeno: t.visteAlmeno,
+      tetto: MAX_PER_INSEGNA,
+    })),
   };
 }
 
