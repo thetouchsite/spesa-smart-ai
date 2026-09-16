@@ -679,10 +679,15 @@ export async function generatePricesCatalogo(
        porta l'informazione che ci manca. */
     const nomeCatalogo = c.nome.charAt(0).toUpperCase() + c.nome.slice(1);
     const nomePagina = v.page?.nome?.trim();
-    const nome =
-      nomePagina && !quantitaDa(nomeCatalogo) && quantitaDa(nomePagina)
-        ? nomePagina
-        : nomeCatalogo;
+    const meglio = Boolean(
+      nomePagina && !quantitaDa(nomeCatalogo) && quantitaDa(nomePagina),
+    );
+    if (meglio) {
+      console.info(`[nome] dalla pagina: «${nomeCatalogo}» → «${nomePagina}»`);
+    } else if (nomePagina && !quantitaDa(nomeCatalogo)) {
+      console.info(`[nome] la pagina non aiuta: «${nomeCatalogo}» ← «${nomePagina?.slice(0, 50)}»`);
+    }
+    const nome = meglio ? (nomePagina as string) : nomeCatalogo;
 
     /* Si mette da parte anche quel che non si mostra.
        Sapere che una pagina non si apre, o che si apre e il prezzo non lo
@@ -774,9 +779,29 @@ export async function generatePricesCatalogo(
     const chiave = `${r.riga.prodotto}|${r.riga.negozio}`;
     const gia = perVoceInsegna.get(chiave);
     if (!gia) { perVoceInsegna.set(chiave, r); continue; }
-    const hoPrezzo = r.riga.prezzo != null;
-    const avevaPrezzo = gia.riga.prezzo != null;
-    const meglio = hoPrezzo !== avevaPrezzo ? hoPrezzo : r.posto < gia.posto;
+    /* PRIMA LA PERTINENZA, POI IL PREZZO — ed era il contrario.
+       Di ogni insegna si tiene una riga sola, e finora vinceva quella che il
+       prezzo ce l'aveva: a parita' di niente sembra ragionevole, e invece
+       faceva uscire il prodotto SBAGLIATO ogni volta che il giusto non
+       dichiarava il prezzo.
+
+       Misurato su duecento voci: ventuno volte il prodotto giusto era stato
+       proposto dalla ricerca e poi perso, e parecchie erano questo caso.
+         «Tomato puree»    → «Essential tomatoes» batteva «Cirio tomato puree»
+         «Möhren»          → «Frosta bio karotten» batteva «naturwert bio moehren»
+
+       Mostrare la cosa sbagliata con un prezzo e' peggio che mostrare quella
+       giusta senza: nel secondo caso c'e' `nessun-prezzo-pubblicato`, il link
+       si apre e l'utente vede il prezzo con i suoi occhi. Nel primo vede una
+       cifra vera attaccata a un prodotto che non ha chiesto — ed e' l'errore
+       che non puo' riconoscere.
+
+       Il prezzo resta, ma come spareggio: fra due candidati altrettanto
+       pertinenti vince quello che una cifra ce l'ha. */
+    const meglio =
+      r.posto !== gia.posto
+        ? r.posto < gia.posto
+        : (r.riga.prezzo != null) && gia.riga.prezzo == null;
     if (meglio) perVoceInsegna.set(chiave, r);
   }
 

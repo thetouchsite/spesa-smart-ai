@@ -343,17 +343,44 @@ function leggiDa(html: string): PagePrice | null {
     if (sane(computed) && computed > current) list = computed;
   }
 
-  /* IL NOME DICHIARATO DALLA PAGINA.
-     Si guarda prima nei dati strutturati, che sono fatti per essere letti da
-     un programma, e solo dopo nel titolo — che spesso porta appiccicato il
-     nome del negozio e altra roba da vetrina.
+  /* IL NOME DEL PRODOTTO, e la parte difficile e' che non sia quello del
+     NEGOZIO.
+     Il primo tentativo cercava il primo `"name"` della pagina, e campionando
+     dodici schede italiane e' venuto fuori cosa c'e' davvero li' dentro:
+     «Bologna» — la citta' del punto vendita — e «La Maremmana», il produttore.
+     I dati strutturati di un negozio descrivono anche il negozio, e il suo
+     nome viene quasi sempre prima di quello del prodotto.
 
-     Si scarta quel che e' troppo corto o troppo lungo: sotto i tre caratteri
-     non e' un nome, sopra i centoventi e' una frase di marketing. */
-  const nome =
-    html.match(/"name"\s*:\s*"([^"]{3,120})"/)?.[1] ??
-    html.match(/<title[^>]*>([^<]{3,120})<\/title>/i)?.[1]?.trim() ??
-    undefined;
+     Quindi si cerca in tre posti, nell'ordine in cui e' probabile che parlino
+     del prodotto:
+
+       1. dentro un oggetto marcato `"@type":"Product"` — non c'e' dubbio
+       2. `og:title`, che i siti riempiono per far bella figura quando il link
+          si condivide: e' il nome del prodotto, a volte con la coda del
+          negozio dopo una barra
+       3. il titolo della pagina, per ultimo perche' e' quello piu' sporco
+
+     Un nome sbagliato non fa danni — viene usato solo se contiene un peso, e
+     «Bologna» un peso non ce l'ha — ma ogni nome sbagliato e' un'occasione
+     persa di calcolare un prezzo al chilo. */
+  const dentroProdotto = html.match(
+    /"@type"\s*:\s*"Product"[^]{0,600}?"name"\s*:\s*"([^"]{3,120})"/i,
+  )?.[1];
+  const daOg = html
+    .match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']{3,140})["']/i)?.[1]
+    ?.split(/[|–—]/)[0]
+    ?.trim();
+  const daTitolo = html.match(/<title[^>]*>([^<]{3,140})<\/title>/i)?.[1]
+    ?.split(/[|–—]/)[0]
+    ?.trim();
+
+  /* Si tiene il primo che porta una quantita': e' l'unica cosa per cui questo
+     nome serve, e sceglierlo cosi' evita di preferire un nome piu' «bello» ma
+     inutile a uno brutto che pero' dice quanto pesa. */
+  const candidati = [dentroProdotto, daOg, daTitolo].filter(
+    (x): x is string => typeof x === "string" && x.length >= 3,
+  );
+  const nome = candidati.find((x) => quantitaDa(x)) ?? candidati[0];
 
   const out: PagePrice = {
     current,

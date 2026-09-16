@@ -1245,7 +1245,21 @@ async function prezziDiLista(data: z.infer<typeof PricesInput>) {
 
      Su Render conta il doppio, perche' il piano gratuito si spegne e riparte
      di continuo: e' esattamente la condizione in cui questo succede. */
-  const utile = (esito.prezzi?.length ?? 0) > 0;
+  /* SI GUARDA QUELLO CHE L'UTENTE RICEVE, non quello che abbiamo raccolto.
+     La prima versione di questa guardia controllava `prezzi`, cioe' le righe
+     grezze. Ma fra quelle e la risposta c'e' il raggruppamento, che ne scarta
+     — una riga senza prezzo e senza un link che si apra non e' un'offerta — e
+     quando ne scartava TUTTE la risposta usciva vuota con `prezzi` pieno: la
+     guardia la lasciava passare e il vuoto finiva in cache per ventiquattro
+     ore.
+
+     Si e' visto sbattendoci contro per un'ora: la stessa lista di venti voci
+     dava ottanta offerte appena calcolata e zero un minuto dopo, e sembrava
+     che il motore si rompesse a intermittenza. Era la cache che ripeteva un
+     vuoto di prima.
+
+     Adesso si guarda `prodotti`, che e' cio' che diventa la risposta. */
+  const utile = (esito.prodotti?.length ?? 0) > 0;
 
   if (utile) {
     /* Scade insieme ai prezzi che contiene — ventiquattro ore, la stessa

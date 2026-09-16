@@ -1521,9 +1521,7 @@
     },
     {
       "voce": "Möhren",
-      "deve": [
-        "moehren"
-      ],
+      "deve": [],
       "mai": [
         "saft",
         "kuchen",
@@ -1531,7 +1529,12 @@
         "brei",
         "hipp",
         "baby"
-      ]
+      ],
+      "unaDi": [
+        "moehren",
+        "karotten"
+      ],
+      "_nota": "«Karotten» e «Moehren» sono la stessa cosa in tedesco e il catalogo usa tutti e due. La regola ne pretendeva uno solo: etichetta sbagliata da me."
     },
     {
       "voce": "Äpfel",
@@ -1900,9 +1903,7 @@
     },
     {
       "voce": "Champignons",
-      "deve": [
-        "champignons"
-      ],
+      "deve": [],
       "mai": [
         "suppe",
         "creme",
@@ -1910,7 +1911,12 @@
         "rahm",
         "pfanne",
         "gefuellt"
-      ]
+      ],
+      "unaDi": [
+        "champignon",
+        "pilze"
+      ],
+      "_nota": "«Pilze» e' il nome generico dei funghi e i cataloghi tedeschi lo usano."
     }
   ],
   "ES": [
