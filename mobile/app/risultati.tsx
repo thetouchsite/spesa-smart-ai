@@ -205,10 +205,28 @@ export default function RisultatiScreen() {
         statoBudget={ui(st.label)}
         tono={st.tone}
         punteggio={results.score.total}
+        /* IL NUMERO SI MOSTRA QUANDO C'E' UN TOTALE, NON QUANDO LA
+           COPERTURA E' PIENA.
+           Qui prima si guardava `savingsAvailable`, che vuol dire «ogni voce
+           ha un prezzo» — e con i prezzi veri la copertura piena e' rara.
+           Misurato su Napoli: tredici voci su sedici con prezzo, 44,81 € di
+           spesa, quattordici insegne confrontate, e l'app scriveva «il
+           risparmio non e' calcolabile». Un risultato ottimo buttato via da un
+           `if`.
+
+           `basketTotal` e' null solo quando il totale non regge davvero —
+           sotto il sessanta per cento di copertura. Sopra, il numero si mostra
+           e si dichiara quante voci mancano: e' la stessa onesta' di prima,
+           senza rinunciare a dire la cosa buona. */
         senzaRisparmio={
-          results.savingsAvailable
+          results.basketTotal !== null
             ? undefined
             : ui("Non abbastanza prezzi per calcolarlo: le voci senza prezzo non entrano nel totale.")
+        }
+        parziale={
+          results.basketTotal !== null && results.missingPrices.length > 0
+            ? ui(`${results.missingPrices.length} voci senza prezzo, escluse dal conto`)
+            : undefined
         }
       />
 
@@ -220,13 +238,13 @@ export default function RisultatiScreen() {
         />
         <RigaBudget
           etichetta={ui("Spesa stimata")}
-          valore={results.savingsAvailable ? money(results.estimatedSpend, cur, language) : "—"}
+          valore={results.basketTotal !== null ? money(results.estimatedSpend, cur, language) : "—"}
         />
         <View style={styles.filo} />
         <RigaBudget
           etichetta={ui(results.status === "over" ? "Sopra il budget di" : "Stai risparmiando")}
           valore={
-            results.savingsAvailable
+            results.basketTotal !== null
               ? money(
                   results.status === "over" ? results.overBudgetAmount : results.savings,
                   cur,
@@ -238,7 +256,7 @@ export default function RisultatiScreen() {
         />
         <RigaBudget
           etichetta={ui("Risparmio annuo")}
-          valore={results.savingsAvailable ? money(results.annualSavings, cur, language) : "—"}
+          valore={results.basketTotal !== null ? money(results.annualSavings, cur, language) : "—"}
         />
       </Card>
 

@@ -57,6 +57,14 @@ export interface EroeRisparmio {
   punteggio: number;
   /** Quando i prezzi non bastano per calcolare il risparmio. */
   senzaRisparmio?: string;
+  /**
+   * Quante voci restano fuori dal conto, quando il totale c'e' ma non e' pieno.
+   *
+   * Si dice sotto la cifra invece di nascondere la cifra: un totale su tredici
+   * voci di sedici e' molto piu' utile di un trattino, purche' sia dichiarato
+   * per quello che e'.
+   */
+  parziale?: string;
   /** Traduttore: la schermata sa in che lingua sta, questo componente no. */
   ui: (t: string) => string;
 }
@@ -71,6 +79,7 @@ export function EroeRisparmio({
   tono,
   punteggio,
   senzaRisparmio,
+  parziale,
   ui,
 }: EroeRisparmio) {
   const colorePallino =
@@ -100,11 +109,14 @@ export function EroeRisparmio({
           <Body style={stili.avvisoTesto}>{senzaRisparmio}</Body>
         </View>
       ) : (
-        <View style={stili.cifra}>
-          <Body style={stili.valuta}>{valuta}</Body>
-          <Body style={stili.numero}>{Math.round(Math.abs(risparmio))}</Body>
-          <Body style={stili.periodo}>{periodo}</Body>
-        </View>
+        <>
+          <View style={stili.cifra}>
+            <Body style={stili.valuta}>{valuta}</Body>
+            <Body style={stili.numero}>{Math.round(Math.abs(risparmio))}</Body>
+            <Body style={stili.periodo}>{periodo}</Body>
+          </View>
+          {parziale ? <Body style={stili.parziale}>{parziale}</Body> : null}
+        </>
       )}
 
       <View style={stili.striscia}>
@@ -249,6 +261,11 @@ const stili = StyleSheet.create({
     marginLeft: 2,
   },
 
+  parziale: {
+    fontSize: font.size.xs,
+    color: colors.mutedForeground,
+    marginTop: 2,
+  },
   avviso: {
     marginTop: spacing.lg,
     backgroundColor: colors.warningBg,
