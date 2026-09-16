@@ -87,6 +87,14 @@ export interface VerifiedPrice {
   page?: PagePrice;
   /** Perché è stato scartato, quando lo è stato. */
   reason?: string;
+  /**
+   * Il nome che la pagina dichiara, anche quando il prezzo non c'e'.
+   *
+   * Sta qui e non dentro `page` proprio per questo: `page` esiste solo se un
+   * prezzo si e' letto, e il caso che ci interessa e' l'opposto — pagina
+   * aperta, prezzo servito da un'API, nome per esteso disponibile.
+   */
+  nome?: string;
 }
 
 import { haLettoreApi, prezzoDaApi } from "./prezzi-api.js";
@@ -228,6 +236,57 @@ function sciogliEntita(html: string): string {
 }
 
 /**
+ * Il nome del prodotto dichiarato dalla pagina.
+ *
+ * Sta in una funzione sua perche' serve in due momenti: quando si legge il
+ * prezzo, e quando la pagina si apre ma il prezzo NON c'e' — che per le
+ * insegne italiane e' il caso normale, perche' il prezzo arriva dalla loro
+ * API e la pagina lo disegna dopo. Prima quel secondo caso non leggeva
+ * niente, e quelle righe restavano col nome corto dell'indirizzo: senza
+ * formato, niente prezzo al chilo.
+ */
+export function nomeDallaPagina(html: string): string | undefined {
+  /* IL NOME DEL PRODOTTO, e la parte difficile e' che non sia quello del
+     NEGOZIO.
+     Il primo tentativo cercava il primo `"name"` della pagina, e campionando
+     dodici schede italiane e' venuto fuori cosa c'e' davvero li' dentro:
+     «Bologna» — la citta' del punto vendita — e «La Maremmana», il produttore.
+     I dati strutturati di un negozio descrivono anche il negozio, e il suo
+     nome viene quasi sempre prima di quello del prodotto.
+
+     Quindi si cerca in tre posti, nell'ordine in cui e' probabile che parlino
+     del prodotto:
+
+       1. dentro un oggetto marcato `"@type":"Product"` — non c'e' dubbio
+       2. `og:title`, che i siti riempiono per far bella figura quando il link
+          si condivide: e' il nome del prodotto, a volte con la coda del
+          negozio dopo una barra
+       3. il titolo della pagina, per ultimo perche' e' quello piu' sporco
+
+     Un nome sbagliato non fa danni — viene usato solo se contiene un peso, e
+     «Bologna» un peso non ce l'ha — ma ogni nome sbagliato e' un'occasione
+     persa di calcolare un prezzo al chilo. */
+  const dentroProdotto = html.match(
+    /"@type"\s*:\s*"Product"[^]{0,600}?"name"\s*:\s*"([^"]{3,120})"/i,
+  )?.[1];
+  const daOg = html
+    .match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']{3,140})["']/i)?.[1]
+    ?.split(/[|–—]/)[0]
+    ?.trim();
+  const daTitolo = html.match(/<title[^>]*>([^<]{3,140})<\/title>/i)?.[1]
+    ?.split(/[|–—]/)[0]
+    ?.trim();
+
+  /* Si tiene il primo che porta una quantita': e' l'unica cosa per cui questo
+     nome serve, e sceglierlo cosi' evita di preferire un nome piu' «bello» ma
+     inutile a uno brutto che pero' dice quanto pesa. */
+  const candidati = [dentroProdotto, daOg, daTitolo].filter(
+    (x): x is string => typeof x === "string" && x.length >= 3,
+  );
+  return candidati.find((x) => quantitaDa(x)) ?? candidati[0];
+}
+
+/**
  * Legge prezzo, listino e scadenza dell'offerta dai dati strutturati.
  *
  * Due passate: prima la pagina com'e', poi — solo se non si e' trovato niente
@@ -343,44 +402,7 @@ function leggiDa(html: string): PagePrice | null {
     if (sane(computed) && computed > current) list = computed;
   }
 
-  /* IL NOME DEL PRODOTTO, e la parte difficile e' che non sia quello del
-     NEGOZIO.
-     Il primo tentativo cercava il primo `"name"` della pagina, e campionando
-     dodici schede italiane e' venuto fuori cosa c'e' davvero li' dentro:
-     «Bologna» — la citta' del punto vendita — e «La Maremmana», il produttore.
-     I dati strutturati di un negozio descrivono anche il negozio, e il suo
-     nome viene quasi sempre prima di quello del prodotto.
-
-     Quindi si cerca in tre posti, nell'ordine in cui e' probabile che parlino
-     del prodotto:
-
-       1. dentro un oggetto marcato `"@type":"Product"` — non c'e' dubbio
-       2. `og:title`, che i siti riempiono per far bella figura quando il link
-          si condivide: e' il nome del prodotto, a volte con la coda del
-          negozio dopo una barra
-       3. il titolo della pagina, per ultimo perche' e' quello piu' sporco
-
-     Un nome sbagliato non fa danni — viene usato solo se contiene un peso, e
-     «Bologna» un peso non ce l'ha — ma ogni nome sbagliato e' un'occasione
-     persa di calcolare un prezzo al chilo. */
-  const dentroProdotto = html.match(
-    /"@type"\s*:\s*"Product"[^]{0,600}?"name"\s*:\s*"([^"]{3,120})"/i,
-  )?.[1];
-  const daOg = html
-    .match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']{3,140})["']/i)?.[1]
-    ?.split(/[|–—]/)[0]
-    ?.trim();
-  const daTitolo = html.match(/<title[^>]*>([^<]{3,140})<\/title>/i)?.[1]
-    ?.split(/[|–—]/)[0]
-    ?.trim();
-
-  /* Si tiene il primo che porta una quantita': e' l'unica cosa per cui questo
-     nome serve, e sceglierlo cosi' evita di preferire un nome piu' «bello» ma
-     inutile a uno brutto che pero' dice quanto pesa. */
-  const candidati = [dentroProdotto, daOg, daTitolo].filter(
-    (x): x is string => typeof x === "string" && x.length >= 3,
-  );
-  const nome = candidati.find((x) => quantitaDa(x)) ?? candidati[0];
+  const nome = nomeDallaPagina(html);
 
   const out: PagePrice = {
     current,
@@ -524,7 +546,12 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
     }
   }
 
-  return { status: "pagina-ok" };
+  /* IL NOME SI RESTITUISCE ANCHE SENZA PREZZO.
+     Qui la pagina c'e' e il prezzo no: per le insegne italiane e' la norma,
+     perche' il prezzo lo servono da un'API. La riga il prezzo ce l'ha gia' —
+     gliel'ha dato l'API — e quel che le manca e' il FORMATO, che sta nel nome
+     per esteso. Leggerlo qui non costa niente: la pagina e' gia' aperta. */
+  return { status: "pagina-ok", nome: nomeDallaPagina(html) };
 }
 
 /** Una riga di prezzo dopo il controllo, pronta per il client. */
@@ -635,7 +662,11 @@ export async function verifyPrices(
           // Link e prezzo restano: la pagina esiste, semplicemente non parla
           // con noi. Sara' l'app a dire che il prezzo non e' confermato.
           console.info(`[verifica] non leggibile "${row.nome}": ${v.reason} — tengo il link`);
-          return { ...row, verifica: v.status };
+          /* Anche qui il nome puo' migliorare: la pagina ha risposto qualcosa,
+             solo non un prezzo. */
+          const meglio =
+            v.nome && quantitaDa(v.nome) && !quantitaDa(row.nome) ? v.nome.trim() : row.nome;
+          return { ...row, nome: meglio, verifica: v.status };
         }
 
         /* Il prezzo della pagina vince su quello di partenza: è quello che
@@ -653,8 +684,11 @@ export async function verifyPrices(
            maiuscolo, e la pagina non la aprono mai. Qui pero' si apre — per
            verificare il link — e leggere anche il nome non costa una richiesta
            in piu'. Senza formato non c'e' prezzo al chilo. */
+        const dallaPagina = v.nome ?? p?.nome;
         const nomeMigliore =
-          p?.nome && quantitaDa(p.nome) && !quantitaDa(row.nome) ? p.nome.trim() : row.nome;
+          dallaPagina && quantitaDa(dallaPagina) && !quantitaDa(row.nome)
+            ? dallaPagina.trim()
+            : row.nome;
 
         return {
           ...row,
