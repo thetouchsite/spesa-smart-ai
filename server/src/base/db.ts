@@ -91,6 +91,20 @@ export interface CatalogoDoc {
   aggiornato: Date;
 }
 
+/**
+ * Una parola che il dizionario ha imparato dal modello.
+ *
+ * Stava in un file dentro `diario/`, e su Render il disco e' effimero: a ogni
+ * riavvio il file spariva, il dizionario ripartiva da zero e si ripagava il
+ * modello per tradurre le stesse parole. In locale non si notava, perche' in
+ * locale il disco resta.
+ */
+export interface ParolaDoc {
+  _id: string; // "parola|lingua"
+  tradotta: string;
+  imparata: Date;
+}
+
 export interface CacheDoc {
   _id: string; // chiave deterministica: endpoint + hash degli argomenti
   value: unknown;
@@ -207,6 +221,10 @@ export async function prezzi(): Promise<Collection<PrezzoDoc>> {
 
 export async function cataloghi(): Promise<Collection<CatalogoDoc>> {
   return (await getDb()).collection<CatalogoDoc>("cataloghi");
+}
+
+export async function vocabolario(): Promise<Collection<ParolaDoc>> {
+  return (await getDb()).collection<ParolaDoc>("vocabolario");
 }
 
 /**
