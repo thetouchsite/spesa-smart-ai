@@ -502,7 +502,7 @@ const NON_ALIMENTARI_EN = [
   /\b(lion|mars|twirl|ripple|flake)\s+(bar|duo|milk|choc)/i,
 ];
 
-function alimentarePlausibile(nome: string): boolean {
+export function alimentarePlausibile(nome: string): boolean {
   return (
     !NON_ALIMENTARI.some((re) => re.test(nome)) && !NON_ALIMENTARI_EN.some((re) => re.test(nome))
   );
@@ -518,7 +518,7 @@ function alimentarePlausibile(nome: string): boolean {
  * serve per cucinare.
  */
 const PREPARAZIONI =
-  /\b(frollin|biscott|merendin|brioche|briochin|croissant|cornett|snack|gelat[oi]|budin|torta|tortin|crostat|wafer|crackers|grissin|pandoro|panettone|colomba|ripien[oi]|farcit|arrost|affettat|precott|impanat|affumicat|stagionat|al forno|sfoglia|insalat|condit|saltat|grigliat|marinat|panat|pronto in|gia' pronto|monoporzion)/i;
+  /\b(frollin|biscott|merendin|brioche|briochin|croissant|cornett|snack|gelat[oi]|budin|torta|tortin|crostat|wafer|crackers|grissin|pandoro|panettone|colomba|ripien[oi]|farcit|arrost|affettat|precott|impanat|affumicat|stagionat|al forno|sfoglia|insalat|condit|saltat|grigliat|marinat|panat|pronto in|gia' pronto|monoporzion|salad|gia pronto)/i;
 
 /**
  * La stessa trappola, in inglese.
@@ -561,7 +561,7 @@ const PIATTI_IT =
   /\b(zuppa|minestr|vellutata|passato di|sugo|rag[uù]|risotto|lasagn|cannellon|tortell|raviol|insalat|panin|tramezzin|piadin|pizza|polpett|parmigiana|cotolett|spiedin|hamburger)/i;
 
 /** Una preparazione o un piatto, in una qualunque delle lingue che copriamo. */
-function paPreparazione(nome: string): boolean {
+export function paPreparazione(nome: string): boolean {
   return (
     PREPARAZIONI.test(nome) ||
     PREPARAZIONI_EN.test(nome) ||
