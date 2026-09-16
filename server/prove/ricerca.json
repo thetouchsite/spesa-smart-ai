@@ -1374,7 +1374,7 @@
       ]
     },
     {
-      "voce": "Olivenoel",
+      "voce": "Olivenöl",
       "deve": [
         "olivenoel"
       ],
@@ -1405,7 +1405,7 @@
       ]
     },
     {
-      "voce": "Haehnchenbrust",
+      "voce": "Hähnchenbrust",
       "deve": [
         "haehnchenbrust"
       ],
@@ -1520,7 +1520,7 @@
       ]
     },
     {
-      "voce": "Moehren",
+      "voce": "Möhren",
       "deve": [
         "moehren"
       ],
@@ -1534,10 +1534,8 @@
       ]
     },
     {
-      "voce": "Aepfel",
-      "deve": [
-        "aepfel"
-      ],
+      "voce": "Äpfel",
+      "deve": [],
       "mai": [
         "saft",
         "mus",
@@ -1548,7 +1546,12 @@
         "essig",
         "chips",
         "strudel"
-      ]
+      ],
+      "unaDi": [
+        "aepfel",
+        "apfel"
+      ],
+      "_nota": "«apfel jonagold» E' una mela: Jonagold e' una varieta'. Il catalogo scrive il singolare «apfel», la regola pretendeva il plurale «aepfel». Etichetta sbagliata da me, corretta."
     },
     {
       "voce": "Bananen",
@@ -1565,7 +1568,7 @@
       ]
     },
     {
-      "voce": "Gouda Kaese",
+      "voce": "Gouda Käse",
       "deve": [
         "kaese"
       ],
@@ -1584,7 +1587,7 @@
       ]
     },
     {
-      "voce": "Geriebener Kaese",
+      "voce": "Geriebener Käse",
       "deve": [
         "kaese"
       ],
@@ -1766,7 +1769,7 @@
       ]
     },
     {
-      "voce": "Weisse Bohnen",
+      "voce": "Weiße Bohnen",
       "deve": [
         "bohnen"
       ],
@@ -3176,5 +3179,6 @@
         "poelee"
       ]
     }
-  ]
+  ],
+  "_nota_DE": "Le voci tedesche si scrivono CON la dieresi, perche' e' cosi' che le digita chi cerca. Il catalogo invece scrive ae/oe/ue, perche' gli indirizzi stanno nell'alfabeto inglese: per questo `deve` e `mai` restano traslitterate. Prima erano scritte alla maniera del catalogo anche le voci, e il metro misurava cosi' la grafia che gia' funzionava invece di quella che serve."
 }
