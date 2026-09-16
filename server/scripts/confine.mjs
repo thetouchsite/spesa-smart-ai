@@ -128,6 +128,10 @@ const PADRONI = {
   quota: "base",
   interruttore: "base",
   schemas: "base",
+  /* Com'e' andata l'ultima chiamata al modello. Sta in base e non in app
+     perche' a leggerlo e' `/health`, che e' di tutti e due: il giorno che
+     l'API sta in piedi da sola, il suo stato deve poter dire lo stesso. */
+  "salute-ia": "base",
 
   // ── radice ─────────────────────────────────────────────────────────
   index: "radice",

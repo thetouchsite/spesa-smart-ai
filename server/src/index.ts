@@ -70,6 +70,7 @@ import { statoCataloghi } from "./catalogo-magazzino.js";
 import { prezziDaiCataloghiIT } from "./catalogo-it.js";
 import { annota } from "./diario.js";
 import { statoVocabolario, quanteImparate } from "./vocabolario.js";
+import { saluteIA } from "./salute-ia.js";
 import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./catalogo.js";
 import { paesiConCatalogo } from "./catalogo-fonti.js";
 import { negoziInCitta, statoNegozi, tuttiINegozi } from "./negozi.js";
@@ -225,8 +226,14 @@ app.get("/health", async () => ({
   groundedModel: GROUNDED_MODEL,
   // Quale delle due strade e' attiva: si cambia con FLUSSO nell'ambiente.
   flusso: flussoPredefinito(),
-  // Dichiara la verità: se manca una chiave lo deve sapere il monitoraggio,
-  // non l'utente che riceve un errore.
+  /* IL MODELLO FUNZIONA DAVVERO — che e' un'altra domanda.
+     `aiConfigured` risponde «la chiave e' scritta nell'ambiente», ed e' vero
+     anche quando la quota Google e' finita e il modello non risponde piu'. Ci
+     ha ingannati due volte in una sera: tutto verde, e meta' della spesa
+     spariva. Resta perche' qualcuno lo legge, ma la verita' sta qui sotto, e
+     `funziona: null` vuol dire che nessuno ha ancora chiamato — che e'
+     un'informazione vera, a differenza di un «si» ottimista. */
+  ia: saluteIA(),
   aiConfigured: isConfigured(),
   dbConfigured: isDbConfigured(),
   shoppingConfigured: isShoppingConfigured(),

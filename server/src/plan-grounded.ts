@@ -56,6 +56,7 @@
 
 import { z } from "zod";
 import { elencoChiuso, isoDaPaese, linkCostruitiAttivo, rigaInsegne } from "./insegne-online.js";
+import { annotaEsito } from "./salute-ia.js";
 
 /** Fase 2: il modello che cerca. È quello che si paga. */
 export const GROUNDED_MODEL = process.env.GEMINI_GROUNDED_MODEL ?? "gemini-3-flash-preview";
@@ -349,18 +350,30 @@ async function callGemini(
   tentativiRimasti = 2,
 ): Promise<CallResult> {
   const started = Date.now();
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        ...(withSearch ? { tools: [{ google_search: {} }] } : {}),
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
-    },
-  );
+
+  /* LA RETE CHE CADE E IL TEMPO CHE SCADE NON ARRIVANO MAI A UNA RISPOSTA.
+     Se `fetch` lancia — rete giu', DNS, AbortSignal scaduto — l'errore esce di
+     qui senza passare da nessuna delle annotazioni piu' sotto, che vivono
+     tutte nel ramo «Google ha risposto». Sono pero' esattamente i casi in cui
+     `/health` deve smettere di dire che il modello funziona. */
+  let res: Response;
+  try {
+    res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          ...(withSearch ? { tools: [{ google_search: {} }] } : {}),
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      },
+    );
+  } catch (err) {
+    annotaEsito(modelId, false, err instanceof Error ? err.message : String(err));
+    throw err;
+  }
 
   const body = (await res.json()) as {
     error?: { message?: string };
@@ -383,6 +396,11 @@ async function callGemini(
       await attesa(1500);
       return callGemini(apiKey, modelId, prompt, withSearch, timeoutMs, tentativiRimasti - 1);
     }
+    /* Si annota PRIMA di rilanciare: piu' in alto qualcuno potrebbe
+       catturare e ripiegare in silenzio — la traduzione lo fa apposta — e
+       allora del guasto non resterebbe traccia da nessuna parte. E' proprio
+       il caso che ha fatto rispondere `aiConfigured: true` a modello morto. */
+    annotaEsito(modelId, false, messaggio);
     throw new Error(`Gemini ${modelId}: ${messaggio}`);
   }
 
@@ -394,8 +412,11 @@ async function callGemini(
       await attesa(1000);
       return callGemini(apiKey, modelId, prompt, withSearch, timeoutMs, tentativiRimasti - 1);
     }
+    annotaEsito(modelId, false, "ha risposto senza contenuto");
     throw new Error(`Gemini ${modelId} ha risposto senza contenuto`);
   }
+
+  annotaEsito(modelId, true);
 
   const usage = body.usageMetadata ?? {};
   const pricing = TOKEN_PRICING[modelId] ?? TOKEN_PRICING["gemini-3-flash-preview"];
