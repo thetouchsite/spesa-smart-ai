@@ -324,12 +324,29 @@ export function traduciVoce(
      Sono due condizioni insieme, e servono tutte e due. In «salsa di
      pomodoro» e «latte di mandorla» il secondo cibo viene dopo «di», che e'
      una parola di servizio e non una sconosciuta: quelle restano intatte. */
+  /* «DA», «PER», «FOR»: DICONO A COSA SERVE, NON CHE COS'E'.
+     «Pomodori da insalata» restituiva insalate di tonno con dentro i
+     pomodori: la ricerca dava a «insalata» lo stesso peso di «pomodori», e
+     vinceva chi aveva tutte e due le parole. Ma li' l'insalata non e' un
+     ingrediente — e' l'uso a cui i pomodori sono destinati.
+
+     Le lingue lo segnano, e l'italiano lo segna bene: «di» introduce un
+     ingrediente — «latte DI mandorla» e' fatto di mandorle — mentre «da»
+     introduce lo scopo: «pomodori DA insalata», «patate DA forno», «mele DA
+     forno». Sono due preposizioni diverse apposta, e finora venivano buttate
+     tutte e due nello stesso mucchio delle parole di servizio. */
+  const SCOPO = new Set(["da", "per", "for", "zum", "para", "pour"]);
+
   let gia = false;          // il prodotto e' gia' stato nominato?
   let primaSconosciuta = false; // la parola appena passata era sconosciuta?
+  let primaScopo = false;   // la parola appena passata era «da», «per», «for»…
 
   for (const p of parole) {
     // Articoli e preposizioni: si tolgono e basta.
-    if (PAROLE_DI_SERVIZIO.has(p)) continue;
+    if (PAROLE_DI_SERVIZIO.has(p)) {
+      primaScopo = SCOPO.has(p);
+      continue;
+    }
 
     /* Numeri, unita' e formati si lasciano stare: «500 g» e' uguale in ogni
        lingua, e la ricerca nel catalogo li scarta comunque. Non sono parole
@@ -346,16 +363,18 @@ export function traduciVoce(
     }
     const i = INDICE.get(p) ?? varianti(p).map((v) => INDICE.get(v)).find((x) => x !== undefined);
     if (i !== undefined) {
-      if (gia && primaSconosciuta) {
+      if (gia && (primaSconosciuta || primaScopo)) {
         /* Sta dentro un nome proprio: non si traduce e non si cerca. Tenerla
            com'e' non basterebbe — «orange» nel catalogo inglese trova le
            arance uguale, ed e' proprio quello che si vuole evitare. */
         primaSconosciuta = false;
+        primaScopo = false;
         continue;
       }
       fuori.push(CONCETTI[i][lingua]);
       gia = true;
       primaSconosciuta = false;
+      primaScopo = false;
       continue;
     }
 
@@ -366,12 +385,14 @@ export function traduciVoce(
       fuori.push(appresa);
       gia = true;
       primaSconosciuta = false;
+      primaScopo = false;
       continue;
     }
 
     fuori.push(p);
     // Le parole corte sono articoli e preposizioni: «di», «da», «the», «of».
     // Non vale la pena spendere una chiamata per tradurle.
+    primaScopo = false;
     if (p.length > 3) {
       sconosciute.push(p);
       primaSconosciuta = true;

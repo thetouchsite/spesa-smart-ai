@@ -700,9 +700,15 @@ const NON_E_UNA_PAGINA = /\/medias\/|\.(xml|jpe?g|png|gif|pdf|webp|svg|css|js|zi
    contiene quattro prodotti con quattro pesi e quattro prezzi (250 g a 0,77,
    360 g a 2,15, 420 g a 1,40, 200 g a 2,00), e tutti e quattro il catalogo li
    ha gia' come schede con il loro indirizzo. Tenere il reparto voleva dire
-   mostrarne uno solo, con un prezzo preso a caso fra i quattro. */
+   mostrarne uno solo, con un prezzo preso a caso fra i quattro.
+
+   QUI DENTRO NON CI VA «CATALOGO». Ce l'avevo messo insieme alle altre, e
+   l'Italia e' passata da 129.212 voci a 126.269: quasi tremila SCHEDE VERE
+   buttate, perche' parecchie insegne italiane tengono i prodotti sotto
+   /catalogo/. La parola descrive l'intero assortimento, non uno scaffale, e
+   non distingue niente. */
 const E_UNA_VETRINA =
-  /\/(offers|ofertas|offerte|promociones|promozioni|folleto|volantino|angebote|promotions|categories|category|categoria|categorias|categorie|kategorie|kategorien|catalogue|catalog)\//i;
+  /\/(offers|ofertas|offerte|promociones|promozioni|folleto|volantino|angebote|promotions|categories|category|categoria|categorias|categorie|kategorie|kategorien)\//i;
 
 /**
  * Le voci di UNA sola insegna.
@@ -856,16 +862,23 @@ async function costruisci(paese: string): Promise<CatalogoPaese | null> {
       let presi = 0;
       for (const s of salvate) {
         if (presi >= MAX_PER_INSEGNA || voci.length >= MAX_PER_PAESE) break;
-        /* SI RICONTROLLA CHE SIA UNA SCHEDA, ANCHE SE ARRIVA DAL MAGAZZINO.
-           Il controllo c'era solo quando si legge la sitemap, di notte. Ma il
-           magazzino conserva quello che era buono ALLORA, e quando la regola
-           cambia le righe vecchie restano dentro finche' qualcuno non ripassa
-           dai negozi — cioe' fino al prossimo giro notturno.
+        /* SOLO LE VETRINE, NON TUTTO IL CONTROLLO.
+           Il magazzino conserva quello che era buono ALLORA: quando la regola
+           cambia, le righe vecchie restano dentro finche' qualcuno non ripassa
+           dai negozi. Le categorie di Morrisons sono entrate cosi' e ci
+           sarebbero rimaste un giorno intero dopo essere state escluse.
 
-           Le categorie di Morrisons sono entrate cosi', e ci sarebbero rimaste
-           un giorno intero dopo essere state escluse. Ricontrollare qui costa
-           una espressione regolare per riga e rende la regola valida subito. */
-        if (!paScheda(s.url)) continue;
+           La prima versione di questa riga chiamava `paScheda` intera, e
+           l'Italia e' passata da 129.212 voci a 126.269: quasi tremila righe
+           buttate senza sapere se fossero spazzatura o prodotti buoni che
+           `paScheda` non riconosce. Il magazzino le ha accettate a suo tempo,
+           e non ho una misura che dica che sbagliava.
+
+           Quindi qui si toglie solo cio' che si sa essere uno scaffale —
+           categorie, offerte, volantini — e si lascia stare il resto. Buttare
+           quello di cui non si e' sicuri e' il contrario di quel che serve
+           adesso, che e' un dataset di cui fidarsi. */
+        if (E_UNA_VETRINA.test(s.url)) continue;
         const p = parole(s.nome);
         if (p.length === 0) continue;
         voci.push({
