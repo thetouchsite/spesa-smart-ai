@@ -215,6 +215,29 @@ Magazzino Mongo collegato: Italia si carica in 2–3 s, Regno Unito in 1 s (eran
 > Se una modifica tocca il file dell'altro, si dice qui **prima** di farla.
 
 **16 settembre 2026 — Alberto**
+Fase 1 dell'API: cinque pezzi su otto. C'e' `npm run confine`, che fallisce il
+build se `api/` importa da `app/` — i fili erano tre, adesso e' uno solo, e
+quell'uno sparira' da se'. Poi: `/v1/prezzi`, `/v1/prodotti`, `/v1/negozi`,
+`/v1/copertura`, `/v1/stato`, protette da una chiave; ogni voce chiesta torna
+con un esito fra quattro; ogni prezzo dice di quando e'; e il tetto di spesa
+adesso e' due, cosi' un menu non puo' piu' far rispondere `402` all'API.
+
+*Per Antonio, tre cose:*
+1. **Le rotte vecchie non sono cambiate.** Provato: stesse chiavi, stessa
+   forma, nessuna chiave richiesta. I tuoi script continuano a funzionare.
+2. **Un file nuovo adesso fa fallire il build** finche' non lo dichiari in
+   `scripts/confine.mjs`. Trenta secondi, e serve a rispondere «e' API o e'
+   app?» il giorno in cui la risposta e' ancora facile.
+3. **Mi serve una finestra** per spostare i file in `api/` e `app/`: e' un
+   `git mv` di trenta file e ti si scontrerebbe addosso. Dimmi quando non hai
+   niente di aperto.
+
+*E una cosa per te che ho misurato:* `catalogo-fonti.ts` ha sei fonti tedesche
+su undici che non sono supermercati — tre drogherie, due consegne di bevande,
+un'enoteca — e mancano Rewe, Edeka, Kaufland, Penny. E' la causa principale del
+«7 voci su 16» di Monaco.
+
+**16 settembre 2026 — Alberto**
 Il dizionario della spesa (`vocabolario.ts`) sostituisce la traduzione a
 richiesta: 102 concetti in sei lingue, il modello viene chiamato solo per le
 parole sconosciute e la sua risposta finisce nel dizionario. Misurato su venti

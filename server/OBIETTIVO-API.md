@@ -525,6 +525,37 @@ nessuna riga di logica cambiata, così il diff si legge e il merge non fa male.
 > Le misure si scrivono qui: numero, data, e **come** è stato ottenuto. Un
 > numero senza il metodo è un'opinione con le cifre.
 
+**16 settembre 2026 — Fase 1, cinque pezzi su otto**
+
+Fatti, tutti provati facendoli fallire prima di dichiararli riusciti:
+
+| pezzo | come si verifica |
+|---|---|
+| lo script del confine | `npm run confine`, attaccato a `npm run build` |
+| da 3 fili a 1 | `npm run confine --dettaglio` |
+| lo stato che non mente | chiave finta → `ia.funziona: false`, `causa: chiave-rifiutata` |
+| i due tetti di spesa | app a tetto → `402`; l'API risponde lo stesso |
+| `/v1` con i quattro esiti | Monaco: **16 risposte su 16 chieste** (erano 11) |
+| ogni prezzo con la sua data | 18 offerte, **0 senza data** |
+| le chiavi | `401` senza, `403` alla pubblicabile sui prezzi, `429` oltre il tetto |
+
+Tre prove hanno trovato difetti che senza di loro sarebbero andati in
+produzione:
+
+- **il tetto vincolava solo dove qualcuno lo guardava.** Con l'app limitata a
+  mezzo centesimo, tre menu sono passati lo stesso: `/ai/menu`, `/ai/lista` e
+  `/ai/menu-da-prodotti` spendevano senza chiedere il permesso a nessuno — e
+  non sforavano solo il tetto nuovo, anche quello complessivo, da sempre.
+- **`/v1/stato` rispondeva `429`** a chi aveva finito il tetto: cioe' proprio a
+  chi doveva vedere quanto aveva consumato e quando riparte.
+- **`letto` non arrivava in fondo.** Il magazzino la data ce l'aveva e veniva
+  buttata nel costruire la riga; poi `groupByProduct` la buttava una seconda
+  volta.
+
+Restano di Fase 1: lo spostamento in `api/` e `app/` — serve una finestra in
+cui Antonio non ha lavoro aperto — e il CORS chiuso, che puo' rompere la
+preview web e va fatto quando nessuno sta provando.
+
 **16 settembre 2026 — il punto di partenza**
 
 | cosa | misura | come |
