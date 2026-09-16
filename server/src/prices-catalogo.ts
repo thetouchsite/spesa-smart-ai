@@ -89,6 +89,16 @@ export interface EsitoCatalogo {
  */
 const CANDIDATI_PER_VOCE = 6;
 
+/**
+ * Quante insegne mostrare per una voce.
+ *
+ * Sei sono i candidati che si aprono; queste sono quelle che arrivano
+ * all'utente. Cinque bastano a far vedere la forbice — nel riso carnaroli
+ * italiano va da 1,99 a 3,29 — e oltre l'elenco diventa una lista da scorrere
+ * invece di un confronto da leggere.
+ */
+const ALTERNATIVE_MAX = 5;
+
 /** Quante pagine aprire insieme. Otto e' gentile e abbastanza veloce. */
 const INSIEME = 8;
 
@@ -370,17 +380,50 @@ export async function generatePricesCatalogo(
      appena dietro. Otto voci diventavano sette.
 
      Quindi prima si guarda se c'e' il prezzo, e solo a parita' la posizione. */
-  const perVoce = new Map<string, { riga: PrezzoGrezzo; posto: number }>();
+  /* TUTTE LE INSEGNE CHE HANNO UN PREZZO, NON SOLO LA PRIMA.
+     Qui si teneva una riga sola per voce, e le altre — gia' aperte, gia'
+     lette, gia' pagate in richieste — venivano buttate. Il motivo scritto era
+     che tre candidati di tre catene non sono lo STESSO prodotto, quindi
+     mostrarli come confronto sarebbe fuorviante.
+
+     E' vero alla lettera, ma per una spesa e' il confronto che serve: chi
+     compra il riso carnaroli vuole sapere che da Aldi costa 1,99 e da Unicoop
+     3,29, anche se le due confezioni non sono identiche. L'Italia lo fa gia' —
+     passa da `prezziDaiCataloghiIT`, che restituisce una riga per insegna — e
+     nell'app si vede: sei negozi su un solo riso. Fuori dall'Italia si vedeva
+     un prezzo solo, e non perche' mancassero i dati.
+
+     Una riga per INSEGNA, non per candidato: due prodotti dello stesso negozio
+     non sono un confronto, sono la stessa voce due volte. E chi non ha il
+     prezzo entra solo se non c'e' nessun altro, perche' una riga senza cifra
+     vale come ripiego e non come alternativa. */
+  const perVoceInsegna = new Map<string, { riga: PrezzoGrezzo; posto: number }>();
   for (const r of letti) {
     if (!r) continue;
-    const gia = perVoce.get(r.riga.prodotto);
-    if (!gia) { perVoce.set(r.riga.prodotto, r); continue; }
+    const chiave = `${r.riga.prodotto}|${r.riga.negozio}`;
+    const gia = perVoceInsegna.get(chiave);
+    if (!gia) { perVoceInsegna.set(chiave, r); continue; }
     const hoPrezzo = r.riga.prezzo != null;
     const avevaPrezzo = gia.riga.prezzo != null;
     const meglio = hoPrezzo !== avevaPrezzo ? hoPrezzo : r.posto < gia.posto;
-    if (meglio) perVoce.set(r.riga.prodotto, r);
+    if (meglio) perVoceInsegna.set(chiave, r);
   }
-  const prezzi: PrezzoGrezzo[] = [...perVoce.values()].map((x) => x.riga);
+
+  const perVoce = new Map<string, Array<{ riga: PrezzoGrezzo; posto: number }>>();
+  for (const r of perVoceInsegna.values()) {
+    const lista = perVoce.get(r.riga.prodotto) ?? [];
+    lista.push(r);
+    perVoce.set(r.riga.prodotto, lista);
+  }
+
+  const prezzi: PrezzoGrezzo[] = [];
+  for (const lista of perVoce.values()) {
+    const conPrezzo = lista.filter((x) => x.riga.prezzo != null);
+    const tenute = conPrezzo.length ? conPrezzo : lista.slice(0, 1);
+    // Dal piu' economico: e' l'ordine in cui l'app le mostra.
+    tenute.sort((a, b) => (a.riga.prezzo ?? Infinity) - (b.riga.prezzo ?? Infinity));
+    prezzi.push(...tenute.slice(0, ALTERNATIVE_MAX).map((x) => x.riga));
+  }
   const secondi = (Date.now() - t0) / 1000;
 
   const conPrezzo = new Set(prezzi.filter((p) => p.prezzo != null).map((p) => p.prodotto)).size;

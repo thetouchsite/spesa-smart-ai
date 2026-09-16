@@ -823,6 +823,10 @@ export async function cercaNelCatalogo(
     (a, b) =>
       b[1] - a[1] ||
       quota(b[0], b[1]) - quota(a[0], a[1]) ||
+      // A pari pertinenza vince chi il prezzo lo dichiara piu' spesso: e' il
+      // posto giusto per la resa, dopo le due misure di quanto il nome
+      // somiglia a cio' che e' stato chiesto.
+      cat.voci[b[0]].resa - cat.voci[a[0]].resa ||
       cat.voci[a[0]].nome.length - cat.voci[b[0]].nome.length,
   );
 
@@ -838,18 +842,30 @@ export async function cercaNelCatalogo(
      Ora si prende il migliore di ogni insegna prima di prenderne un secondo
      dalla stessa. E' anche cio' che serve a un'app di confronto: tre offerte
      dello stesso negozio non sono un confronto. */
-  /* LE INSEGNE GENEROSE PER PRIME.
+  /* LE INSEGNE GENEROSE PER PRIME, MA SOLO A PARITA' DI PERTINENZA.
      A parita' di parole in comune conviene provare la catena che il prezzo lo
-     dichiara. In Spagna solo Bonpreu lo fa — Alcampo, Consum, Mercadona, Aldi
-     ed El Corte Ingles sono a zero — e senza questo ordine i candidati
-     finivano su quelle mute. */
-  const perResa = [...ordinati].sort(
-    (a, b) => cat.voci[b[0]].resa - cat.voci[a[0]].resa || b[1] - a[1],
-  );
+     dichiara: in Spagna solo Bonpreu lo fa, e senza quell'ordine i candidati
+     finivano sulle mute.
 
+     LA RESA PERO' NON DEVE SCAVALCARE LA PERTINENZA, E PRIMA LO FACEVA.
+     Ordinando per resa e SOLO POI per parole in comune, il candidato debole di
+     una catena generosa batteva quello giusto di una catena avara. Misurato
+     sullo stesso piano londinese, prima e dopo il merge: le voci con prodotto
+     e link sono scese da 13 su 16 a 10 su 16, con cinquantuno pagine aperte
+     invece di trentasette. Piu' lavoro, meno risultato.
+
+     Si vedeva nei candidati: per «fresh spinach» arrivava «sainsburys fresh
+     GNOCCHI», per «milk» arrivava «waitrose milk BUNS» — che e' pane. Erano
+     entrati perche' la loro insegna dichiara i prezzi piu' spesso, non perche'
+     somigliassero a quello che l'utente aveva scritto.
+
+     Ora la resa fa da spareggio dentro `ordinati`, e la passata per insegna
+     scorre in ordine di PERTINENZA: la diversita' resta — il migliore di ogni
+     catena prima di prenderne un secondo dalla stessa — ma non compra il posto
+     a un candidato sbagliato. */
   const scelti: typeof ordinati = [];
   const viste = new Set<string>();
-  for (const riga of perResa) {
+  for (const riga of ordinati) {
     if (scelti.length >= quanti) break;
     const insegna = cat.voci[riga[0]].insegna;
     if (viste.has(insegna)) continue;
