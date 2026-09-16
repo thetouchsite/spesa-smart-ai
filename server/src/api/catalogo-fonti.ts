@@ -52,8 +52,19 @@
  * occupavano il posto dei supermercati veri.
  *
  * Chi nel `robots.txt` vieta le schede prodotto — Tesco, Sainsbury's, Lidl
- * Spagna e Polonia, Pingo Doce, Ahorramas, Hipercor, Walmart. E i generalisti
- * tipo Galaxus: hanno milioni di prodotti e non sono roba da mangiare.
+ * Spagna e Polonia, Ahorramas, Hipercor, Walmart. E i generalisti tipo
+ * Galaxus: hanno milioni di prodotti e non sono roba da mangiare.
+ *
+ * PINGO DOCE ERA IN QUELL'ELENCO ED ERA SBAGLIATO.
+ * Riletto il 16 settembre 2026: il suo `robots.txt` non ha nessun
+ * `Disallow: /`, vieta soltanto carrello, pagamento, area cliente e la
+ * navigazione a filtri. Le schede prodotto sono consentite e la sitemap e'
+ * dichiarata. Misurata: 7 su 10 con prezzo, 12.441 prodotti — tenuti fuori
+ * per anni da una nota che nessuno aveva piu' verificato.
+ *
+ * Vale come avvertimento generale: un «no» scritto qui dentro invecchia. I
+ * negozi cambiano il `robots.txt` senza dirlo a nessuno, e un divieto dato per
+ * scontato costa quanto un'insegna mai trovata.
  */
 
 export interface FonteCatalogo {
@@ -107,10 +118,10 @@ export const FONTI: FonteCatalogo[] = [
      DA DECIDERE: e' una drogheria, e la regola dice «solo roba da mangiare» —
      su otto schede aperte sei erano cosmetici. In Germania dm era gia' stata
      tolta per questo. Qui resta finche' non lo si decide. */
-  { paese: "AT", insegna: "dm Austria", dominio: "www.dm.at", sitemap: "https://www.dm.at/product-sitemap.xml", resa: 0.4, stimati: 13577 },
-  { paese: "AT", insegna: "MPreis", dominio: "www.mpreis.at", sitemap: "https://www.mpreis.at/sitemap.xml", resa: 0.97, stimati: 12793 },
+  { paese: "AT", insegna: "dm Austria", dominio: "www.dm.at", sitemap: "https://www.dm.at/product-sitemap.xml", resa: 0.5, stimati: 13577 },
+  { paese: "AT", insegna: "MPreis", dominio: "www.mpreis.at", sitemap: "https://www.mpreis.at/sitemap.xml", resa: 0.8, stimati: 12793 },
   { paese: "AT", insegna: "BILLA Online Shop", dominio: "shop.billa.at", sitemap: "https://shop.billa.at/sitemap.xml", resa: 1, stimati: 12536 },
-  { paese: "AT", insegna: "Hofer", dominio: "www.hofer.at", sitemap: "https://www.hofer.at/sitemap_products.xml", resa: 0.9, stimati: 1157 },
+  { paese: "AT", insegna: "Hofer", dominio: "www.hofer.at", sitemap: "https://www.hofer.at/sitemap_products.xml", resa: 1, stimati: 1157 },
 
   { paese: "BA", insegna: "Glovo Sarajevo - Spesa", dominio: "glovoapp.com", sitemap: "https://glovoapp.com/sitemap-index.xml", resa: 0, stimati: 373 },
 
@@ -138,8 +149,8 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "DE", insegna: "Netto", dominio: "www.netto-online.de", sitemap: "https://www.netto-online.de/sitemap.xml", resa: 1, stimati: 1803 },
 
   { paese: "DK", insegna: "BilkaToGo", dominio: "www.bilkatogo.dk", sitemap: "https://www.bilkatogo.dk/sitemap-products.xml", resa: 0, stimati: 37087 },
-  { paese: "DK", insegna: "Føtex", dominio: "foetex.dk", sitemap: "https://foetex.dk/sitemap/sitemap-index.xml", resa: 1, stimati: 28338 },
-  { paese: "DK", insegna: "Matas", dominio: "www.matas.dk", sitemap: "https://www.matas.dk/sitemap", resa: 0.93, stimati: 7441 },
+  { paese: "DK", insegna: "Føtex", dominio: "foetex.dk", sitemap: "https://foetex.dk/sitemap/sitemap-index.xml", resa: 0.7, stimati: 28338 },
+  { paese: "DK", insegna: "Matas", dominio: "www.matas.dk", sitemap: "https://www.matas.dk/sitemap", resa: 1, stimati: 7441 },
   { paese: "DK", insegna: "Nemlig.com", dominio: "www.nemlig.com", sitemap: "https://www.nemlig.com/googleproductsitemap", resa: 0, stimati: 4046 },
 
   { paese: "EE", insegna: "Rimi Estonia", dominio: "www.rimi.ee", sitemap: "https://www.rimi.ee/epood/sitemap.xml", resa: 1, stimati: 58320 },
@@ -167,7 +178,7 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "FR", insegna: "Auchan", dominio: "www.auchan.fr", sitemap: "https://www.auchan.fr/sitemap.xml", resa: 1, stimati: 8708 },
   { paese: "FR", insegna: "Kazidomi", dominio: "www.kazidomi.com", sitemap: "https://www.kazidomi.com/sitemap/sitemap.xml", resa: 1, stimati: 8039 },
   { paese: "FR", insegna: "Naturalia", dominio: "www.naturalia.fr", sitemap: "https://www.naturalia.fr/media/sitemap_product.xml", resa: 1, stimati: 6072 },
-  { paese: "FR", insegna: "La Grande Épicerie", dominio: "www.lagrandeepicerie.com", sitemap: "https://www.lagrandeepicerie.com/sitemap_index.xml", resa: 0.97, stimati: 3956 },
+  { paese: "FR", insegna: "La Grande Épicerie", dominio: "www.lagrandeepicerie.com", sitemap: "https://www.lagrandeepicerie.com/sitemap_index.xml", resa: 0, stimati: 3956 },
   { paese: "FR", insegna: "Picard", dominio: "www.picard.fr", sitemap: "https://www.picard.fr/sitemap_0.xml", resa: 0.97, stimati: 1569 },
 
   { paese: "GB", insegna: "Morrisons Groceries", dominio: "groceries.morrisons.com", sitemap: "https://groceries.morrisons.com/sitemaps/sitemap_index.xml", resa: 0.93, stimati: 32873 },
@@ -203,7 +214,7 @@ export const FONTI: FonteCatalogo[] = [
      Stesso motivo per cui restano fuori B&M e Holland & Barrett. */
 
   { paese: "GR", insegna: "Masoutis", dominio: "www.masoutis.gr", sitemap: "https://www.masoutis.gr/images/sitemapthree.xml", resa: 0, stimati: 15434 },
-  { paese: "GR", insegna: "Kritikos", dominio: "kritikos-sm.gr", sitemap: "https://kritikos-sm.gr/sitemap-1.xml", resa: 1, stimati: 5000 },
+  { paese: "GR", insegna: "Kritikos", dominio: "kritikos-sm.gr", sitemap: "https://kritikos-sm.gr/sitemap-1.xml", resa: 0, stimati: 5000 },
   { paese: "GR", insegna: "Sklavenitis", dominio: "www.sklavenitis.gr", sitemap: "https://www.sklavenitis.gr/sitemap/Products/sitemap_index.xml", resa: 1, stimati: 4552 },
   { paese: "GR", insegna: "Lidl Hellas", dominio: "www.lidl-hellas.gr", sitemap: "https://www.lidl-hellas.gr/static/sitemap.xml", resa: 1, stimati: 589 },
 
@@ -218,7 +229,7 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "IE", insegna: "Tesco Ireland", dominio: "www.tesco.ie", sitemap: "https://www.tesco.ie/sitemaps/en-IE/groceries/products-index.xml", resa: 0, stimati: 22467 },
   { paese: "IE", insegna: "SuperValu Online", dominio: "shop.supervalu.ie", sitemap: "https://shop.supervalu.ie/sitemap.xml", resa: 0, stimati: 11807 },
   { paese: "IE", insegna: "Aldi Ireland", dominio: "www.aldi.ie", sitemap: "https://www.aldi.ie/sitemap_products.xml", resa: 0.97, stimati: 4300 },
-  { paese: "IE", insegna: "Lidl Ireland", dominio: "www.lidl.ie", sitemap: "https://www.lidl.ie/static/sitemap.xml", resa: 1, stimati: 1494 },
+  { paese: "IE", insegna: "Lidl Ireland", dominio: "www.lidl.ie", sitemap: "https://www.lidl.ie/static/sitemap.xml", resa: 0.1, stimati: 1494 },
 
   { paese: "IN", insegna: "JioMart", dominio: "www.jiomart.com", sitemap: "https://www.jiomart.com/sitemap.xml", resa: 0, stimati: 9332 },
 
@@ -245,7 +256,7 @@ export const FONTI: FonteCatalogo[] = [
 
   { paese: "KR", insegna: "Emart Mall", dominio: "emart.ssg.com", sitemap: "https://emart.ssg.com/sitemap/best.xml", resa: 0, stimati: 498 },
 
-  { paese: "LT", insegna: "Rimi Lituania", dominio: "www.rimi.lt", sitemap: "https://www.rimi.lt/e-parduotuve/sitemap.xml", resa: 1, stimati: 61956 },
+  { paese: "LT", insegna: "Rimi Lituania", dominio: "www.rimi.lt", sitemap: "https://www.rimi.lt/e-parduotuve/sitemap.xml", resa: 0.7, stimati: 61956 },
   { paese: "LT", insegna: "LastMile", dominio: "www.lastmile.lt", sitemap: "https://www.lastmile.lt/sitemap.xml", resa: 0, stimati: 61013 },
   { paese: "LT", insegna: "Rimi e-shop", dominio: "www.rimi.lt", sitemap: "https://www.rimi.lt/e-parduotuve/sitemaps/categories/siteMap_rimiLtSite_Category_ru_1.xml", resa: 0.87, stimati: 702 },
 
@@ -266,10 +277,10 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "PL", insegna: "Auchan Polska", dominio: "zakupy.auchan.pl", sitemap: "https://zakupy.auchan.pl/sitemaps/sitemap_index.xml", resa: 0.1, stimati: 24140 },
   { paese: "PL", insegna: "Rossmann Polska", dominio: "www.rossmann.pl", sitemap: "https://www.rossmann.pl/sitemap.xml", resa: 1, stimati: 14078 },
 
-  { paese: "PT", insegna: "Continente Online", dominio: "www.continente.pt", sitemap: "https://www.continente.pt/sitemap_index.xml", resa: 0.7, stimati: 89297 },
+  { paese: "PT", insegna: "Continente Online", dominio: "www.continente.pt", sitemap: "https://www.continente.pt/sitemap_index.xml", resa: 1, stimati: 89297 },
   { paese: "PT", insegna: "Auchan Portugal", dominio: "www.auchan.pt", sitemap: "https://www.auchan.pt/sitemap_index.xml", resa: 0.97, stimati: 44039 },
   { paese: "PT", insegna: "Recheio", dominio: "www.recheio.pt", sitemap: "https://www.recheio.pt/portal/sitemap.xml", resa: 0, stimati: 20283 },
-  { paese: "PT", insegna: "Pingo Doce", dominio: "www.pingodoce.pt", sitemap: "https://www.pingodoce.pt/home/sitemap_index.xml", resa: 0, stimati: 12441 },
+  { paese: "PT", insegna: "Pingo Doce", dominio: "www.pingodoce.pt", sitemap: "https://www.pingodoce.pt/home/sitemap_index.xml", resa: 0.7, stimati: 12441 },
   { paese: "PT", insegna: "Wells", dominio: "www.wells.pt", sitemap: "https://www.wells.pt/sitemap_index.xml", resa: 0.97, stimati: 7859 },
   { paese: "PT", insegna: "Garrafeira Nacional", dominio: "www.garrafeiranacional.com", sitemap: "https://www.garrafeiranacional.com/pub/sitemap.xml", resa: 0, stimati: 413 },
   { paese: "PT", insegna: "Lidl Portugal", dominio: "www.lidl.pt", sitemap: "https://www.lidl.pt/static/sitemap.xml", resa: 1, stimati: 333 },
