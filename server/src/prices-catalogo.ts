@@ -169,6 +169,86 @@ Solo JSON:
 }
 
 /**
+ * La lista della spesa nella lingua del paese in cui si compra.
+ *
+ * IL CATALOGO E' SCRITTO NELLA LINGUA DEL NEGOZIO, LA LISTA IN QUELLA
+ * DELL'UTENTE, E FINCHE' COINCIDONO NON SI NOTA. Un italiano a Londra chiede
+ * «Funghi» e nelle sitemap britanniche quella parola non esiste: c'e'
+ * «mushrooms». Il catalogo aveva settantaquattromila prodotti giusti e
+ * rispondeva «nessun negozio ha questo prodotto», che e' vero alla lettera e
+ * falso nella sostanza.
+ *
+ * PEGGIO DEL NIENTE, PERO', E' QUELLO CHE TROVAVA PER SBAGLIO. Le parole
+ * italiane combaciano con i prodotti di marca italiana venduti in Inghilterra:
+ *
+ *     Funghi          ->  Schwartz x Bella Italia pollo funghi
+ *     Latte           ->  Co-op Cafe Latte 330ml
+ *     Pane            ->  Crosta & Mollica pane pugliese
+ *
+ * Tre prezzi veri attaccati a tre prodotti sbagliati — l'errore di cui l'utente
+ * non si accorge, che e' quello che questo codice ha il dovere di non fare.
+ *
+ * COME, E QUANTO COSTA. Una chiamata sola per tutta la lista, senza ricerca sul
+ * web: al modello si chiede solo come si chiama quella cosa al supermercato di
+ * quel paese. Se la chiamata fallisce si tengono le parole originali, cioe' il
+ * comportamento di prima: una traduzione mancata non deve spegnere il catalogo.
+ *
+ * L'italiano non passa di qui: per l'Italia la lista e' gia' nella lingua
+ * giusta e la chiamata si salta del tutto.
+ */
+const LINGUA_DEL_PAESE: Record<string, string> = {
+  IT: "italiano", AT: "tedesco", DE: "tedesco", GB: "inglese", IE: "inglese",
+  US: "inglese", CA: "inglese", ZA: "inglese", IN: "inglese", AU: "inglese",
+  ES: "spagnolo", AR: "spagnolo", PT: "portoghese", BR: "portoghese",
+  BE: "francese", PL: "polacco", RO: "rumeno", BG: "bulgaro", HR: "croato",
+  RS: "serbo", HU: "ungherese", DK: "danese", SE: "svedese", NO: "norvegese",
+  LT: "lituano", LV: "lettone", EE: "estone", SI: "sloveno", TR: "turco",
+  KR: "coreano", AL: "albanese", BA: "bosniaco",
+};
+
+/** Le traduzioni gia' fatte: la stessa lista non si ripaga due volte. */
+const tradotte = new Map<string, string[]>();
+
+async function nelleParoleDelPaese(items: string[], paeseIso: string): Promise<string[]> {
+  const lingua = LINGUA_DEL_PAESE[paeseIso.toUpperCase()];
+  if (!lingua || lingua === "italiano") return items;
+
+  const chiave = `${paeseIso}|${items.join("|").toLowerCase()}`;
+  const gia = tradotte.get(chiave);
+  if (gia) return gia;
+
+  try {
+    /* Un oggetto e non un array nudo, perche' `parseJson` cerca la prima
+       graffa: a un array risponderebbe «nessun JSON nella risposta». */
+    const prompt =
+      `Traduci in ${lingua} questa lista della spesa, usando le parole con cui il ` +
+      `prodotto e' scritto sugli scaffali dei supermercati di quel paese — il nome ` +
+      `commerciale, non la traduzione letterale. «Funghi» in inglese e' ` +
+      `"mushrooms", non "fungi".\n` +
+      `Stesso ordine, stessa lunghezza. Solo JSON:\n` +
+      `{"tradotte":["...","..."]}\n\n${JSON.stringify(items)}`;
+
+    const r = await chiamaMenu(MENU_MODEL, prompt, 45_000);
+    const dati = parseJson(r.text) as { tradotte?: unknown };
+    const fuori = dati.tradotte;
+    if (!Array.isArray(fuori) || fuori.length !== items.length) throw new Error("forma inattesa");
+
+    // Una voce vuota o non tradotta torna com'era: meglio la parola originale
+    // di una casella bianca.
+    const pulite = fuori.map((x, i) => (typeof x === "string" && x.trim() ? x.trim() : items[i]));
+    tradotte.set(chiave, pulite);
+    console.info(
+      `[catalogo] lista tradotta in ${lingua} ($${r.cost.toFixed(4)}): ` +
+        pulite.slice(0, 4).map((x, i) => `${items[i]}->${x}`).join(", "),
+    );
+    return pulite;
+  } catch (err) {
+    console.warn(`[catalogo] traduzione in ${lingua} non riuscita, tengo le parole originali:`, err);
+    return items;
+  }
+}
+
+/**
  * Prezzi per una lista della spesa, presi dal catalogo.
  *
  * Restituisce una riga per ogni candidato con un prezzo leggibile: piu' righe
@@ -186,12 +266,17 @@ export async function generatePricesCatalogo(
     return { prezzi: [], senzaCandidati: items.length, pagineAperte: 0, secondi: 0 };
   }
 
-  // Prima i candidati: e' tutto lavoro in memoria, istantaneo dopo il primo
+  /* Si cerca nella lingua del negozio, ma la voce mostrata resta quella
+     dell'utente: chi legge la lista vuole rivedere «Funghi», non «mushrooms».
+     Per questo `voce` tiene l'originale e solo la ricerca usa la traduzione. */
+  const cercabili = await nelleParoleDelPaese(items, paeseIso);
+
+  // Poi i candidati: e' tutto lavoro in memoria, istantaneo dopo il primo
   // caricamento del paese.
   const candidature = await Promise.all(
-    items.map(async (voce) => ({
+    items.map(async (voce, i) => ({
       voce,
-      candidati: await cercaNelCatalogo(paeseIso, voce, CANDIDATI_PER_VOCE),
+      candidati: await cercaNelCatalogo(paeseIso, cercabili[i] ?? voce, CANDIDATI_PER_VOCE),
     })),
   );
 
