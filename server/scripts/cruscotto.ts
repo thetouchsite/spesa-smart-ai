@@ -63,6 +63,29 @@ const mute = FONTI.filter((f) => f.resa === 0);
 const senzaPrezzoPerPaese = new Map<string, number>();
 for (const f of mute) senzaPrezzoPerPaese.set(f.paese, (senzaPrezzoPerPaese.get(f.paese) ?? 0) + 1);
 
+/**
+ * DUE MODI DIVERSI DI STARE AL BUIO, E VANNO SEPARATI.
+ *
+ * Un paese senza prezzi puo' esserlo per due ragioni opposte, e confonderle
+ * fa sbagliare la mossa successiva:
+ *
+ *   NON ANCORA PREZZATO    ha insegne che il prezzo lo pubblicano, e basta
+ *                          farci girare il notturno. Costa tempo macchina.
+ *   NESSUNA INSEGNA RENDE  tutte le sue fonti hanno `resa: 0`. Qui il
+ *                          notturno non puo' fare niente: servono insegne
+ *                          nuove, o un lettore per la loro API.
+ *
+ * Misurato: sette paesi sono del secondo tipo — Bosnia, Belgio, Canada,
+ * India, Corea, Serbia, Stati Uniti — per 126.742 indirizzi. In Belgio sono
+ * mute tutte e quattro le insegne: 267 candidati saltati, zero pagine da
+ * aprire.
+ */
+const tuttoMuto = new Set(
+  [...new Set(FONTI.map((f) => f.paese))].filter(
+    (p) => !FONTI.some((f) => f.paese === p && f.resa > 0),
+  ),
+);
+
 /** Paesi con il catalogo e nessun prezzo: e' il buco che conta. */
 const alBuio = q.paesi.filter((r) => r.prezzi === 0 && r.link > 0).sort((a, b) => b.link - a.link);
 const linkAlBuio = alBuio.reduce((a, r) => a + r.link, 0);
@@ -89,8 +112,15 @@ const righeTabella = q.paesi
   .join("\n");
 
 const righeBuio = alBuio
-  .slice(0, 14)
-  .map((r) => `    <li><b>${esc(r.paese)}</b> &mdash; ${n(r.link)} link, nessun prezzo</li>`)
+  .slice(0, 16)
+  .map(
+    (r) =>
+      `    <li><b>${esc(r.paese)}</b> &mdash; ${n(r.link)} link, ` +
+      (tuttoMuto.has(r.paese)
+        ? "<b>nessuna insegna pubblica il prezzo</b>"
+        : "non ancora prezzato") +
+      "</li>",
+  )
   .join("\n");
 
 const html = `<title>Cruscotto dati MealMint</title>
@@ -184,7 +214,7 @@ const html = `<title>Cruscotto dati MealMint</title>
   <div class="allarme">
     <p><b>Il catalogo &egrave; pieno, il magazzino dei prezzi &egrave; vuoto.</b> ${n(q.totale.link)} indirizzi di prodotto contro <b>${n(q.totale.cifre)} prezzi</b> ancora validi. &Egrave; lo ${(q.totale.cifre / q.totale.link * 100).toFixed(2).replace(".", ",")}% del catalogo.</p>
     <p><b>${alBuio.length} paesi su ${q.paesi.length} hanno il catalogo e nessun prezzo</b>, per ${n(linkAlBuio)} indirizzi. Per quei paesi l&#39;app apre le pagine dal vivo mentre l&#39;utente aspetta: &egrave; il comportamento che il magazzino doveva togliere.</p>
-    <p>Non &egrave; un guasto, &egrave; il disegno: il lavoro notturno prezza sessanta voci per paese per sei candidati, circa trecento pagine. Con otto paesi fanno 2.400, e torna esatto.</p>
+    <p><b>Perch&eacute;.</b> Il lavoro notturno prezza le voci di una lista della spesa, e le liste scritte a mano sono sei. Dal 16 settembre, dove la lista manca si prezza <b>a tappeto</b>: si prendono le schede dal catalogo a passo costante, un giro per insegna prima di tornare sulla stessa. Misurato sulla Lituania: 240 schede aperte, 236 con prezzo, 27 secondi. Il primo giro completo su tutti i paesi &egrave; in corso, e questa pagina lo segue.</p>
   </div>
 
   <div class="cifre">
@@ -202,7 +232,7 @@ ${righeTabella}
   </div>
 
   <h2>I paesi al buio</h2>
-  <p class="nota">Catalogo salvato e fresco, zero prezzi. Sono ${n(linkAlBuio)} indirizzi che l&#39;API conosce e non sa quotare.</p>
+  <p class="nota">Catalogo salvato e fresco, zero prezzi: ${n(linkAlBuio)} indirizzi che l&#39;API conosce e non sa quotare. <b>Ma sono due problemi diversi.</b> Dove c&#39;&egrave; scritto &laquo;non ancora prezzato&raquo; basta far girare il lavoro notturno. Dove nessuna insegna pubblica il prezzo il notturno non pu&ograve; farci niente: servono insegne nuove o un lettore per la loro API. Sono ${tuttoMuto.size} paesi, ${n(alBuio.filter((r) => tuttoMuto.has(r.paese)).reduce((a, r) => a + r.link, 0))} indirizzi.</p>
   <ul class="semplice">
 ${righeBuio}
   </ul>
