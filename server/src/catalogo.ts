@@ -1002,6 +1002,29 @@ export async function cercaNelCatalogo(
 
   // Quante volte ogni voce viene nominata dalle parole cercate.
   const conteggio = new Map<number, number>();
+
+  /* E QUANTO PESANO QUELLE PAROLE, che non e' la stessa domanda.
+     Contandole e basta, «wholemeal» vale quanto «pasta» — e siccome di roba
+     integrale il catalogo e' pieno mentre la pasta e' una cosa sola, per
+     «Wholemeal pasta» vinceva un PANE: aveva una parola su due, come tutti
+     gli altri, e la spuntava sugli altri criteri.
+
+     Misurato, gli stessi errori in quattro lingue:
+       «Wholemeal pasta»      → Warburtons Wholemeal (pane)
+       «Oignons jaunes»       → lentilles jaunes      (matcha solo il colore)
+       «Yaourt grec nature»   → yaourt nature         (perde «grec»)
+       «Carne picada»         → bolitas de carne      (perde «picada»)
+       «Pommes Golden»        → puree pommes          (perde «golden»)
+
+     Una parola che compare in mezzo catalogo non distingue niente; una che
+     compare raramente distingue quasi da sola. Il peso e' il logaritmo di
+     quante voci NON la contengono — la misura di quanto sorprende trovarla —
+     ed e' la stessa cosa che fa qualunque motore di ricerca da cinquant'anni.
+     Qui serve perche' le liste della spesa sono fatte cosi': un nome e uno o
+     due aggettivi, e l'aggettivo da solo non e' mai la risposta. */
+  const peso = new Map<number, number>();
+  const quanteVoci = cat.voci.length || 1;
+
   for (const forme of formeDelleParole(richiesta)) {
     /* UNA PAROLA CHIESTA VALE UN PUNTO, anche quando si scrive in due modi.
        «Käse» si cerca come `kase` e come `kaese`, e un prodotto che le ha tutte
@@ -1017,7 +1040,18 @@ export async function cercaNelCatalogo(
       if (dove.length > cat.voci.length / 3) continue;
       for (const i of dove) toccate.add(i);
     }
-    for (const i of toccate) conteggio.set(i, (conteggio.get(i) ?? 0) + 1);
+    if (toccate.size === 0) continue;
+
+    /* Quanto e' rara questa parola nel catalogo di QUESTO paese. Si misura
+       ogni volta e non si scrive da nessuna parte: «bio» e' comune in
+       Germania e rara altrove, e un elenco fatto a mano invecchierebbe a ogni
+       insegna che Antonio aggiunge. */
+    const rarita = Math.log(quanteVoci / toccate.size);
+
+    for (const i of toccate) {
+      conteggio.set(i, (conteggio.get(i) ?? 0) + 1);
+      peso.set(i, (peso.get(i) ?? 0) + rarita);
+    }
   }
 
   /* CHI HA TUTTE LE PAROLE VIENE PRIMA, E DI SOLITO BASTA LUI.
@@ -1055,6 +1089,10 @@ export async function cercaNelCatalogo(
      tutti nella stessa catena. */
   const ordinati = usati.sort(
     (a, b) =>
+      /* Il PESO viene prima del conteggio: chi ha la parola che distingue
+         batte chi ne ha tante di comuni. A parita' di peso — cioe' quando
+         hanno davvero le stesse parole — decidono i criteri di sempre. */
+      (peso.get(b[0]) ?? 0) - (peso.get(a[0]) ?? 0) ||
       b[1] - a[1] ||
       quota(b[0], b[1]) - quota(a[0], a[1]) ||
       // A pari pertinenza vince chi il prezzo lo dichiara piu' spesso: e' il
