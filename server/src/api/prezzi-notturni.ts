@@ -184,14 +184,92 @@ function listaDellaSpesa(paese: string): { voci: string[]; come: string } {
   return { voci: tradotte, come: `tradotta in ${lingua} dal dizionario` };
 }
 
+/**
+ * Quando non c'e' una lista della spesa: si prezza a tappeto.
+ *
+ * VENTINOVE PAESI AVEVANO IL CATALOGO E ZERO PREZZI.
+ * Il notturno prezza le voci di una lista, e le liste esistono per sedici
+ * paesi su trentasei. Per gli altri venti il dizionario non conosce la lingua,
+ * quindi `riempiPrezzi` rispondeva «nessuna lista» e se ne andava: 903.868
+ * indirizzi salvati e mai quotati, e l'app costretta ad aprire le pagine dal
+ * vivo mentre l'utente aspetta — esattamente cio' che il magazzino doveva
+ * togliere.
+ *
+ * Ma per RIEMPIRE il magazzino la lista non serve. Serve a decidere QUALI
+ * prezzi prendere per primi, ed e' la cosa giusta dove la lista c'e': si
+ * prezza quel che la gente chiede. Dove non c'e', qualunque prezzo vale piu'
+ * di nessun prezzo.
+ *
+ * PERCHE' NON SI RICAVA UNA LISTA DALLE PAROLE PIU' FREQUENTI
+ * -----------------------------------------------------------
+ * Sembrava l'idea buona: i nomi dei prodotti lituani sono in lituano, e le
+ * parole piu' frequenti di un catalogo alimentare dovrebbero essere la spesa
+ * di base. Provato, e non regge:
+ *
+ *   LT   gerimas (bevanda), suris (formaggio)... ma anche knyga (LIBRO) e
+ *        sampunas (shampoo)
+ *   PL   woda, herbata, makaron... e karma (cibo per animali), krem
+ *   NO   riesling, chardonnay, brut, 2023, 2022 — il catalogo norvegese e'
+ *        quasi tutto VINO
+ *
+ * Una lista cosi' manderebbe il lavoro notturno a prezzare libri e shampoo.
+ * Meglio non fingere di avere una lista: si prende dal catalogo a passo
+ * costante e si dichiara che e' un campione, non una scelta.
+ *
+ * SI SPARGE, NON SI PRENDONO I PRIMI
+ * ----------------------------------
+ * A passo costante lungo tutto il catalogo, e un giro per insegna prima di
+ * tornare sulla stessa: prendere i primi mille significherebbe mille prodotti
+ * della stessa lettera dello stesso negozio.
+ */
+function aTappeto(
+  voci: ReadonlyArray<{ url: string; nome: string; insegna: string }>,
+  mute: ReadonlySet<string>,
+  quanti: number,
+): Array<{ url: string; nome: string; insegna: string }> {
+  const perInsegna = new Map<string, Array<{ url: string; nome: string; insegna: string }>>();
+  for (const v of voci) {
+    if (mute.has(v.insegna)) continue;
+    const suoi = perInsegna.get(v.insegna) ?? [];
+    suoi.push(v);
+    perInsegna.set(v.insegna, suoi);
+  }
+  if (perInsegna.size === 0) return [];
+
+  /* Da ogni insegna la sua quota, presa a passo costante. */
+  const quota = Math.max(1, Math.ceil(quanti / perInsegna.size));
+  const mazzi: Array<Array<{ url: string; nome: string; insegna: string }>> = [];
+  for (const suoi of perInsegna.values()) {
+    const passo = Math.max(1, Math.floor(suoi.length / quota));
+    const presi: Array<{ url: string; nome: string; insegna: string }> = [];
+    for (let i = 0; i < quota && i * passo < suoi.length; i++) presi.push(suoi[i * passo]);
+    mazzi.push(presi);
+  }
+
+  /* A giro: uno per insegna prima di tornare sulla stessa. */
+  const scelti: Array<{ url: string; nome: string; insegna: string }> = [];
+  for (let i = 0; scelti.length < quanti; i++) {
+    let aggiunto = false;
+    for (const m of mazzi) {
+      if (i >= m.length) continue;
+      scelti.push(m[i]);
+      aggiunto = true;
+      if (scelti.length >= quanti) break;
+    }
+    if (!aggiunto) break;
+  }
+  return scelti;
+}
+
 export async function riempiPrezzi(paese: string, quanteVoci: number): Promise<void> {
   const { voci: tutte, come } = listaDellaSpesa(paese);
   const voci = tutte.slice(0, quanteVoci);
-  if (voci.length === 0) {
-    console.log(`${paese}  nessuna lista della spesa: ${come}`);
-    return;
-  }
-  console.log(`${paese}  lista ${come}: ${voci.length} voci`);
+  const conLista = voci.length > 0;
+  console.log(
+    conLista
+      ? `${paese}  lista ${come}: ${voci.length} voci`
+      : `${paese}  nessuna lista (${come}): si prezza a tappeto`,
+  );
 
   const inizio = Date.now();
   const cat = await catalogoDi(paese);
@@ -201,7 +279,7 @@ export async function riempiPrezzi(paese: string, quanteVoci: number): Promise<v
   }
   console.log(
     `\n${paese}  catalogo pronto: ${cat.voci.length.toLocaleString("it-IT")} prodotti ` +
-      `da ${cat.insegne.length} insegne · ${voci.length} voci da risolvere`,
+      `da ${cat.insegne.length} insegne · ${conLista ? `${voci.length} voci da risolvere` : "campione a tappeto"}`,
   );
 
   // Prima si raccolgono tutti gli indirizzi candidati, poi si guarda quali
@@ -226,14 +304,28 @@ export async function riempiPrezzi(paese: string, quanteVoci: number): Promise<v
     FONTI.filter((f) => f.paese === paese.toUpperCase() && f.resa === 0).map((f) => f.insegna),
   );
 
-  const candidati: Array<{ url: string; nome: string; insegna: string }> = [];
+  let candidati: Array<{ url: string; nome: string; insegna: string }> = [];
   let scartate = 0;
-  for (const voce of voci) {
-    for (const c of await cercaNelCatalogo(paese, voce, CANDIDATI)) {
-      if (mute.has(c.insegna)) { scartate++; continue; }
-      candidati.push({ url: c.url, nome: c.nome, insegna: c.insegna });
+
+  if (conLista) {
+    for (const voce of voci) {
+      for (const c of await cercaNelCatalogo(paese, voce, CANDIDATI)) {
+        if (mute.has(c.insegna)) { scartate++; continue; }
+        candidati.push({ url: c.url, nome: c.nome, insegna: c.insegna });
+      }
     }
+  } else {
+    /* Senza lista si prende dal catalogo, sparso. Quante: lo stesso numero di
+       pagine che costerebbe una lista piena, cosi' la notte dura uguale. */
+    const quante = quanteVoci * CANDIDATI;
+    candidati = aTappeto(
+      cat.voci.map((v) => ({ url: v.url, nome: v.nome, insegna: v.insegna })),
+      mute,
+      quante,
+    );
+    console.log(`${paese}  campione a tappeto: ${candidati.length} schede da ${new Set(candidati.map((c) => c.insegna)).size} insegne`);
   }
+
   if (scartate > 0) {
     console.log(`${paese}  ${scartate} candidati saltati: ${[...mute].join(", ")} il prezzo non lo pubblicano`);
   }

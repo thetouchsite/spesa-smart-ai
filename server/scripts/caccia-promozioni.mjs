@@ -19,7 +19,7 @@
  * Il risultato non e' un'opinione sul codice, e' un conteggio su pagine vere.
  */
 
-import { CATALOGHI } from "../dist/catalogo-it.js";
+import { CATALOGHI } from "../dist/api/catalogo-it.js";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";

@@ -1,0 +1,172 @@
+/**
+ * COSA SERVIRA' L'API DOMANI MATTINA. Letto dal database, non dalle stime.
+ *
+ * PERCHE' ESISTE
+ * --------------
+ * Il cruscotto dei dati mostrava 1.872.278 prodotti, e quel numero era la
+ * somma del campo `stimati` di `catalogo-fonti.ts` — cioe' di conteggi scritti
+ * a mano, alcuni vecchi di mesi. Nessuno l'aveva mai confrontato con quel che
+ * c'e' davvero salvato.
+ *
+ * Confrontato il 16 settembre 2026, e non torna in nessuna direzione:
+ *
+ *   stimato in `catalogo-fonti.ts`        1.902.334
+ *   grezzo sul database                   2.644.440   piu' del doppio di certe insegne
+ *   SERVIBILE (insegne ancora in elenco)  1.716.324
+ *
+ * Il terzo e' l'unico che descrive il prodotto. Gli altri due descrivono
+ * rispettivamente cosa credevamo e cosa abbiamo accumulato.
+ *
+ * Fra le differenze: Carrefour Brasile e' scritto a 80.000 prodotti e ne
+ * conta ZERO; il magazzino teneva 100.000 articoli di Marks & Spencer, che
+ * vende vestiti, e 34.785 di cibo per cani.
+ *
+ * COSA MISURA, E PERCHE' DUE MAGAZZINI E NON UNO
+ * ----------------------------------------------
+ *   CATALOGO   gli indirizzi: quanti prodotti sappiamo che esistono e dove.
+ *              Vale trenta ore, lo riscrive il lavoro notturno.
+ *   PREZZI     quanti di quegli indirizzi hanno un prezzo letto e ancora
+ *              valido. Vale ventiquattro ore.
+ *
+ * Un catalogo pieno e un magazzino prezzi vuoto non e' mezzo servizio: e'
+ * un'app che per ogni voce apre le pagine dal vivo mentre l'utente aspetta.
+ * Per questo le due colonne stanno accanto e non si sommano.
+ *
+ * Uso:
+ *   npx tsx --env-file-if-exists=.env scripts/quadro-db.ts
+ *   npx tsx --env-file-if-exists=.env scripts/quadro-db.ts --json diario/quadro.json
+ */
+
+import { writeFileSync } from "node:fs";
+import { cataloghi, prezzi } from "../src/base/db.js";
+import { FONTI, SENZA_PREZZO } from "../src/api/catalogo-fonti.js";
+import { FRESCHEZZA_MS } from "../src/api/prezzi-magazzino.js";
+
+/** Trenta ore: quanto vale un catalogo salvato. */
+const VALIDITA_CATALOGO_MS = 30 * 3_600_000;
+
+interface RigaPaese {
+  paese: string;
+  insegneInElenco: number;
+  insegneNelDb: number;
+  link: number;
+  linkFreschi: number;
+  prezzi: number;
+  prezziConCifra: number;
+}
+
+async function main() {
+  const inElenco = new Map(FONTI.map((f) => [`${f.paese}|${f.insegna}`, f]));
+  const paeseDi = new Map(FONTI.map((f) => [f.insegna, f.paese]));
+  const escluse = new Set(SENZA_PREZZO.map((f) => `${f.paese}|${f.insegna}`));
+
+  const docCat = (await (await cataloghi())
+    .find({}, { projection: { _id: 1, paese: 1, insegna: 1, prodotti: 1, aggiornato: 1 } })
+    .toArray()) as Array<{ paese: string; insegna: string; prodotti?: number; aggiornato?: Date }>;
+
+  const docPrezzi = (await (await prezzi())
+    .find({}, { projection: { _id: 1, prezzo: 1, insegna: 1, visto: 1 } })
+    .toArray()) as Array<{ prezzo: number | null; insegna: string; visto?: Date }>;
+
+  const ora = Date.now();
+  const perPaese = new Map<string, RigaPaese>();
+  const riga = (p: string) => {
+    let r = perPaese.get(p);
+    if (!r) {
+      r = { paese: p, insegneInElenco: 0, insegneNelDb: 0, link: 0, linkFreschi: 0, prezzi: 0, prezziConCifra: 0 };
+      perPaese.set(p, r);
+    }
+    return r;
+  };
+
+  for (const f of FONTI) riga(f.paese).insegneInElenco++;
+
+  /* SOLO LE INSEGNE ANCORA IN ELENCO.
+     Un catalogo salvato di un'insegna che non chiediamo piu' non e' servizio:
+     e' spazio occupato. Tenerlo nel conto e' esattamente l'errore che questo
+     strumento esiste per non fare piu'. */
+  let orfaneLink = 0;
+  let orfane = 0;
+  for (const d of docCat) {
+    const chiave = `${d.paese}|${d.insegna}`;
+    if (!inElenco.has(chiave)) {
+      if (!escluse.has(chiave)) {
+        orfane++;
+        orfaneLink += d.prodotti ?? 0;
+      }
+      continue;
+    }
+    const r = riga(d.paese);
+    r.insegneNelDb++;
+    r.link += d.prodotti ?? 0;
+    if (d.aggiornato && ora - new Date(d.aggiornato).getTime() < VALIDITA_CATALOGO_MS) {
+      r.linkFreschi += d.prodotti ?? 0;
+    }
+  }
+
+  for (const d of docPrezzi) {
+    const p = paeseDi.get(d.insegna);
+    if (!p) continue;
+    const fresco = d.visto && ora - new Date(d.visto).getTime() < FRESCHEZZA_MS;
+    if (!fresco) continue;
+    const r = riga(p);
+    r.prezzi++;
+    if (d.prezzo != null) r.prezziConCifra++;
+  }
+
+  const righe = [...perPaese.values()].filter((r) => r.link > 0 || r.prezzi > 0);
+  righe.sort((a, b) => b.link - a.link);
+
+  const tot = righe.reduce(
+    (a, r) => ({
+      link: a.link + r.link,
+      freschi: a.freschi + r.linkFreschi,
+      prezzi: a.prezzi + r.prezzi,
+      cifre: a.cifre + r.prezziConCifra,
+    }),
+    { link: 0, freschi: 0, prezzi: 0, cifre: 0 },
+  );
+
+  const n = (x: number) => x.toLocaleString("it-IT");
+
+  console.log("\n  QUEL CHE L'API SERVE OGGI, letto dal database\n");
+  console.log(`  ${"paese".padEnd(7)}${"insegne".padStart(9)}${"link".padStart(12)}${"freschi".padStart(12)}${"prezzi".padStart(9)}${"con cifra".padStart(11)}`);
+  console.log("  " + "─".repeat(60));
+  for (const r of righe) {
+    console.log(
+      `  ${r.paese.padEnd(7)}${`${r.insegneNelDb}/${r.insegneInElenco}`.padStart(9)}` +
+        `${n(r.link).padStart(12)}${n(r.linkFreschi).padStart(12)}` +
+        `${n(r.prezzi).padStart(9)}${n(r.prezziConCifra).padStart(11)}`,
+    );
+  }
+  console.log("  " + "─".repeat(60));
+  console.log(
+    `  ${"TOTALE".padEnd(16)}${n(tot.link).padStart(12)}${n(tot.freschi).padStart(12)}` +
+      `${n(tot.prezzi).padStart(9)}${n(tot.cifre).padStart(11)}`,
+  );
+
+  const stimati = FONTI.reduce((a, f) => a + f.stimati, 0);
+  console.log(`\n  stimato in catalogo-fonti.ts : ${n(stimati)}`);
+  console.log(`  servibile dal database       : ${n(tot.link)}`);
+  const scarto = tot.link - stimati;
+  console.log(`  scarto                       : ${scarto >= 0 ? "+" : ""}${n(scarto)}`);
+  if (orfane > 0) {
+    console.log(`\n  ancora orfane sul database: ${orfane} insegne, ${n(orfaneLink)} link non servibili`);
+  }
+
+  const dove = process.argv.includes("--json")
+    ? process.argv[process.argv.indexOf("--json") + 1]
+    : "diario/quadro-db.json";
+  writeFileSync(
+    dove,
+    JSON.stringify({ quando: new Date().toISOString(), totale: tot, stimati, orfane, orfaneLink, paesi: righe }, null, 2),
+    "utf8",
+  );
+  console.log(`\n  scritto in ${dove}\n`);
+  process.exit(0);
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

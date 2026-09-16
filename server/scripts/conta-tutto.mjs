@@ -17,9 +17,9 @@
  */
 
 import { writeFileSync } from "node:fs";
-import { FONTI } from "../dist/catalogo-fonti.js";
-import { daUnaFonte } from "../dist/catalogo.js";
-import { verifyProductPage } from "../dist/price-page.js";
+import { FONTI } from "../dist/api/catalogo-fonti.js";
+import { daUnaFonte } from "../dist/api/catalogo.js";
+import { verifyProductPage } from "../dist/api/price-page.js";
 
 const CAMPIONE = Number(process.env.CAMPIONE ?? 6);
 const USCITA = process.env.USCITA ?? "conteggio.json";

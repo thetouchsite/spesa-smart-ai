@@ -15,7 +15,7 @@
  * Nessuna e' scelta per far fare bella figura al codice.
  */
 
-import { catalogoDi, cercaNelCatalogo } from "../dist/catalogo.js";
+import { catalogoDi, cercaNelCatalogo } from "../dist/api/catalogo.js";
 
 const LISTA = [
   "milk", "bread", "eggs", "chicken breast", "tomatoes",

@@ -125,6 +125,9 @@ export const FONTI: FonteCatalogo[] = [
 
   { paese: "BA", insegna: "Glovo Sarajevo - Spesa", dominio: "glovoapp.com", sitemap: "https://glovoapp.com/sitemap-index.xml", resa: 0, stimati: 373 },
 
+  /* Piattaforma Aldi Nord, come Germania e Spagna: la sitemap dei prodotti
+     e' `/sitemaps/.aldi-nord-sitemap-products.xml`, non l'indice. */
+  { paese: "BE", insegna: "Aldi Belgique", dominio: "www.aldi.be", sitemap: "https://www.aldi.be/sitemaps/.aldi-nord-sitemap-products.xml", resa: 0, stimati: 2814 },
   { paese: "BE", insegna: "Delhaize", dominio: "www.delhaize.be", sitemap: "https://www.delhaize.be/sitemap/delhaizesitemapindex.xml", resa: 0, stimati: 14668 },
   { paese: "BE", insegna: "Okay", dominio: "www.okay.be", sitemap: "https://www.okay.be/sitemap.xml", resa: 0, stimati: 8126 },
   { paese: "BE", insegna: "Intermarché BE", dominio: "www.intermarche.be", sitemap: "https://www.intermarche.be/sitemap_index.xml", resa: 0, stimati: 214 },
@@ -138,6 +141,10 @@ export const FONTI: FonteCatalogo[] = [
 
   { paese: "CH", insegna: "Lidl Svizzera", dominio: "www.lidl.ch", sitemap: "https://www.lidl.ch/static/sitemap.xml", resa: 1, stimati: 678 },
 
+  /* Billa Cechia e Slovacchia: gli indirizzi ci sono, il prezzo no — il
+     browser lo disegna dopo. Restano perche' un nome e un link valgono anche
+     senza prezzo, e il lavoro notturno non le apre nemmeno. */
+  { paese: "CZ", insegna: "Billa", dominio: "www.billa.cz", sitemap: "https://www.billa.cz/sitemap.xml", resa: 0, stimati: 12416 },
   { paese: "CZ", insegna: "Billa CZ", dominio: "www.billa.cz", sitemap: "https://www.billa.cz/sitemap.xml", resa: 1, stimati: 13303 },
 
   { paese: "DE", insegna: "Knuspr", dominio: "www.knuspr.de", sitemap: "https://www.knuspr.de/sitemap_products.xml", resa: 0.93, stimati: 15177 },
@@ -178,7 +185,14 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "FR", insegna: "Auchan", dominio: "www.auchan.fr", sitemap: "https://www.auchan.fr/sitemap.xml", resa: 1, stimati: 8708 },
   { paese: "FR", insegna: "Kazidomi", dominio: "www.kazidomi.com", sitemap: "https://www.kazidomi.com/sitemap/sitemap.xml", resa: 1, stimati: 8039 },
   { paese: "FR", insegna: "Naturalia", dominio: "www.naturalia.fr", sitemap: "https://www.naturalia.fr/media/sitemap_product.xml", resa: 1, stimati: 6072 },
-  { paese: "FR", insegna: "La Grande Épicerie", dominio: "www.lagrandeepicerie.com", sitemap: "https://www.lagrandeepicerie.com/sitemap_index.xml", resa: 0, stimati: 3956 },
+  /* MISURATA 0 SU 10 DA `resa-veloce.ts` E 12 SU 12 DAL CATALOGO VERO.
+     Vince il catalogo vero, e il perche' conta piu' del numero: `resa-veloce`
+     campiona la sitemap grezza, e l'indice di questa insegna porta a pagine
+     `coup-de-coeur` che hanno la forma di una scheda ma non lo sono. Il
+     catalogo invece le scarta, e quel che resta rende il 100%.
+     Regola: quando le due misure litigano, ha ragione quella che campiona da
+     `daUnaFonte`. L'altra e' veloce, non esatta. */
+  { paese: "FR", insegna: "La Grande Épicerie", dominio: "www.lagrandeepicerie.com", sitemap: "https://www.lagrandeepicerie.com/sitemap_index.xml", resa: 1, stimati: 3956 },
   { paese: "FR", insegna: "Picard", dominio: "www.picard.fr", sitemap: "https://www.picard.fr/sitemap_0.xml", resa: 0.97, stimati: 1569 },
 
   { paese: "GB", insegna: "Morrisons Groceries", dominio: "groceries.morrisons.com", sitemap: "https://groceries.morrisons.com/sitemaps/sitemap_index.xml", resa: 0.93, stimati: 32873 },
@@ -218,6 +232,10 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "GR", insegna: "Sklavenitis", dominio: "www.sklavenitis.gr", sitemap: "https://www.sklavenitis.gr/sitemap/Products/sitemap_index.xml", resa: 1, stimati: 4552 },
   { paese: "GR", insegna: "Lidl Hellas", dominio: "www.lidl-hellas.gr", sitemap: "https://www.lidl-hellas.gr/static/sitemap.xml", resa: 1, stimati: 589 },
 
+  /* Trovata sondando sedici insegne dell'Europa dell'Est e balcanica.
+     Pubblica `sitemap_products.xml` separata dal resto: 11.153 schede, e il
+     prezzo sta in `og:price`. */
+  { paese: "HR", insegna: "Konzum", dominio: "www.konzum.hr", sitemap: "https://www.konzum.hr/sitemap_products.xml", resa: 0.9, stimati: 11153 },
   { paese: "HR", insegna: "Tommy", dominio: "www.tommy.hr", sitemap: "https://www.tommy.hr/sitemap.xml", resa: 0.97, stimati: 28640 },
   { paese: "HR", insegna: "Konzum Online", dominio: "www.konzum.hr", sitemap: "https://www.konzum.hr/sitemap_products.xml", resa: 0.97, stimati: 11153 },
 
@@ -298,6 +316,7 @@ export const FONTI: FonteCatalogo[] = [
   { paese: "SI", insegna: "Mercator Online", dominio: "mercatoronline.si", sitemap: "https://mercatoronline.si/sitemap.xml", resa: 1, stimati: 17241 },
   { paese: "SI", insegna: "Hofer SI", dominio: "www.hofer.si", sitemap: "https://www.hofer.si/sitemap_products.xml", resa: 0.93, stimati: 1035 },
 
+  { paese: "SK", insegna: "Billa Slovensko", dominio: "www.billa.sk", sitemap: "https://www.billa.sk/sitemap.xml", resa: 0, stimati: 3673 },
   { paese: "SK", insegna: "Billa SK", dominio: "www.billa.sk", sitemap: "https://www.billa.sk/sitemap.xml", resa: 0.93, stimati: 4286 },
 
   { paese: "TR", insegna: "Migros Sanal Market", dominio: "www.migros.com.tr", sitemap: "https://www.migros.com.tr/hermes/api/sitemaps/sitemap.xml", resa: 1, stimati: 350 },

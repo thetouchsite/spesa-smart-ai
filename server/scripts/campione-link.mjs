@@ -14,9 +14,9 @@
  */
 
 import { writeFileSync } from "node:fs";
-import { FONTI } from "../dist/catalogo-fonti.js";
-import { daUnaFonte } from "../dist/catalogo.js";
-import { verifyProductPage } from "../dist/price-page.js";
+import { FONTI } from "../dist/api/catalogo-fonti.js";
+import { daUnaFonte } from "../dist/api/catalogo.js";
+import { verifyProductPage } from "../dist/api/price-page.js";
 
 const QUANTI = Number(process.env.QUANTI ?? 50);
 const UA =
