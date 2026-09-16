@@ -49,7 +49,7 @@
  */
 
 import { catalogoDi, statoCatalogo } from "./catalogo.js";
-import { paesiConCatalogo } from "./catalogo-fonti.js";
+import { caricaFontiDalDb, paesiConCatalogo, statoFonti } from "./catalogo-fonti.js";
 import { riempiPrezzi } from "./prezzi-notturni.js";
 
 /**
@@ -123,6 +123,21 @@ export async function aggiornaCatalogo(motivo: string): Promise<void> {
   const inizio = Date.now();
   console.info(`[catalogo] aggiornamento (${motivo}): ${paesi.join(" ")}`);
 
+  /* PRIMA LE FONTI, POI I CATALOGHI.
+     L'elenco delle insegne sta sul database, e il file `catalogo-fonti.ts` e'
+     solo la semente per il primo avvio. Rileggerlo qui vuol dire che una resa
+     corretta stanotte vale gia' stanotte, senza aspettare un rilascio.
+
+     Se il database non risponde non cambia niente: si tiene la semente e si
+     lavora lo stesso. Un elenco vecchio di qualche giorno fa girare l'app,
+     nessun elenco la ferma. */
+  const quante = await caricaFontiDalDb();
+  console.info(
+    quante > 0
+      ? `[fonti] ${quante} insegne lette dal database`
+      : `[fonti] database muto: resta la semente del file`,
+  );
+
   try {
     for (const p of paesi) {
       try {
@@ -150,6 +165,8 @@ export async function aggiornaCatalogo(motivo: string): Promise<void> {
       }
     }
     const s = statoCatalogo();
+    const sf = statoFonti();
+    console.info(`[fonti] ${sf.quante} insegne in memoria`);
     const totale = s.caricati.reduce((n, c) => n + c.prodotti, 0);
     console.info(
       `[catalogo] aggiornamento finito in ${((Date.now() - inizio) / 1000).toFixed(0)}s — ` +
@@ -174,6 +191,26 @@ export function avviaCatalogoNotturno(): void {
     return;
   }
 
+  /* PRIMA LE FONTI, POI GLI APPUNTAMENTI — E IN QUEST'ORDINE.
+     L'elenco delle insegne sta sul database, e `paesiDaScaldare()` lo
+     interroga per sapere quali paesi tenere pronti. Chiamandola prima che il
+     database abbia risposto trova zero insegne, conclude «nessun paese» e non
+     programma niente: il lavoro notturno non partirebbe mai, e il registro non
+     direbbe nulla di strano.
+
+     Ci sono cascato scrivendo questa stessa funzione, mezz'ora fa. */
+  void caricaFontiDalDb().then((quante) => {
+    console.info(
+      quante > 0
+        ? `[fonti] ${quante} insegne lette dal database`
+        : "[fonti] il database non ha dato insegne: niente catalogo",
+    );
+    programma();
+  });
+}
+
+/** Gli appuntamenti veri, chiamati solo dopo che le fonti ci sono. */
+function programma(): void {
   const paesi = paesiDaScaldare();
   if (paesi.length === 0) return;
 

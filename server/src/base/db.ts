@@ -91,6 +91,54 @@ export interface CatalogoDoc {
   aggiornato: Date;
 }
 
+/**
+ * Una fonte del catalogo: l'insegna, dove sta la sua sitemap, quanto rende.
+ *
+ * PERCHE' SUL DATABASE E NON PIU' SOLO IN UN FILE
+ * -----------------------------------------------
+ * L'elenco delle fonti e' sempre stato un file TypeScript scritto a mano, e i
+ * suoi numeri non li confrontava nessuno col database. Al 16 settembre 2026 i
+ * due dicevano cose diverse: il file 1.902.334 prodotti, il magazzino
+ * 1.716.324, e dentro il file c'era Carrefour Brasile a 80.000 prodotti
+ * mentre il magazzino non ne aveva nemmeno il catalogo.
+ *
+ * Due elenchi che dovrebbero dire la stessa cosa divergono sempre, perche' si
+ * aggiornano in momenti diversi e con strumenti diversi: le rese le scriveva
+ * uno script, i conteggi un altro, le aggiunte una persona a mano. Qui c'e'
+ * una copia sola, e chi misura scrive li'.
+ *
+ * Il file resta come SEMENTE: serve al primo avvio, e serve quando il database
+ * non risponde — meglio un elenco vecchio che nessun catalogo.
+ */
+export interface FonteDoc {
+  _id: string; // "PAESE|Insegna"
+  paese: string;
+  insegna: string;
+  dominio: string;
+  sitemap: string;
+  /** Quota di schede che espongono il prezzo, da 0 a 1. */
+  resa: number;
+  /** Indirizzi di prodotto pubblicati, contati. */
+  stimati: number;
+  /** Se c'e', l'insegna e' TENUTA FUORI e questa frase dice perche'. */
+  esclusa?: string;
+  /**
+   * Quel che si e' imparato su questa insegna, in chiaro.
+   *
+   * Stava nei commenti dentro `catalogo-fonti.ts`, e li' serviva solo a chi
+   * apriva quel file. Attaccato alla riga viaggia col dato: lo vede chi
+   * interroga il database, chi genera il cruscotto, e chi fra sei mesi si
+   * chiede perche' Alcampo punta all'indice e non alla prima parte.
+   *
+   * Non e' decorazione. Ogni riga qui dentro e' costata una serata: la sitemap
+   * sbagliata di Aldi Spagna, il volantino di Alcampo scambiato per una
+   * scheda, il divieto di Pingo Doce che non c'era mai stato.
+   */
+  nota?: string;
+  /** Quando l'ha toccata l'ultima misura. */
+  aggiornato: Date;
+}
+
 export interface CacheDoc {
   _id: string; // chiave deterministica: endpoint + hash degli argomenti
   value: unknown;
@@ -141,6 +189,8 @@ export async function getDb(): Promise<Db> {
     // Nessun indice sul contenuto: qui dentro non si cerca, si legge il
     // pacchetto della propria insegna e lo si scompatta.
     db.collection<CatalogoDoc>("cataloghi").createIndex({ paese: 1 }),
+    // Le fonti si chiedono sempre per paese, e quasi sempre ordinate per resa.
+    db.collection<FonteDoc>("fonti").createIndex({ paese: 1, resa: -1 }),
   ]);
 
   console.info("[db] connesso a MongoDB");
@@ -207,6 +257,10 @@ export async function prezzi(): Promise<Collection<PrezzoDoc>> {
 
 export async function cataloghi(): Promise<Collection<CatalogoDoc>> {
   return (await getDb()).collection<CatalogoDoc>("cataloghi");
+}
+
+export async function fonti(): Promise<Collection<FonteDoc>> {
+  return (await getDb()).collection<FonteDoc>("fonti");
 }
 
 /**

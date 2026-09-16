@@ -138,7 +138,9 @@ async function radiciDi(dominio) {
 }
 
 async function main() {
-  const { FONTI } = await import("../src/api/catalogo-fonti.js");
+  const { caricaFontiDalDb, tutteLeFonti } = await import("../src/api/catalogo-fonti.js");
+  await caricaFontiDalDb();
+  const FONTI = tutteLeFonti();
 
   const filtro = process.argv.includes("--solo")
     ? new Set(

@@ -45,7 +45,7 @@
  */
 
 import { gunzipSync } from "node:zlib";
-import { fontiDi, paesiConCatalogo, partiSuccessive, type FonteCatalogo } from "./catalogo-fonti.js";
+import { assicuraFonti, fontiDi, paesiConCatalogo, partiSuccessive, type FonteCatalogo } from "./catalogo-fonti.js";
 import { conSinonimi } from "./sinonimi.js";
 import { catalogoSalvato, salvaCatalogo } from "./catalogo-magazzino.js";
 
@@ -646,6 +646,19 @@ export function paScheda(u: string): boolean {
   // Trattini bassi al posto dei trattini, con o senza `.html` in fondo.
   if (/[a-z]{3,}(?:_[a-z0-9]{2,}){2,}_\d{6,}(\.html?)?$/i.test(u)) return true;
 
+  /* LA `/p` FINALE, SENZA BARRA: E' LA CONVENZIONE VTEX.
+     `/achocolatado-danone-200ml-9339990/p` e' una scheda; la riga qui sopra che
+     accetta `/p/` non la prende, perche' la barra finale non c'e'.
+
+     Costava ottantamila prodotti del solo Carrefour Brasile — che nell'elenco
+     era scritto a 80.000 e nei conteggi risultava ZERO, e per tre volte l'ho
+     creduto un negozio chiuso invece che un difetto nostro.
+
+     Si puo' accettare senza paura: su VTEX `/p` in fondo vuol dire scheda e
+     basta. Le categorie finiscono per `/c` o col nome del reparto, e nessuna
+     pagina di servizio si chiama cosi'. */
+  if (/\/[a-z0-9][a-z0-9-]{4,}\/p$/i.test(u)) return true;
+
   return false;
 }
 
@@ -799,6 +812,10 @@ export async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> 
 
 
 async function costruisci(paese: string): Promise<CatalogoPaese | null> {
+  /* L'elenco delle insegne sta sul database, quindi la prima cosa e' averlo.
+     Senza, `fontiDi` torna vuoto e questo paese risulterebbe «senza fonti»
+     quando invece e' solo il database che non l'abbiamo ancora letto. */
+  await assicuraFonti();
   const fonti = fontiDi(paese);
   if (fonti.length === 0) return null;
 

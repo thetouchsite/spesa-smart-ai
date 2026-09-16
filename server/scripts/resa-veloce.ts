@@ -54,7 +54,7 @@
 
 import { writeFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
-import { FONTI } from "../src/api/catalogo-fonti.js";
+import { caricaFontiDalDb, tutteLeFonti } from "../src/api/catalogo-fonti.js";
 import { paScheda } from "../src/api/catalogo.js";
 import { verifyProductPage } from "../src/api/price-page.js";
 
@@ -155,7 +155,10 @@ async function main() {
     process.exit(1);
   }
 
-  const elenco = FONTI.filter((f) => paesi.includes(f.paese));
+  /* Le insegne stanno sul database: senza questa riga l'elenco e' vuoto e lo
+     strumento direbbe «nessuna insegna» invece di «database non letto». */
+  await caricaFontiDalDb();
+  const elenco = tutteLeFonti().filter((f) => paesi.includes(f.paese));
 
   /* Solo gli indirizzi: nessuna pagina aperta, nessun prezzo letto. */
   if (process.argv.includes("--link")) {

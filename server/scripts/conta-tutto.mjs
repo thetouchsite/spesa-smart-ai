@@ -17,7 +17,15 @@
  */
 
 import { writeFileSync } from "node:fs";
-import { FONTI } from "../dist/api/catalogo-fonti.js";
+import { caricaFontiDalDb, tutteLeFonti } from "../dist/api/catalogo-fonti.js";
+
+/* Le insegne stanno sul database: `FONTI` non esiste piu' come array nel
+   codice. Si legge qui, una volta, prima di qualunque altra cosa. */
+if ((await caricaFontiDalDb()) === 0) {
+  console.error("il database non ha insegne: non c'e' niente da contare");
+  process.exit(1);
+}
+const FONTI = tutteLeFonti();
 import { daUnaFonte } from "../dist/api/catalogo.js";
 import { verifyProductPage } from "../dist/api/price-page.js";
 

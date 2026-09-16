@@ -39,7 +39,7 @@
 
 import { writeFileSync } from "node:fs";
 import { cataloghi, prezzi } from "../src/base/db.js";
-import { FONTI, SENZA_PREZZO } from "../src/api/catalogo-fonti.js";
+import { caricaFontiDalDb, fontiEscluse, tutteLeFonti } from "../src/api/catalogo-fonti.js";
 import { FRESCHEZZA_MS } from "../src/api/prezzi-magazzino.js";
 
 /** Trenta ore: quanto vale un catalogo salvato. */
@@ -56,9 +56,20 @@ interface RigaPaese {
 }
 
 async function main() {
+  /* Le insegne stanno sul database come tutto il resto: qui si leggono, non si
+     importano da un file. E' il punto di tutta la riorganizzazione del 16
+     settembre 2026 — un elenco solo non puo' divergere da se stesso. */
+  const quante = await caricaFontiDalDb();
+  if (quante === 0) {
+    console.error("  il database non ha insegne: `semina-fonti` non e' mai girato?");
+    process.exit(1);
+  }
+  const FONTI = tutteLeFonti();
+  const fuori = await fontiEscluse();
+
   const inElenco = new Map(FONTI.map((f) => [`${f.paese}|${f.insegna}`, f]));
   const paeseDi = new Map(FONTI.map((f) => [f.insegna, f.paese]));
-  const escluse = new Set(SENZA_PREZZO.map((f) => `${f.paese}|${f.insegna}`));
+  const escluse = new Set(fuori.map((f) => `${f.paese}|${f.insegna}`));
 
   const docCat = (await (await cataloghi())
     .find({}, { projection: { _id: 1, paese: 1, insegna: 1, prodotti: 1, aggiornato: 1 } })
@@ -159,7 +170,27 @@ async function main() {
     : "diario/quadro-db.json";
   writeFileSync(
     dove,
-    JSON.stringify({ quando: new Date().toISOString(), totale: tot, stimati, orfane, orfaneLink, paesi: righe }, null, 2),
+    JSON.stringify(
+      {
+        quando: new Date().toISOString(),
+        totale: tot,
+        stimati,
+        orfane,
+        orfaneLink,
+        paesi: righe,
+        /* Il cruscotto disegna e basta: tutto quel che gli serve sta qui, e non
+           tocca ne' il database ne' l'elenco. Un disegnatore che interroga il
+           database e' un disegnatore che puo' mostrare numeri diversi da questi. */
+        insegneInElenco: FONTI.length,
+        mute: FONTI.filter((f) => f.resa === 0).map((f) => ({ paese: f.paese, insegna: f.insegna, stimati: f.stimati })),
+        tuttoMuto: [...new Set(FONTI.map((f) => f.paese))].filter(
+          (p) => !FONTI.some((f) => f.paese === p && f.resa > 0),
+        ),
+        fuori: fuori.map((f) => ({ paese: f.paese, insegna: f.insegna, stimati: f.stimati, esclusa: f.esclusa })),
+      },
+      null,
+      2,
+    ),
     "utf8",
   );
   console.log(`\n  scritto in ${dove}\n`);

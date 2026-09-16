@@ -258,31 +258,34 @@ function promosse() {
 /**
  * Le fonti che l'app gia' usa: si raccolgono anche quelle, per il conto vero.
  *
- * Si leggono dal sorgente TypeScript a colpi di espressione regolare invece di
- * importarlo. Non e' eleganza, e' l'unico modo che non dipende da una
- * compilazione: `node` il `.ts` non lo apre, e `dist/` puo' non esserci o
- * essere vecchio. La prima versione lo importava dentro un `try` e falliva in
- * silenzio — le cinquantasette fonti dell'app erano semplicemente sparite dal
- * giro, e il totale della notte sarebbe uscito senza di loro.
+ * Si leggono DAL DATABASE, che dal 16 settembre 2026 e' l'unico posto dove
+ * l'elenco vive. Prima si leggevano dal sorgente TypeScript a colpi di
+ * espressione regolare, perche' `node` un `.ts` non lo apre e `dist/` poteva
+ * essere vecchio; adesso quel file i dati non ce li ha piu'.
+ *
+ * Se il database non risponde si torna a mani vuote e il giro prosegue senza
+ * le fonti gia' in uso: e' peggio, ma e' onesto. La prima versione le perdeva
+ * in silenzio dentro un `try`, e cinquantasette insegne sparivano dal totale
+ * della notte senza che nessuno se ne accorgesse.
  */
-function fontiInUso() {
-  if (!existsSync("src/catalogo-fonti.ts")) return [];
-  const testo = readFileSync("src/catalogo-fonti.ts", "utf8");
-  const fonti = [];
-  for (const riga of testo.split("\n")) {
-    const paese = /paese:\s*"([A-Z]{2})"/.exec(riga);
-    const insegna = /insegna:\s*"([^"]+)"/.exec(riga);
-    const sitemap = /sitemap:\s*"([^"]+)"/.exec(riga);
-    if (!paese || !insegna || !sitemap) continue;
-    const stimati = /stimati:\s*(\d+)/.exec(riga);
-    fonti.push({
-      paese: paese[1],
-      insegna: insegna[1],
-      sitemap: sitemap[1],
-      atteso: stimati ? Number(stimati[1]) : 0,
-    });
+async function fontiInUso() {
+  try {
+    const { caricaFontiDalDb, tutteLeFonti } = await import("../dist/api/catalogo-fonti.js");
+    const quante = await caricaFontiDalDb();
+    if (quante === 0) {
+      console.warn("[raccolta] il database non ha insegne: giro senza le fonti in uso");
+      return [];
+    }
+    return tutteLeFonti().map((f) => ({
+      paese: f.paese,
+      insegna: f.insegna,
+      sitemap: f.sitemap,
+      atteso: f.stimati,
+    }));
+  } catch (e) {
+    console.warn(`[raccolta] fonti non lette dal database: ${e.message}`);
+    return [];
   }
-  return fonti;
 }
 
 async function main() {
@@ -305,7 +308,7 @@ async function main() {
   const gia = new Set(fatti.map((f) => `${f.paese}|${f.insegna}`));
 
   const tutte = new Map();
-  for (const f of [...fontiInUso(), ...promosse()]) {
+  for (const f of [...(await fontiInUso()), ...promosse()]) {
     const chiave = `${f.paese}|${f.insegna}`;
     if (!tutte.has(chiave)) tutte.set(chiave, f);
   }

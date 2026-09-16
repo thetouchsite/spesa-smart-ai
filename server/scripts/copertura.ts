@@ -36,7 +36,7 @@
 
 import { writeFileSync } from "node:fs";
 import { prezzi as collezionePrezzi } from "../src/base/db.js";
-import { FONTI } from "../src/api/catalogo-fonti.js";
+import { caricaFontiDalDb, tutteLeFonti } from "../src/api/catalogo-fonti.js";
 
 const n = (x: number) => x.toLocaleString("it-IT");
 const perc = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : "—");
@@ -53,7 +53,7 @@ async function main() {
      fonti: nel magazzino c'e' il nome dell'insegna, non il paese, perche' la
      chiave e' l'indirizzo della scheda. */
   const paeseDi = new Map<string, string>();
-  for (const f of FONTI) paeseDi.set(f.insegna, f.paese);
+  for (const f of tutteLeFonti()) paeseDi.set(f.insegna, f.paese);
 
   const perInsegna = new Map<
     string,
@@ -75,7 +75,7 @@ async function main() {
     { insegne: number; dichiarati: number; provate: number; conPrezzo: number }
   >();
 
-  for (const f of FONTI) {
+  for (const f of tutteLeFonti()) {
     const c = perPaese.get(f.paese) ?? { insegne: 0, dichiarati: 0, provate: 0, conPrezzo: 0 };
     c.insegne++;
     c.dichiarati += f.stimati;
@@ -142,7 +142,7 @@ async function main() {
   console.log(`  di cui la pagina si apre   ${n(aperte)}  (${perc(aperte, provate)})`);
   console.log(`  di cui con prezzo VERO     ${n(conPrezzo)}  (${perc(conPrezzo, provate)})`);
   console.log(
-    `\n  prodotti dichiarati dalle sitemap: ${n(FONTI.reduce((a, f) => a + f.stimati, 0))}` +
+    `\n  prodotti dichiarati dalle sitemap: ${n(tutteLeFonti().reduce((a, f) => a + f.stimati, 0))}` +
       `\n  — e' la grandezza del catalogo, non la copertura. La copertura e' la riga sopra.\n`,
   );
 
@@ -154,10 +154,10 @@ async function main() {
     generatoIl: new Date().toISOString(),
 
     inSintesi: {
-      dichiaratiDalleSitemap: FONTI.reduce((a, f) => a + f.stimati, 0),
+      dichiaratiDalleSitemap: tutteLeFonti().reduce((a, f) => a + f.stimati, 0),
       nota: "quanto e' GRANDE il catalogo: indirizzi reali, mai aperti",
-      insegneInCatalogo: FONTI.length,
-      paesiInCatalogo: new Set(FONTI.map((f) => f.paese)).size,
+      insegneInCatalogo: tutteLeFonti().length,
+      paesiInCatalogo: new Set(tutteLeFonti().map((f) => f.paese)).size,
       schedeAperteDavvero: provate,
       schedeCheSiAprono: aperte,
       SCHEDE_CON_PREZZO_VERO: conPrezzo,

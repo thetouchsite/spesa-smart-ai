@@ -31,7 +31,7 @@
  */
 
 import { catalogoDi, cercaNelCatalogo } from "./catalogo.js";
-import { FONTI } from "./catalogo-fonti.js";
+import { tutteLeFonti } from "./catalogo-fonti.js";
 import { verifyProductPage } from "./price-page.js";
 import { prezziGiaVisti, salvaPrezzi, statoMagazzino, type PrezzoSalvato } from "./prezzi-magazzino.js";
 import { LINGUA_DEL_PAESE, traduciVoce } from "./vocabolario.js";
@@ -301,7 +301,9 @@ export async function riempiPrezzi(paese: string, quanteVoci: number): Promise<v
      anche senza prezzo, e per qualche prodotto di nicchia sono l'unica
      risposta. Quel che non devono fare e' costarci una pagina aperta. */
   const mute = new Set(
-    FONTI.filter((f) => f.paese === paese.toUpperCase() && f.resa === 0).map((f) => f.insegna),
+    tutteLeFonti()
+      .filter((f) => f.paese === paese.toUpperCase() && f.resa === 0)
+      .map((f) => f.insegna),
   );
 
   let candidati: Array<{ url: string; nome: string; insegna: string }> = [];
@@ -314,16 +316,36 @@ export async function riempiPrezzi(paese: string, quanteVoci: number): Promise<v
         candidati.push({ url: c.url, nome: c.nome, insegna: c.insegna });
       }
     }
-  } else {
-    /* Senza lista si prende dal catalogo, sparso. Quante: lo stesso numero di
-       pagine che costerebbe una lista piena, cosi' la notte dura uguale. */
-    const quante = quanteVoci * CANDIDATI;
-    candidati = aTappeto(
+  }
+
+  /* POI SI COMPLETA A TAPPETO, ANCHE QUANDO LA LISTA C'E'.
+     La prima versione faceva una cosa sola delle due, e usciva un risultato
+     rovesciato: i paesi CON una lista scritta a mano finivano meno coperti di
+     quelli senza. Misurato nello stesso giro: Italia 89 pagine aperte,
+     Lituania 356, Romania 360.
+
+     Il motivo e' che una lista di sessanta voci per sei candidati non fa
+     trecentosessanta schede diverse: i candidati si ripetono fra una voce e
+     l'altra, molti sono gia' freschi dal giro precedente, e le insegne mute si
+     saltano. Resta un pugno di pagine, e intanto centoventinovemila indirizzi
+     italiani restano senza prezzo.
+
+     Adesso la lista viene prima, perche' e' quel che la gente chiede davvero,
+     e poi si riempie il budget rimasto pescando dal catalogo. Le due cose non
+     si tolgono niente a vicenda: la lista sceglie, il tappeto copre. */
+  const budget = quanteVoci * CANDIDATI;
+  if (candidati.length < budget) {
+    const presi = new Set(candidati.map((c) => c.url));
+    const extra = aTappeto(
       cat.voci.map((v) => ({ url: v.url, nome: v.nome, insegna: v.insegna })),
       mute,
-      quante,
-    );
-    console.log(`${paese}  campione a tappeto: ${candidati.length} schede da ${new Set(candidati.map((c) => c.insegna)).size} insegne`);
+      budget,
+    ).filter((c) => !presi.has(c.url));
+    const quanti = Math.min(extra.length, budget - candidati.length);
+    if (quanti > 0) {
+      candidati.push(...extra.slice(0, quanti));
+      console.log(`${paese}  completato a tappeto: +${quanti} schede`);
+    }
   }
 
   if (scartate > 0) {

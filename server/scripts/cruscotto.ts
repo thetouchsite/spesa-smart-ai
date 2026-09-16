@@ -27,7 +27,7 @@
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { FONTI, SENZA_PREZZO } from "../src/api/catalogo-fonti.js";
+
 
 interface RigaPaese {
   paese: string;
@@ -46,6 +46,10 @@ interface Quadro {
   orfane: number;
   orfaneLink: number;
   paesi: RigaPaese[];
+  insegneInElenco: number;
+  mute: Array<{ paese: string; insegna: string; stimati: number }>;
+  tuttoMuto: string[];
+  fuori: Array<{ paese: string; insegna: string; stimati: number; esclusa: string }>;
 }
 
 const q: Quadro = JSON.parse(readFileSync("diario/quadro-db.json", "utf8"));
@@ -58,10 +62,11 @@ const n = (x: number) =>
   String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-/** Insegne con e senza prezzo leggibile, dall'elenco (non dal database). */
-const mute = FONTI.filter((f) => f.resa === 0);
-const senzaPrezzoPerPaese = new Map<string, number>();
-for (const f of mute) senzaPrezzoPerPaese.set(f.paese, (senzaPrezzoPerPaese.get(f.paese) ?? 0) + 1);
+/* Tutto viene dal quadro: questo file disegna e basta. Un disegnatore che
+   interroga il database per conto suo puo' mostrare numeri diversi da quelli
+   che ha in cima alla pagina, ed e' successo. */
+const mute = q.mute;
+const fuori = q.fuori;
 
 /**
  * DUE MODI DIVERSI DI STARE AL BUIO, E VANNO SEPARATI.
@@ -80,11 +85,7 @@ for (const f of mute) senzaPrezzoPerPaese.set(f.paese, (senzaPrezzoPerPaese.get(
  * mute tutte e quattro le insegne: 267 candidati saltati, zero pagine da
  * aprire.
  */
-const tuttoMuto = new Set(
-  [...new Set(FONTI.map((f) => f.paese))].filter(
-    (p) => !FONTI.some((f) => f.paese === p && f.resa > 0),
-  ),
-);
+const tuttoMuto = new Set(q.tuttoMuto);
 
 /** Paesi con il catalogo e nessun prezzo: e' il buco che conta. */
 const alBuio = q.paesi.filter((r) => r.prezzi === 0 && r.link > 0).sort((a, b) => b.link - a.link);
@@ -220,7 +221,7 @@ const html = `<title>Cruscotto dati MealMint</title>
   <div class="cifre">
     <div class="cifra ok"><b>${n(q.totale.link)}</b><span>link servibili</span></div>
     <div class="cifra"><b>${q.paesi.length}</b><span>paesi</span></div>
-    <div class="cifra"><b>${FONTI.length}</b><span>insegne in elenco</span></div>
+    <div class="cifra"><b>${q.insegneInElenco}</b><span>insegne in elenco</span></div>
     <div class="cifra male"><b>${n(q.totale.cifre)}</b><span>prezzi validi</span></div>
     <div class="cifra male"><b>${alBuio.length}</b><span>paesi senza prezzi</span></div>
   </div>
@@ -252,7 +253,7 @@ ${righeBuio}
 
   <h2>Insegne senza prezzo leggibile</h2>
   <p class="nota">${mute.length} insegne in elenco hanno <code>resa: 0</code>: le pagine si aprono, il prezzo non c&#39;&egrave;. Restano nel catalogo perch&eacute; un nome e un link valgono anche senza prezzo, ma <b>il lavoro notturno non le apre pi&ugrave;</b> &mdash; misurato: 684 pagine risparmiate su otto paesi.</p>
-  <p class="nota">Altre ${SENZA_PREZZO.length} sono uscite del tutto, per ${n(SENZA_PREZZO.reduce((a, f) => a + f.stimati, 0))} prodotti: CoopShop, Esselunga, Al&igrave;, Tigros e Basko vogliono che uno acceda. Stanno in <code>SENZA_PREZZO</code> con accanto il motivo, per non rifare quel lavoro fra sei mesi.</p>
+  <p class="nota">Altre ${fuori.length} sono uscite del tutto, per ${n(fuori.reduce((a, f) => a + f.stimati, 0))} prodotti: CoopShop, Esselunga, Al&igrave;, Tigros e Basko vogliono che uno acceda. Stanno in <code>SENZA_PREZZO</code> con accanto il motivo, per non rifare quel lavoro fra sei mesi.</p>
 
   <p class="pie">
     Generato da <code>scripts/cruscotto.ts</code> a partire da <code>diario/quadro-db.json</code>, che scrive <code>scripts/quadro-db.ts</code> leggendo Mongo.

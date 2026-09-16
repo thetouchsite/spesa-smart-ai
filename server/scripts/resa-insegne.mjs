@@ -39,7 +39,9 @@ import { writeFileSync } from "node:fs";
 const CAMPIONE = 12;
 
 async function main() {
-  const { FONTI, paesiConCatalogo } = await import("../src/api/catalogo-fonti.js");
+  const { caricaFontiDalDb, tutteLeFonti, paesiConCatalogo } = await import("../src/api/catalogo-fonti.js");
+  await caricaFontiDalDb();
+  const FONTI = tutteLeFonti();
   const { catalogoDi } = await import("../src/api/catalogo.js");
   const { verifyProductPage } = await import("../src/api/price-page.js");
 
