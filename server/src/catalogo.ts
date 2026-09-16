@@ -250,7 +250,11 @@ export function parole(testo: string): string[] {
  */
 const NON_ALIMENTARI = [
   // ── animali ──────────────────────────────────────────────────────
+  /* I supermercati veri il cibo per animali lo vendono, e ha nomi da cibo:
+     «wet adult cat food tuna» rispondeva alla voce «Tuna tin». Togliere i
+     negozi per animali dalle fonti non basta — serve anche qui. */
   /\b(crocchett|croccantin|gatt[oi]?|cane|cani|cucciol|cuccioli|mangim|croquett|katzen|hunde|tierfutter|pienso|racao|kattenvoer|hondenvoer)/i,
+  /\b(cat food|dog food|pet food|kitten|puppy|cat treat|dog treat|adult cat|adult dog|comida para (?:gatos|perros)|nourriture pour (?:chats|chiens))/i,
 
   // ── pulizia e igiene ─────────────────────────────────────────────
   /\b(detersiv|detergent|ammorbid|candeggi|sgrassat|anticalcar|shampoo|shampooing|champu|champo|balsamo|bagnoschiuma|sapone|savon|jabon|seife|dentifric|toothpaste|zahnpasta|deodorant|assorbent|pannolin|couches|windeln|salviett|tovagliol|carta igienic|papier toilette|toilettenpapier|polish|insettic|lessive|waschmittel|limpiador)/i,

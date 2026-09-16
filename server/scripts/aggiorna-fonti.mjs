@@ -54,8 +54,29 @@ const RACCOLTA = "diario/raccolta-europa.json";
  */
 const MINIMO = 200;
 
-/** Vendono di tutto tranne la spesa: fuori. Vedi l'intestazione. */
+/**
+ * Vendono di tutto tranne la spesa: fuori. Vedi l'intestazione.
+ *
+ * I NEGOZI PER ANIMALI SONO IL CASO PIU' INSIDIOSO.
+ * Non sembrano generalisti — vendono cibo, e il cibo ha nomi da cibo. Misurato
+ * su Londra: alla voce «Tuna tin» rispondeva «Thrive complete wet adult cat
+ * food tuna 6 tin» di Pets at Home, 6,69 sterline, verificato e con il link
+ * funzionante. Tutto vero tranne che era scatolette per gatti.
+ *
+ * Il filtro sui nomi non basta a tenerli fuori, perche' il nome e' giusto:
+ * c'e' scritto tonno. Si tolgono alla radice.
+ */
 const GENERALISTI = new Set([
+  // negozi per animali
+  "Pets at Home",
+  "Zooplus",
+  "Zooplus Italia",
+  "Zooplus France",
+  "Fressnapf",
+  "Arcaplanet",
+  "Tiendanimal",
+  "Kiwoko",
+
   "Galaxus",
   "Trendyol",
   "Hepsiburada",
@@ -236,7 +257,12 @@ function main() {
     const vecchia = unite.get(chiave);
     unite.set(chiave, vecchia ? { ...vecchia, ...f } : f);
   }
-  const finali = [...unite.values()];
+  /* I generalisti si tolgono anche in uscita, non solo in entrata.
+     La fusione tiene le fonti che c'erano gia', ed e' voluto — un'insegna muta
+     per una sera non va cancellata. Ma Pets at Home era gia' dentro: filtrarlo
+     solo dal raccolto lo avrebbe lasciato al suo posto, e alla voce «Tuna tin»
+     avrebbe continuato a rispondere scatolette per gatti. */
+  const finali = [...unite.values()].filter((f) => !GENERALISTI.has(f.insegna));
 
   const somma = (a) => a.reduce((n, f) => n + f.stimati, 0);
   const paesi = (a) => new Set(a.map((f) => f.paese)).size;
