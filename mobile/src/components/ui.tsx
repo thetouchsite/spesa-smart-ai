@@ -17,6 +17,8 @@
 import type { ReactNode } from "react";
 import {
   ActivityIndicator,
+  Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,10 +29,17 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+
+/** Il marchio completo: maialino piu' scritta. */
+const MARCHIO = require("../../assets/mealmint-logo.png");
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LanguagePicker } from "./language-picker";
 import { colors, font, radius, shadow, spacing } from "../theme";
+
+/** Il serif di sistema per i titoli: il prototipo usa un display serif, e
+    caricarne uno costerebbe mezzo megabyte nel pacchetto. */
+const SERIF = Platform.select({ ios: "Georgia", android: "serif", default: "Georgia" });
 
 export type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -49,8 +58,21 @@ export function Screen({
   edgeToEdge?: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  /* SENZA SCORRIMENTO SERVE UN'ALTEZZA DA RIEMPIRE.
+     Il corpo aveva solo margini: con `scroll` va benissimo, perche' l'altezza
+     gliela da' il contenuto. Ma quando lo scorrimento non c'e' — il caricatore
+     del piano — un figlio che chiede `flex: 1` per centrarsi lo chiede a un
+     genitore che un'altezza non ce l'ha, e il centraggio non avviene: sul
+     caricatore Android il titolo finiva fuori dallo schermo e l'anello si
+     vedeva tagliato. */
   const body = (
-    <View style={[styles.screenBody, { paddingTop: edgeToEdge ? 0 : insets.top + spacing.lg }]}>
+    <View
+      style={[
+        styles.screenBody,
+        !scroll && styles.screenBodyPieno,
+        { paddingTop: edgeToEdge ? 0 : insets.top + spacing.lg },
+      ]}
+    >
       {children}
     </View>
   );
@@ -88,15 +110,31 @@ export function TopBar({
   onBack,
   right,
   showLanguage = true,
+  logo = false,
 }: {
   title?: string;
   onBack?: () => void;
   right?: ReactNode;
   showLanguage?: boolean;
+  /** Il marchio al posto del tondo vuoto: per la schermata iniziale. */
+  logo?: boolean;
 }) {
   return (
     <View style={styles.topBar}>
-      {onBack ? (
+      {logo && !onBack ? (
+        /* DOVE NON C'E' UN INDIETRO, C'E' IL MARCHIO.
+           In alto a sinistra la schermata iniziale teneva un tondo vuoto: lo
+           spazio che il pulsante indietro lascia libero quando non serve. Un
+           cerchio bianco senza niente dentro sembra un difetto, e il posto
+           dove l'occhio va per primo e' proprio quello. */
+        <Image
+          source={MARCHIO}
+          style={styles.logo}
+          resizeMode="contain"
+          accessibilityRole="image"
+          accessibilityLabel="MealMint"
+        />
+      ) : onBack ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Indietro"
@@ -228,6 +266,43 @@ export function Button({
 }) {
   const inactive = disabled || loading;
   const fg = variant === "primary" ? colors.primaryForeground : colors.primary;
+
+  const dentro = loading ? (
+    <ActivityIndicator color={fg} />
+  ) : (
+    <View style={styles.buttonInner}>
+      {icon ? <Ionicons name={icon} size={19} color={fg} /> : null}
+      <Text style={[styles.buttonText, { color: fg }]}>{label}</Text>
+    </View>
+  );
+
+  /* IL PRIMARIO HA LA SFUMATURA E L'ALONE, COME NEL PROTOTIPO.
+     Era verde piatto, e accanto al resto sembrava un pulsante di sistema
+     invece dell'azione principale della schermata. Il prototipo del cliente
+     usa `bg-gradient-primary` piu' `shadow-glow`: la sfumatura da' profondita',
+     l'alone verde lo stacca dal fondo chiaro. Da spento nessuno dei due, o
+     l'alone farebbe sembrare premibile un pulsante che non lo e'. */
+  if (variant === "primary" && !inactive) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ busy: loading }}
+        onPress={onPress}
+        style={({ pressed }) => [styles.buttonAlone, pressed && styles.buttonPressed, style]}
+      >
+        <LinearGradient
+          colors={[colors.primary, colors.primaryGlow]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.buttonSfumato}
+        >
+          {dentro}
+        </LinearGradient>
+      </Pressable>
+    );
+  }
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -245,14 +320,7 @@ export function Button({
         style,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator color={fg} />
-      ) : (
-        <View style={styles.buttonInner}>
-          {icon ? <Ionicons name={icon} size={19} color={fg} /> : null}
-          <Text style={[styles.buttonText, { color: fg }]}>{label}</Text>
-        </View>
-      )}
+      {dentro}
     </Pressable>
   );
 }
@@ -355,6 +423,7 @@ export { Ionicons };
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   screenBody: { paddingHorizontal: spacing.lg, gap: spacing.lg },
+  screenBodyPieno: { flex: 1 },
   footer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
@@ -369,6 +438,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.xs,
   },
+  logo: { width: 108, height: 28 },
   backBtn: {
     width: 38,
     height: 38,
@@ -388,7 +458,26 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
+  buttonAlone: {
+    borderRadius: radius.lg,
+    // L'alone: verde, largo e basso. Su Android `elevation` non colora, quindi
+    // li' resta un'ombra neutra — meglio di niente e non stona.
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.32,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+  buttonSfumato: {
+    minHeight: 54,
+    borderRadius: radius.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+  },
+
   title: {
+    fontFamily: SERIF,
     fontSize: font.size.xxl,
     fontWeight: font.weight.bold,
     color: colors.foreground,

@@ -13,7 +13,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Body, Button, Card, Label, Screen, Subtitle, Title } from "../../src/components/ui";
+import { Body, Button, Card, Label } from "../../src/components/ui";
+import { Step } from "../../src/components/onboarding";
 import { searchCities } from "../../src/lib/location";
 import type { CityResult } from "../../src/lib/location/providers/types";
 import { detectLocation, type ResolvedLocation } from "../../src/lib/location/geolocate";
@@ -119,21 +120,19 @@ export default function CittaScreen() {
   }
 
   return (
-    <Screen
-      footer={
-        <Button
-          label={chosen ? `Continua con ${chosen.city}` : "Scegli una città"}
-          onPress={next}
-          disabled={!chosen}
-        />
-      }
+    /* IL GUSCIO COMUNE, COME GLI ALTRI CINQUE PASSI.
+       Questa schermata se la costruiva da sola: niente barra in alto, niente
+       freccia per tornare, nessuna icona e l'avanzamento scritto a mano. Chi
+       arrivava qui dalla home restava incastrato — il primo passo era una via
+       a senso unico. */
+    <Step
+      step="citta"
+      title={ui("Dove fai la spesa?")}
+      subtitle={ui("Serve per usare i prezzi di riferimento del tuo paese e trovare i negozi vicini.")}
+      canNext={Boolean(chosen)}
+      nextLabel={chosen ? `Continua con ${chosen.city}` : "Scegli una città"}
+      onNext={next}
     >
-      <View style={styles.head}>
-        <Body style={styles.step}>Passo 1 di 6</Body>
-        <Title>{ui("Dove fai la spesa?")}</Title>
-        <Subtitle>{ui("Serve per usare i prezzi di riferimento del tuo paese e trovare i negozi vicini.")}</Subtitle>
-      </View>
-
       <Button
         label={locating ? "Rilevamento…" : "Usa la mia posizione"}
         variant="secondary"
@@ -185,7 +184,7 @@ export default function CittaScreen() {
       {query.trim().length >= 3 && !searching && results.length === 0 && !chosen ? (
         <Body style={styles.empty}>{ui("Nessuna città trovata. Prova con un nome più completo.")}</Body>
       ) : null}
-    </Screen>
+    </Step>
   );
 }
 

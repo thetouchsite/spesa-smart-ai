@@ -197,12 +197,21 @@ export default function ElaborazioneScreen() {
 }
 
 const styles = StyleSheet.create({
+  /* CENTRATO SI', MA SENZA USCIRE DA SOPRA.
+     Con `justifyContent: center` e quarantotto di margine sopra e sotto, su
+     uno schermo corto il contenuto piu' alto della schermata esce da entrambi
+     i lati e il titolo finisce fuori dallo schermo — sull'emulatore Android
+     sparisce del tutto e l'anello si vede tagliato a meta'.
+
+     `minHeight: 0` insieme al margine ridotto lascia comprimere il blocco
+     invece di traboccare. */
   center: {
     flex: 1,
+    minHeight: 0,
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.lg,
-    paddingVertical: spacing.xxxl,
+    paddingVertical: spacing.lg,
   },
   title: { textAlign: "center" },
   /** I numeri del caso: si leggono a colpo d'occhio, quindi stanno soli. */

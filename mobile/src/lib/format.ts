@@ -50,6 +50,29 @@ export function money(value: number, currency: string, language = "en"): string 
   }
 }
 
+/**
+ * Il solo simbolo della valuta: «€», «£», «¥».
+ *
+ * Serve dove la cifra e' composta a mano invece che formattata — l'eroe del
+ * risparmio scrive il simbolo piccolo accanto a un numero enorme, e
+ * `money()` gli darebbe simbolo e cifre insieme, nella stessa dimensione.
+ *
+ * Si ricava chiedendo a Intl di formattare zero e togliendo tutto il resto:
+ * cosi' il simbolo e' quello giusto per la lingua — in inglese il dollaro
+ * canadese e' «CA$», in francese «$ CA» — senza una tabella da mantenere.
+ */
+export function simboloValuta(currency: string, language = "en"): string {
+  try {
+    const parti = new Intl.NumberFormat(localeFor(language), {
+      style: "currency",
+      currency: currency || "EUR",
+    }).formatToParts(0);
+    return parti.find((p) => p.type === "currency")?.value ?? currency;
+  } catch {
+    return currency || "€";
+  }
+}
+
 /** Importo arrotondato all'unità: per le cifre grandi, dove i centesimi distraggono. */
 export function moneyRounded(value: number, currency: string, language = "en"): string {
   if (!Number.isFinite(value)) return "—";

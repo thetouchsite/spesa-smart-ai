@@ -75,7 +75,7 @@ export default function Home() {
 
   return (
     <Screen>
-      <TopBar />
+      <TopBar logo />
 
       <QuotaBanner />
 

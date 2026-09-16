@@ -177,7 +177,12 @@ export function LoaderPiano({ etichette }: { etichette?: string[] }) {
 const ANELLO = 132;
 
 const stili = StyleSheet.create({
-  tutto: { alignItems: "center", gap: spacing.xxl },
+  /* LARGO QUANTO LA SCHERMATA, NON QUANTO IL CERCHIO.
+     Il genitore centra i figli, quindi questo contenitore si restringeva al
+     suo elemento piu' largo — l'anello — e l'elenco dei passi, che dentro
+     chiede tutta la larghezza, la chiedeva a una colonna da centottanta pixel.
+     Le tre righe andavano a capo ogni due parole. */
+  tutto: { alignItems: "center", gap: spacing.xl, alignSelf: "stretch" },
 
   anelloBox: {
     width: ANELLO,
@@ -211,7 +216,7 @@ const stili = StyleSheet.create({
   },
   simbolo: { width: 58, height: 58 },
 
-  passi: { gap: spacing.md, alignSelf: "stretch", paddingHorizontal: spacing.lg },
+  passi: { gap: spacing.md, alignSelf: "stretch", paddingHorizontal: spacing.sm },
   passo: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   pallino: {
     width: 8,
