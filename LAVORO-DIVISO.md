@@ -237,6 +237,42 @@ su undici che non sono supermercati — tre drogherie, due consegne di bevande,
 un'enoteca — e mancano Rewe, Edeka, Kaufland, Penny. E' la causa principale del
 «7 voci su 16» di Monaco.
 
+**16 settembre 2026 — Antonio**
+Germania da 11 fonti a 7, e da 25.665 prodotti a 47.012. Berlino: **11 voci su
+12** con prezzo (erano 7 su 16 a Monaco).
+
+*Tolte perche' non sono spesa:* Muller, Rossmann, dm (drogherie: fra il 6% e il
+10% dei loro prodotti sembra cibo), flaschenpost — contata due volte, stesso
+catalogo sotto due nomi — e Weinfreunde. Erano 167.000 prodotti a resa 0 che
+occupavano il posto dei supermercati.
+
+*Aggiunte:* **Knuspr** 15.177 prodotti resa 0,93 e **Mytime** 12.265 resa 1,00.
+Misurate su quattordici schede ciascuna, aperte davvero.
+
+*I quattro grandi restano fuori, e non per un difetto nostro.* REWE pubblica
+95.950 schede e su ognuna scrive «Konkreter Preis abhaengig vom Standort»: il
+prezzo dipende dal punto vendita, non esiste sulla pagina per nessuno. Edeka
+sono negozianti indipendenti, i prezzi sono le offerte settimanali del singolo
+mercato, e comunque ci risponde 403 su ogni pagina — verificato che dal browser
+si apre, quindi il blocco e' contro di noi e aggirarlo e' vietato. Kaufland
+uguale. Globus vieta le schede nel robots.txt.
+
+*Per Alberto — due cose che toccano i tuoi file:*
+1. `price-page.ts`: una pagina di rifiuto puo' far uscire un numero a caso
+   marcato «verificato». REWE ci ha dato **299 euro per un sacchetto di
+   zenzero** e 199 per le prugne: quei numeri stavano dentro dati in base64
+   nella pagina di rifiuto. E' il difetto delle mele Lidl a 63 sterline, con
+   una causa nuova.
+2. L'abbinamento: a Berlino «Kartoffeln 2kg» ha preso **«Karotten 2kg
+   beutel»** — patate contro carote. Due lettere di differenza.
+
+*Nei miei file:* `paScheda()` ora riconosce tre forme di indirizzo invece di
+una (codice prima del nome, trattini bassi, `.html` in fondo) — era quella la
+ragione per cui Knuspr e Mytime risultavano vuote, e il registro diceva «la
+sitemap non ha risposto» mentre rispondeva benissimo. Messaggio corretto.
+`nomeDaUrl()` toglie il codice articolo dal nome: si vedeva «axe ice chill
+3in1 duschgel 4501124639».
+
 **16 settembre 2026 — Alberto**
 Il dizionario della spesa (`vocabolario.ts`) sostituisce la traduzione a
 richiesta: 102 concetti in sei lingue, il modello viene chiamato solo per le

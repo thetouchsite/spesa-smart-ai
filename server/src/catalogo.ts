@@ -293,7 +293,27 @@ export function nomeDaUrl(url: string): string | null {
   }
   if (!migliore || migliore.length < 4) return null;
 
-  return migliore.replace(/[-_+]+/g, " ").replace(/\s+/g, " ").trim();
+  /* VIA IL CODICE ARTICOLO, CHE NON E' PARTE DEL NOME.
+     Quando il numero sta in un segmento suo viene gia' scartato sopra. Ma
+     parecchi negozi lo infilano dentro lo slug, e allora resta attaccato:
+
+         /125860-pfand-0-08              → «125860 pfand 0 08»   Knuspr
+         /axe_duschgel_4501124639.html   → «axe duschgel 4501124639»  Mytime
+
+     All'utente si mostrerebbe cosi', e nell'indice delle parole entrerebbe un
+     numero che nessuna lista della spesa cerchera' mai. Si toglie solo quando
+     e' lungo — cinque cifre o piu' — perche' «latte 1 l» e «uova 6» il numero
+     ce l'hanno per buone ragioni. */
+  const pulito = migliore
+    .replace(/^\d{5,}[-_]/, "")
+    .replace(/[-_]\d{6,}$/, "");
+
+  const nome = (pulito.length >= 4 ? pulito : migliore)
+    .replace(/[-_+]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return nome.length >= 3 ? nome : null;
 }
 
 /** Parole confrontabili: senza accenti, senza numeri isolati, senza sigle corte. */
@@ -504,7 +524,29 @@ function paScheda(u: string): boolean {
   ) {
     return true;
   }
-  return /[a-z]{3,}(?:-[a-z0-9]{2,}){2,}[/-]\d{6,}/i.test(u);
+  /* LA STESSA FORMA, SCRITTA IN TRE MODI DIVERSI.
+     Un nome lungo accanto a un codice: e' come quasi tutti i negozi scrivono
+     l'indirizzo di una scheda. Ma ognuno lo compone a modo suo, e chiedere una
+     sola disposizione fa sparire insegne intere.
+
+     Misurato sulle tedesche: Knuspr pubblica 15.177 prodotti e Mytime 12.265,
+     e per noi erano zero — «la sitemap non ha risposto», diceva il registro,
+     mentre la sitemap rispondeva benissimo. Non riconoscevamo la forma.
+
+         nome-poi-codice   /mutti-passata-700-g/0000080042563
+         codice-poi-nome   /125860-pfand-0-08              ← Knuspr
+         con trattini bassi /axe_duschgel_4501124639.html  ← Mytime */
+
+  // Nome, poi il codice: la forma piu' diffusa.
+  if (/[a-z]{3,}(?:-[a-z0-9]{2,}){2,}[/-]\d{6,}/i.test(u)) return true;
+
+  // Il codice per primo, poi il nome.
+  if (/\/\d{5,}-[a-z]{2,}[a-z0-9-]{4,}$/i.test(u)) return true;
+
+  // Trattini bassi al posto dei trattini, con o senza `.html` in fondo.
+  if (/[a-z]{3,}(?:_[a-z0-9]{2,}){2,}_\d{6,}(\.html?)?$/i.test(u)) return true;
+
+  return false;
 }
 
 /**
@@ -704,7 +746,14 @@ async function costruisci(paese: string): Promise<CatalogoPaese | null> {
         sue.map((v) => ({ url: v.url, nome: v.nome })),
       );
     } else {
-      console.warn(`[catalogo] ${paese} ${f.insegna}: niente (la sitemap non ha risposto)`);
+      /* «Niente» ha due cause diverse e vanno distinte: la sitemap che non
+         risponde e quella che risponde con indirizzi che non riconosciamo.
+         Confonderle e' costato due insegne tedesche da 27.000 prodotti —
+         cercavamo un difetto di rete dove c'era un difetto di lettura. */
+      console.warn(
+        `[catalogo] ${paese} ${f.insegna}: nessuna scheda riconosciuta ` +
+          `(la sitemap non ha risposto, oppure i suoi indirizzi hanno una forma che non leggiamo)`,
+      );
     }
   }
 

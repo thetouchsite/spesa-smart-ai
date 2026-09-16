@@ -1,8 +1,15 @@
 /**
  * Da dove viene il catalogo: una riga per insegna.
  *
- * Generato da `scripts/aggiorna-fonti.mjs` — non si scrive a mano, si
- * rigenera dopo una passata di raccolta.
+ * NON SI RIGENERA ALLA CIECA. LEGGERE PRIMA.
+ * `scripts/aggiorna-fonti.mjs` sa costruire questo file dalle misure, ma non
+ * sa cio' che e' stato aggiunto a mano dopo: sette insegne britanniche che il
+ * censimento non trova, la deduplica per sitemap (sedici insegne contate due
+ * volte, 225.731 prodotti doppi) e le esclusioni decise guardando i prodotti
+ * uno per uno. Rigenerare senza recuperare quelle cose le cancella.
+ *
+ * Le righe si possono correggere a mano. Il generatore serve a proporre, non
+ * a decidere.
  *
  * 144 insegne · 38 paesi · 2.675.799 prodotti
  *
@@ -21,8 +28,29 @@
  * SCESE da quattro a una su nove, perche' i candidati si concentravano sulle
  * insegne mute. Un catalogo grande non e' un catalogo utile.
  *
+ * LA GERMANIA NON SI RISOLVE CON I GRANDI, E VA SAPUTO
+ * ----------------------------------------------------
+ * REWE, Edeka e Kaufland non sono qui, e non per un nostro difetto. REWE
+ * pubblica 95.950 schede prodotto e su ognuna scrive «Konkreter Preis
+ * abhaengig vom Standort»: il prezzo dipende dal punto vendita, e senza
+ * scegliere un negozio col CAP non esiste per nessuno. Edeka e' un consorzio
+ * di negozianti indipendenti e i prezzi sono le offerte settimanali del
+ * singolo mercato; ci respinge comunque con 403 su ogni pagina, e aggirarlo
+ * non si fa. Kaufland uguale.
+ *
+ * Quindi il tedesco si copre con chi il prezzo lo fa nazionale: i discount
+ * (Lidl, Aldi, Netto) e le consegne online (Knuspr, Mytime). Sono meno
+ * prodotti dei grandi, ma sono prodotti con un prezzo.
+ *
  * CHI NON C'E'
  * ------------
+ * I NEGOZI CHE NON VENDONO LA SPESA, tolti guardando cosa hanno dentro:
+ * Muller, Rossmann e dm sono drogherie — salviette, cosmetici, detersivi e
+ * perfino vestiti, e fra il 6% e il 10% dei loro prodotti sembra cibo;
+ * flaschenpost consegna bevande; Weinfreunde e' un'enoteca. Insieme erano
+ * 167.000 prodotti tedeschi che rispondevano con schede senza prezzo e
+ * occupavano il posto dei supermercati veri.
+ *
  * Chi nel `robots.txt` vieta le schede prodotto — Tesco, Sainsbury's, Lidl
  * Spagna e Polonia, Pingo Doce, Ahorramas, Hipercor, Walmart. E i generalisti
  * tipo Galaxus: hanno milioni di prodotti e non sono roba da mangiare.
@@ -87,17 +115,13 @@ export const FONTI: FonteCatalogo[] = [
 
   { paese: "CZ", insegna: "Billa CZ", dominio: "www.billa.cz", sitemap: "https://www.billa.cz/sitemap.xml", resa: 1, stimati: 13303 },
 
-  { paese: "DE", insegna: "Müller", dominio: "www.mueller.de", sitemap: "https://www.mueller.de/sitemaps/sitemap.xml", resa: 0, stimati: 70589 },
-  { paese: "DE", insegna: "Rossmann", dominio: "www.rossmann.de", sitemap: "https://www.rossmann.de/de/sitemap_index.xml", resa: 0, stimati: 32301 },
-  { paese: "DE", insegna: "dm", dominio: "www.dm.de", sitemap: "https://www.dm.de/sitemap.xml", resa: 0, stimati: 20966 },
+  { paese: "DE", insegna: "Knuspr", dominio: "www.knuspr.de", sitemap: "https://www.knuspr.de/sitemap_products.xml", resa: 0.93, stimati: 15177 },
   { paese: "DE", insegna: "Lidl Deutschland", dominio: "www.lidl.de", sitemap: "https://www.lidl.de/static/sitemap.xml", resa: 0.97, stimati: 12720 },
+  { paese: "DE", insegna: "Mytime", dominio: "www.mytime.de", sitemap: "https://www.mytime.de/sitemaps/mytime/sitemap.produkte.xml", resa: 1, stimati: 12265 },
   { paese: "DE", insegna: "Aldi Süd", dominio: "www.aldi-sued.de", sitemap: "https://www.aldi-sued.de/sitemap_products.xml", resa: 1, stimati: 4786 },
-  { paese: "DE", insegna: "flaschenpost Supermarkt", dominio: "www.flaschenpost.de", sitemap: "https://www.flaschenpost.de/sitemap_p.xml", resa: 0, stimati: 4154 },
-  { paese: "DE", insegna: "flaschenpost", dominio: "www.flaschenpost.de", sitemap: "https://www.flaschenpost.de/sitemap.xml", resa: 0, stimati: 4154 },
   { paese: "DE", insegna: "Aldi Nord", dominio: "www.aldi-nord.de", sitemap: "https://www.aldi-nord.de/.aldi-nord-sitemap.xml", resa: 0, stimati: 3241 },
   { paese: "DE", insegna: "Alnatura", dominio: "www.alnatura.de", sitemap: "https://www.alnatura.de/sitemap.xml", resa: 0.4, stimati: 3115 },
   { paese: "DE", insegna: "Netto", dominio: "www.netto-online.de", sitemap: "https://www.netto-online.de/sitemap.xml", resa: 1, stimati: 1803 },
-  { paese: "DE", insegna: "Weinfreunde", dominio: "www.weinfreunde.de", sitemap: "https://www.weinfreunde.de/sitemap.xml", resa: 1, stimati: 1162 },
 
   { paese: "DK", insegna: "BilkaToGo", dominio: "www.bilkatogo.dk", sitemap: "https://www.bilkatogo.dk/sitemap-products.xml", resa: 0, stimati: 37087 },
   { paese: "DK", insegna: "Føtex", dominio: "foetex.dk", sitemap: "https://foetex.dk/sitemap/sitemap-index.xml", resa: 1, stimati: 28338 },
