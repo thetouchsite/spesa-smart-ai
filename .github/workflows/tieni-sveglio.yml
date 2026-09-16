@@ -1,0 +1,78 @@
+# Tiene sveglio il servizio su Render, che sul piano gratuito si addormenta.
+#
+# PERCHE'
+# -------
+# Render spegne un servizio gratuito dopo quindici minuti senza traffico.
+# Riaccenderlo e ricaricare duecentomila prodotti dal database costa, misurato
+# il 16 settembre 2026:
+#
+#     appena risvegliato    55 secondi     ← l'app molla prima di ricevere
+#     gia' sveglio           3,5 secondi
+#     con la cache calda     0,16 secondi
+#
+# Cinquantacinque secondi vuol dire, per chi usa l'app, che non funziona
+# niente: la richiesta scade e la lista torna vuota. E' successo davvero, in
+# mezzo a una dimostrazione al cliente.
+#
+# PERCHE' QUI E NON SU UPTIMEROBOT
+# --------------------------------
+# Fa la stessa cosa e non serve aprire un conto su un servizio di terzi ne'
+# ricordarsi che esiste: sta nel repo, si legge, si cambia, e se ne va insieme
+# al progetto. Su un repo privato GitHub da' 2000 minuti al mese e questo ne
+# consuma una settantina.
+#
+# QUELLO CHE NON RISOLVE, E VA SAPUTO
+# -----------------------------------
+# 1. NON salva dai deploy. Ogni push ricompila e riavvia il servizio: freddo
+#    comunque, e il primo che chiama aspetta. Se qualcuno sta facendo vedere
+#    l'app a un cliente, non si pusha.
+# 2. CONSUMA LE ORE GRATUITE. Render ne da' 750 al mese e un servizio acceso
+#    ventiquattr'ore su ventiquattro ne fa 720. Ci sta, ma senza margine: due
+#    servizi accesi e si e' fuori.
+# 3. L'orologio di GitHub NON E' PUNTUALE. Nei momenti di carico un lavoro
+#    programmato parte con dieci o quindici minuti di ritardo, e la finestra di
+#    Render e' quindici. Ogni tanto il servizio si addormentera' lo stesso.
+#
+# Per questo resta un rimedio, non una soluzione. La soluzione e' il piano
+# Starter di Render — sette dollari al mese, non si spegne mai — e va presa
+# prima di consegnare a un cliente che paga: uno che paga non deve vedere
+# cinquantacinque secondi nemmeno una volta.
+
+name: Tieni sveglio il servizio
+
+on:
+  schedule:
+    # Ogni dieci minuti. Non di piu': la finestra di Render e' quindici.
+    - cron: "*/10 * * * *"
+  # Per provarlo subito senza aspettare il turno.
+  workflow_dispatch:
+
+# Se un ping e' ancora in corso quando parte il successivo, si tiene il nuovo.
+concurrency:
+  group: tieni-sveglio
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Sveglia il servizio
+        run: |
+          # `/health` e' la rotta piu' leggera: non apre pagine, non legge
+          # prezzi, non costa niente. Serve solo a far girare il processo.
+          #
+          # `--max-time 90` perche' a servizio spento la risposta puo'
+          # metterci quasi un minuto: e' proprio il caso che vogliamo evitare
+          # agli utenti, quindi tocca aspettarlo a noi.
+          codice=$(curl -s -o /dev/null -w '%{http_code}' --max-time 90 \
+            https://spesa-smart-ai.onrender.com/health || echo "000")
+
+          echo "health ha risposto $codice"
+
+          # Non si fa fallire il lavoro per un ping andato storto: Render ogni
+          # tanto e' lento e una notifica rossa ogni dieci minuti e' una
+          # notifica che si smette di guardare. Si scrive e si va avanti.
+          if [ "$codice" != "200" ]; then
+            echo "::warning::Il servizio non ha risposto 200 (era $codice)"
+          fi
