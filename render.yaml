@@ -87,6 +87,15 @@ services:
       # cancella.
       - key: SPESA_MAX_USD
         value: "5"
+      # Quanto puo' arrivare a spendere DA SOLA la parte app — menu, ricette,
+      # liste. Quel che avanza fino al tetto sopra resta riservato alle
+      # risposte sui prezzi, che sono il prodotto.
+      #
+      # Il contatore era uno solo, e voleva dire che la generazione di un menu
+      # poteva finire il credito e far rispondere 402 anche a chi l'API la
+      # paga. Senza questa riga il valore e' tre quarti del tetto.
+      - key: SPESA_MAX_USD_APP
+        value: "3.75"
 
       # ── Facoltative: senza, i pezzi che le usano restano spenti ────────
       # Prodotti Amazon veri al tocco su una voce.

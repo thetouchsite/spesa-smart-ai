@@ -41,7 +41,15 @@ import { fetchPageContext, rankHits, searchProvider } from "./search.js";
 import { cache, isDbConfigured, plans, users } from "./db.js";
 import { hashPassword, issueToken, requireUser, verifyPassword } from "./auth.js";
 import { isShoppingConfigured, searchShopping } from "./shopping.js";
-import { budgetExhausted, quotaStatus, recordCost, recordUse, spendStatus } from "./quota.js";
+import {
+  type Blocco,
+  budgetExhausted,
+  perchePieno,
+  quotaStatus,
+  recordCost,
+  recordUse,
+  spendStatus,
+} from "./quota.js";
 import {
   flussoPredefinito,
   generateListaSpesa,
@@ -217,6 +225,32 @@ async function generate<T extends z.ZodTypeAny>(
 }
 
 /* ────────────────────────────── Salute ────────────────────────────── */
+
+/**
+ * Il freno, prima di spendere.
+ *
+ * UN TETTO VINCOLA SOLO DOVE QUALCUNO LO GUARDA, e questa e' stata la scoperta
+ * della prova: con l'app limitata a mezzo centesimo, tre generazioni di menu
+ * sono passate lo stesso e ne hanno spesi tre quarti in piu'. Il controllo
+ * stava su `/ai/plan-full` e su `/ai/prices`, e gli altri tre punti che
+ * chiamano il modello — menu, lista, menu-da-prodotti — spendevano senza
+ * chiedere il permesso a nessuno. Non sforavano solo il tetto dell'app: anche
+ * quello complessivo.
+ *
+ * Adesso il freno e' uno solo e si chiama da tutte le parti, cosi' il prossimo
+ * punto che spende non puo' dimenticarselo per distrazione — c'e' una riga
+ * sola da copiare, ed e' quella giusta.
+ */
+function fermatiSePieno(blocco: Blocco): void {
+  if (!budgetExhausted(blocco)) return;
+  throw new HttpError(
+    402,
+    `Spesa: ${perchePieno(blocco)}. ` +
+      (blocco === "app"
+        ? "Alza SPESA_MAX_USD_APP o riavvia il servizio per ripartire."
+        : "Alza SPESA_MAX_USD o riavvia il servizio per ripartire."),
+  );
+}
 
 app.get("/health", async () => ({
   ok: true,
@@ -656,7 +690,7 @@ async function prezzaLista(
       secondi = fase2.seconds;
       costo = fase2.cost;
       ricerche = fase2.data.searches;
-      recordCost(fase2.cost);
+      recordCost(fase2.cost, "api");
       hacercato = fase2.data.grounded;
       console.info(
         `[prezzi] ${fase2.model}: ${fase2.seconds.toFixed(0)}s, $${fase2.cost.toFixed(4)}, ` +
@@ -947,9 +981,10 @@ app.post("/ai/menu", async (body) => {
     }
   }
 
+  fermatiSePieno("app");
   recordUse("gemini");
   const fase1 = await generateMenu(data);
-  recordCost(fase1.cost);
+  recordCost(fase1.cost, "app");
   console.info(
     `[menu] ${fase1.model}: ${fase1.seconds.toFixed(0)}s, $${fase1.cost.toFixed(4)}, ` +
       `${fase1.data.menu.length} giorni, ${fase1.data.lista.length} voci`,
@@ -1006,9 +1041,10 @@ app.post("/ai/lista", async (body) => {
     return local;
   }
 
+  fermatiSePieno("app");
   recordUse("gemini");
   const fase = await generateListaSpesa(data);
-  recordCost(fase.cost);
+  recordCost(fase.cost, "app");
   console.info(
     `[lista] ${fase.model}: ${fase.seconds.toFixed(0)}s, $${fase.cost.toFixed(4)}, ` +
       `${fase.data.lista.length} voci`,
@@ -1054,9 +1090,10 @@ app.post("/ai/menu-da-prodotti", async (body) => {
     return local;
   }
 
+  fermatiSePieno("app");
   recordUse("gemini");
   const fase = await generateMenuDaProdotti(data, data.disponibili);
-  recordCost(fase.cost);
+  recordCost(fase.cost, "app");
   console.info(
     `[menu-da-prodotti] ${fase.model}: ${fase.seconds.toFixed(0)}s, $${fase.cost.toFixed(4)}, ` +
       `${fase.data.menu.length} giorni da ${data.disponibili.length} prodotti comprabili`,
@@ -1128,14 +1165,9 @@ app.post("/ai/prices", async (body) => {
     }
   }
 
-  if (budgetExhausted()) {
-    const sp = spendStatus();
-    throw new HttpError(
-      402,
-      `Tetto di spesa raggiunto ($${sp.usd} su $${sp.limitUsd}). ` +
-        `Alza SPESA_MAX_USD o riavvia il servizio per ripartire.`,
-    );
-  }
+  /* L'API cede per ultima: se si ferma lei si e' fermato il prodotto. Quindi
+     qui pesa solo il tetto complessivo, non quello dell'app. */
+  fermatiSePieno("api");
 
   const esito = await prezzaLista(data.items, data.city, data.country, data.currency, fonte);
 
@@ -1193,18 +1225,10 @@ app.post("/ai/plan-full", async (body) => {
     }
   }
 
-  if (budgetExhausted()) {
-    const sp = spendStatus();
-    throw new HttpError(
-      402,
-      `Tetto di spesa raggiunto ($${sp.usd} su $${sp.limitUsd}). ` +
-        `Alza SPESA_MAX_USD o riavvia il servizio per ripartire.`,
-    );
-  }
-
+  fermatiSePieno("app");
   recordUse("gemini");
   const fase1 = await generateMenu(data);
-  recordCost(fase1.cost);
+  recordCost(fase1.cost, "app");
   console.info(
     `[plan-full] fase 1 ${fase1.model}: ${fase1.seconds.toFixed(0)}s, ` +
       `$${fase1.cost.toFixed(4)}, ${fase1.data.menu.length} giorni, ` +

@@ -123,35 +123,99 @@ export function quotaNeedsAttention(): boolean {
  * a mano — quello vero lo tiene Google, e sul suo cruscotto si può impostare
  * un limite mensile che nessun riavvio azzera.
  */
-let spesoUsd = 0;
+/**
+ * DUE BORSELLINI, UN TETTO SOLO.
+ *
+ * Il contatore era uno, condiviso fra l'API e l'app. Vuol dire che la
+ * generazione di un menu — che costa dieci volte una risposta sui prezzi —
+ * poteva finire il credito e far rispondere `402` anche a chi l'API la paga.
+ * Il cliente che compra i dati si vede chiudere la porta perche' un'altra
+ * parte del sistema ha mangiato troppo.
+ *
+ * Adesso sono due, ma NON e' un permesso di spendere il doppio: il tetto
+ * globale resta e vale sulla somma. Quello che cambia e' che l'app ha anche un
+ * tetto suo, piu' basso, e quel che avanza fra i due e' RISERVATO all'API.
+ *
+ *     SPESA_MAX_USD       $2,00   il tetto vero, sulla somma
+ *     SPESA_MAX_USD_APP   $1,50   quanto puo' arrivare a spendere l'app
+ *                                 → $0,50 restano sempre per i prezzi
+ *
+ * Il tre quarti predefinito non e' una misura, e' un compromesso: lascia
+ * all'app quasi tutto — perche' e' lei che spende — e tiene da parte abbastanza
+ * per qualche decina di risposte sui prezzi, che costano un centesimo l'una.
+ * Quando l'IA uscira' dalla strada dei prezzi (Fase 3) la riserva servira'
+ * ancora meno, e questa riga si potra' semplificare.
+ */
+export type Blocco = "api" | "app";
 
-/** Il limite oltre il quale si smette di chiamare. 0 = nessun limite. */
+const speso: Record<Blocco, number> = { api: 0, app: 0 };
+
+/** Il limite sulla somma. 0 = nessun limite. */
 const LIMITE_USD = Number(process.env.SPESA_MAX_USD ?? 2);
 
-/** Registra il costo di una chiamata appena fatta. */
-export function recordCost(usd: number): void {
+/** Quanto puo' arrivare a spendere l'app da sola. Il resto e' dell'API. */
+const LIMITE_APP = Number(process.env.SPESA_MAX_USD_APP ?? LIMITE_USD * 0.75);
+
+const totale = (): number => speso.api + speso.app;
+
+/** Registra il costo di una chiamata appena fatta, e di chi era. */
+export function recordCost(usd: number, blocco: Blocco = "app"): void {
   if (!Number.isFinite(usd) || usd <= 0) return;
-  spesoUsd += usd;
+  speso[blocco] += usd;
 
   if (LIMITE_USD > 0) {
-    const pct = Math.round((spesoUsd / LIMITE_USD) * 100);
+    const pct = Math.round((totale() / LIMITE_USD) * 100);
     if (pct >= 80) {
       console.warn(
-        `[spesa] $${spesoUsd.toFixed(3)} su $${LIMITE_USD} (${pct}%) — vicino al limite`,
+        `[spesa] $${totale().toFixed(3)} su $${LIMITE_USD} (${pct}%) — vicino al limite ` +
+          `(api $${speso.api.toFixed(3)}, app $${speso.app.toFixed(3)})`,
       );
     }
   }
 }
 
-/** Vero quando il tetto è stato raggiunto e conviene fermarsi. */
-export function budgetExhausted(): boolean {
-  return LIMITE_USD > 0 && spesoUsd >= LIMITE_USD;
+/**
+ * Vero quando conviene fermarsi.
+ *
+ * Per l'app ci sono due modi di essere al limite: il tetto globale, e il suo.
+ * Per l'API solo il globale — se si ferma lei, si e' fermato tutto, ed e'
+ * giusto che sia l'ultima a cedere: e' il prodotto.
+ */
+export function budgetExhausted(blocco: Blocco = "app"): boolean {
+  if (LIMITE_USD > 0 && totale() >= LIMITE_USD) return true;
+  if (blocco === "app" && LIMITE_APP > 0 && speso.app >= LIMITE_APP) return true;
+  return false;
 }
 
-export function spendStatus(): { usd: number; limitUsd: number; percent: number } {
+/** Perche' si e' fermato, per dirlo a chi riceve il 402 invece di farlo indovinare. */
+export function perchePieno(blocco: Blocco = "app"): string {
+  if (LIMITE_USD > 0 && totale() >= LIMITE_USD) {
+    return `tetto complessivo raggiunto ($${totale().toFixed(3)} su $${LIMITE_USD})`;
+  }
+  if (blocco === "app" && LIMITE_APP > 0 && speso.app >= LIMITE_APP) {
+    return (
+      `l'app ha raggiunto il suo tetto ($${speso.app.toFixed(3)} su $${LIMITE_APP}); ` +
+      `il resto e' riservato alle risposte sui prezzi`
+    );
+  }
+  return "nessun tetto raggiunto";
+}
+
+export function spendStatus(): {
+  usd: number;
+  limitUsd: number;
+  percent: number;
+  perBlocco: { api: number; app: number; limiteApp: number };
+} {
   return {
-    usd: Number(spesoUsd.toFixed(4)),
+    // I tre campi di prima, invariati: qualcuno li legge.
+    usd: Number(totale().toFixed(4)),
     limitUsd: LIMITE_USD,
-    percent: LIMITE_USD > 0 ? Math.min(100, Math.round((spesoUsd / LIMITE_USD) * 100)) : 0,
+    percent: LIMITE_USD > 0 ? Math.min(100, Math.round((totale() / LIMITE_USD) * 100)) : 0,
+    perBlocco: {
+      api: Number(speso.api.toFixed(4)),
+      app: Number(speso.app.toFixed(4)),
+      limiteApp: LIMITE_APP,
+    },
   };
 }
