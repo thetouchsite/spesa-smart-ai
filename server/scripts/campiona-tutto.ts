@@ -45,9 +45,9 @@
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
-import { nomeDaUrl } from "../src/catalogo.js";
-import { verifyProductPage } from "../src/price-page.js";
-import { salvaPrezzi, type PrezzoSalvato } from "../src/prezzi-magazzino.js";
+import { nomeDaUrl } from "../src/api/catalogo.js";
+import { verifyProductPage } from "../src/api/price-page.js";
+import { salvaPrezzi, type PrezzoSalvato } from "../src/api/prezzi-magazzino.js";
 
 const CARTELLA = "diario/raccolto";
 const DOVE = "diario/campione-europa.json";

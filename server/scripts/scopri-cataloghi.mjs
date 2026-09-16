@@ -238,7 +238,7 @@ async function aBrani(cose, quante, lavoro) {
 }
 
 async function main() {
-  const { FONTI } = await import("../src/catalogo-fonti.js");
+  const { FONTI } = await import("../src/api/catalogo-fonti.js");
   const precedenti = JSON.parse(
     await import("node:fs").then((fs) => fs.promises.readFile("diario/sitemap-insegne.json", "utf8")),
   );

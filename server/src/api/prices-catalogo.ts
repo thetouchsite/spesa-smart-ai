@@ -44,7 +44,7 @@
 import { cercaNelCatalogo } from "./catalogo.js";
 import { paesiConCatalogo } from "./catalogo-fonti.js";
 import { verifyProductPage } from "./price-page.js";
-import { chiamaMenu, MENU_MODEL, parseJson } from "./plan-grounded.js";
+import { chiamaMenu, MENU_MODEL, parseJson } from "../app/plan-grounded.js";
 import {
   traduciVoce,
   impara,

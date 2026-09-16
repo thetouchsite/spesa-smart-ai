@@ -17,8 +17,8 @@
 
 const [, , comando, ...resto] = process.argv;
 
-const { chiavi, isDbConfigured, closeDb } = await import("../src/db.js");
-const { generaChiave, improntaDi } = await import("../src/chiavi.js");
+const { chiavi, isDbConfigured, closeDb } = await import("../src/base/db.js");
+const { generaChiave, improntaDi } = await import("../src/api/chiavi.js");
 
 if (!isDbConfigured()) {
   console.error(

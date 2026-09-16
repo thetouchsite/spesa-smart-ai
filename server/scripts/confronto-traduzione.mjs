@@ -26,7 +26,7 @@ async function cerca(q) {
   return d.trovati ?? [];
 }
 
-const { traduciVoce } = await import("../src/vocabolario.js");
+const { traduciVoce } = await import("../src/api/vocabolario.js");
 
 let vinceDiz = 0, vinceOrig = 0, pari = 0;
 let totDiz = 0, totOrig = 0;

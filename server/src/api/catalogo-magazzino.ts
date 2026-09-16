@@ -45,8 +45,8 @@
 
 import { gunzipSync, gzipSync } from "node:zlib";
 import { Binary } from "mongodb";
-import { cataloghi as collezioneCataloghi, isDbConfigured } from "./db.js";
-import { conInterruttore, statoInterruttore } from "./interruttore.js";
+import { cataloghi as collezioneCataloghi, isDbConfigured } from "../base/db.js";
+import { conInterruttore, statoInterruttore } from "../base/interruttore.js";
 
 /** Una voce come sta nel pacchetto: indirizzo e nome, niente altro. */
 export interface VoceSalvata {

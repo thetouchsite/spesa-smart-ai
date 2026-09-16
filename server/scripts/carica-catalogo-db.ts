@@ -35,8 +35,8 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
-import { nomeDaUrl } from "../src/catalogo.js";
-import { salvaCatalogo, statoCataloghi } from "../src/catalogo-magazzino.js";
+import { nomeDaUrl } from "../src/api/catalogo.js";
+import { salvaCatalogo, statoCataloghi } from "../src/api/catalogo-magazzino.js";
 
 const CARTELLA = "diario/raccolto";
 

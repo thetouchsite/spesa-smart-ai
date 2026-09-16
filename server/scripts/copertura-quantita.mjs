@@ -1,6 +1,6 @@
 /** Quanti prodotti del catalogo vero danno una quantita' leggibile. */
-const { catalogoDi } = await import("../src/catalogo.js");
-const { quantitaDa } = await import("../src/quantita.js");
+const { catalogoDi } = await import("../src/api/catalogo.js");
+const { quantitaDa } = await import("../src/api/quantita.js");
 for (const paese of (process.env.PAESI ?? "IT,GB,DE").split(",")) {
   const cat = await catalogoDi(paese);
   if (!cat) { console.log(`  ${paese}: nessun catalogo`); continue; }

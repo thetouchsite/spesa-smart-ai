@@ -18,7 +18,7 @@
  */
 
 import { MongoClient, type Binary, type Collection, type Db } from "mongodb";
-import type { VerifyStatus } from "./price-page.js";
+import type { VerifyStatus } from "../api/price-page.js";
 
 export interface UserDoc {
   _id?: unknown;

@@ -42,7 +42,7 @@
  */
 
 import { createHash, randomBytes } from "node:crypto";
-import { type ChiaveDoc, chiavi as collezioneChiavi, isDbConfigured } from "./db.js";
+import { type ChiaveDoc, chiavi as collezioneChiavi, isDbConfigured } from "../base/db.js";
 
 export type { ChiaveDoc };
 

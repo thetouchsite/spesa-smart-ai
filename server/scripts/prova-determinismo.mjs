@@ -31,7 +31,7 @@ const LISTA = {
   priceSource: "catalogo",
 };
 
-const { cache, closeDb } = await import("../src/db.js");
+const { cache, closeDb } = await import("../src/base/db.js");
 
 async function chiedi() {
   const r = await fetch(`${API}/v1/prezzi`, {

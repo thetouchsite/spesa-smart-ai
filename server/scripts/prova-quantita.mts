@@ -1,4 +1,4 @@
-import { quantitaDa, prezzoNormalizzato } from "../src/quantita.js";
+import { quantitaDa, prezzoNormalizzato } from "../src/api/quantita.js";
 
 const CASI: Array<[string, string | null]> = [
   ["zucchine scure 500 g", "500 g"],

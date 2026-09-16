@@ -72,11 +72,11 @@ cresce anche aggiungendo lampadine.
 ### File di Antonio
 
 ```
-server/src/catalogo-fonti.ts          generato — attenzione sotto
-server/src/negozi.ts                  i punti vendita
-server/src/catalogo-magazzino.ts      il magazzino dei cataloghi
-server/src/prezzi-magazzino.ts        il magazzino dei prezzi
-server/src/insegne-online.ts
+server/src/api/catalogo-fonti.ts      generato — attenzione sotto
+server/src/api/negozi.ts              i punti vendita
+server/src/api/catalogo-magazzino.ts  il magazzino dei cataloghi
+server/src/api/prezzi-magazzino.ts    il magazzino dei prezzi
+server/src/api/insegne-online.ts
 server/scripts/aggiorna-fonti.mjs     caccia-*.mjs, censimento-*.mjs,
 server/scripts/resa-insegne.mjs       verifica-insegne.mjs, cerca-insegne.mjs
 ```
@@ -152,12 +152,14 @@ l'IA. Dire quanto costa il latte a Milano è un dato, e un dato non si inventa.
 ### File di Alberto
 
 ```
-server/src/catalogo.ts                ATTENZIONE — vedi sotto
-server/src/prices-catalogo.ts         i prezzi, strada generica
-server/src/catalogo-it.ts             i prezzi, strada italiana
-server/src/price-page.ts              leggere il prezzo da una pagina
-server/src/vocabolario.ts             il dizionario della spesa
-server/src/sinonimi.ts                i sinonimi dentro un paese
+server/src/api/catalogo.ts            ATTENZIONE — vedi sotto
+server/src/api/prices-catalogo.ts     i prezzi, strada generica
+server/src/api/catalogo-it.ts         i prezzi, strada italiana
+server/src/api/price-page.ts          leggere il prezzo da una pagina
+server/src/api/vocabolario.ts         il dizionario della spesa
+server/src/api/contratto-v1.ts        la forma che l'API promette
+server/src/api/chiavi.ts              chi puo' chiamare, e quanto
+server/src/api/quantita.ts            il peso, per il prezzo al chilo
 server/src/index.ts                   le rotte
 ```
 
@@ -165,7 +167,7 @@ server/src/index.ts                   le rotte
 
 ## L'unico punto dove ci pestiamo i piedi
 
-**`server/src/catalogo.ts`** — 998 righe, e dentro ci sono due mestieri
+**`server/src/api/catalogo.ts`** — mille righe, e dentro ci sono due mestieri
 diversi:
 
 | righe | cosa fa | di chi |
@@ -213,6 +215,48 @@ Magazzino Mongo collegato: Italia si carica in 2–3 s, Regno Unito in 1 s (eran
 
 > Righe nuove **in cima**. Chi pusha scrive: data, chi, cosa cambia per l'altro.
 > Se una modifica tocca il file dell'altro, si dice qui **prima** di farla.
+
+**16 settembre 2026 — Alberto ⚠ LEGGI PRIMA DI RIPRENDERE**
+
+**I file si sono spostati.** `server/src/` adesso ha tre cartelle:
+
+```
+  src/api/    catalogo, ricerca, prezzi, negozi, magazzini   ← anche tuoi
+  src/app/    menu, ricette, utenti, Amazon, SerpAPI
+  src/base/   database, http, diario, quota
+  src/index.ts
+```
+
+I tuoi file sono in **`src/api/`**: `catalogo.ts`, `catalogo-fonti.ts`,
+`negozi.ts`, `catalogo-magazzino.ts`, `prezzi-magazzino.ts`,
+`insegne-online.ts`. Gli script in `server/scripts/` non si sono mossi, e i
+loro import sono gia' stati aggiornati.
+
+**SE AVEVI LAVORO NON COMMITTATO**, il `git pull` ti dira' qualcosa tipo
+«CONFLICT (modify/delete): src/negozi.ts deleted in HEAD». Non e' grave e si
+risolve in cinque minuti:
+
+```bash
+git stash                      # metti da parte quel che hai
+git pull                       # prendi lo spostamento
+git stash pop                  # rimetti — ora va sul file vecchio
+# se si lamenta, applica le tue modifiche a mano sul file NUOVO:
+#   src/negozi.ts  →  src/api/negozi.ts
+```
+
+Se invece avevi committato e pushato, il pull e' pulito e non devi fare
+niente: git riconosce i file come spostati (33 rinominati, 0 cancellati), e
+`git log --follow` continua a mostrarti la storia.
+
+**Lo spostamento non ha cambiato una riga di logica.** Provato con il metro di
+misura prima e dopo: 186 voci giuste su 200, identico. Se qualcosa si rompe,
+non e' stato lo spostamento — ma dimmelo lo stesso.
+
+**Una regola nuova:** un file nuovo fa fallire il build finche' non lo dichiari
+in `scripts/confine.mjs`. Trenta secondi, e serve a rispondere «e' API o e'
+app?» il giorno in cui la risposta e' ancora facile.
+
+---
 
 **16 settembre 2026 — Alberto**
 Fase 1 dell'API: cinque pezzi su otto. C'e' `npm run confine`, che fallisce il

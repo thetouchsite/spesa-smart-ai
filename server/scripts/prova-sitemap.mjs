@@ -253,7 +253,7 @@ async function aBrani(elementi, quanti, lavoro) {
 }
 
 async function main() {
-  const { insegnePerPaese, paesiCoperti } = await import("../src/insegne-online.js");
+  const { insegnePerPaese, paesiCoperti } = await import("../src/api/insegne-online.js");
 
   const tutte = [];
   for (const iso of paesiCoperti()) {

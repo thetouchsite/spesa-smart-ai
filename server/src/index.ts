@@ -35,12 +35,12 @@ import { createHash } from "node:crypto";
 import { generateText, Output } from "ai";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import { createApp, HttpError } from "./http.js";
-import { isConfigured, model, MODEL_ID } from "./gemini.js";
-import { fetchPageContext, rankHits, searchProvider } from "./search.js";
-import { cache, cacheVecchia, isDbConfigured, plans, users } from "./db.js";
-import { hashPassword, issueToken, requireUser, verifyPassword } from "./auth.js";
-import { isShoppingConfigured, searchShopping } from "./shopping.js";
+import { createApp, HttpError } from "./base/http.js";
+import { isConfigured, model, MODEL_ID } from "./app/gemini.js";
+import { fetchPageContext, rankHits, searchProvider } from "./app/search.js";
+import { cache, cacheVecchia, isDbConfigured, plans, users } from "./base/db.js";
+import { hashPassword, issueToken, requireUser, verifyPassword } from "./app/auth.js";
+import { isShoppingConfigured, searchShopping } from "./app/shopping.js";
 import {
   type Blocco,
   budgetExhausted,
@@ -49,7 +49,7 @@ import {
   recordCost,
   recordUse,
   spendStatus,
-} from "./quota.js";
+} from "./base/quota.js";
 import {
   flussoPredefinito,
   generateListaSpesa,
@@ -58,8 +58,8 @@ import {
   generatePricesParallel,
   GROUNDED_MODEL,
   MENU_MODEL,
-} from "./plan-grounded.js";
-import type { CheckedRow } from "./price-page.js";
+} from "./app/plan-grounded.js";
+import type { CheckedRow } from "./api/price-page.js";
 import {
   groupByProduct,
   migliorePrezzoVerificato,
@@ -67,24 +67,24 @@ import {
   scartaImplausibili,
   togliOutlier,
   verifyPrices,
-} from "./price-page.js";
-import { generatePricesSerpapi } from "./prices-serpapi.js";
-import { catalogoDisponibilePer, generatePricesCatalogo, type PrezzoGrezzo } from "./prices-catalogo.js";
-import { cercaProdottoAmazon, isAmazonSearchConfigured } from "./amazon-search.js";
-import { linkDiRipiego } from "./fallback-link.js";
-import { isoDaPaese } from "./insegne-online.js";
-import { FRESCHEZZA_MS, statoMagazzino } from "./prezzi-magazzino.js";
-import { statoCataloghi } from "./catalogo-magazzino.js";
-import { prezziDaiCataloghiIT } from "./catalogo-it.js";
-import { annota } from "./diario.js";
-import { statoVocabolario, quanteImparate } from "./vocabolario.js";
-import { saluteIA } from "./salute-ia.js";
-import { rispostaPrezziV1 } from "./contratto-v1.js";
-import { consumoDiOggi, controllaChiave } from "./chiavi.js";
-import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./catalogo.js";
-import { paesiConCatalogo } from "./catalogo-fonti.js";
-import { negoziInCitta, statoNegozi, tuttiINegozi } from "./negozi.js";
-import { aggiornaCatalogo, avviaCatalogoNotturno } from "./catalogo-notturno.js";
+} from "./api/price-page.js";
+import { generatePricesSerpapi } from "./app/prices-serpapi.js";
+import { catalogoDisponibilePer, generatePricesCatalogo, type PrezzoGrezzo } from "./api/prices-catalogo.js";
+import { cercaProdottoAmazon, isAmazonSearchConfigured } from "./app/amazon-search.js";
+import { linkDiRipiego } from "./app/fallback-link.js";
+import { isoDaPaese } from "./api/insegne-online.js";
+import { FRESCHEZZA_MS, statoMagazzino } from "./api/prezzi-magazzino.js";
+import { statoCataloghi } from "./api/catalogo-magazzino.js";
+import { prezziDaiCataloghiIT } from "./api/catalogo-it.js";
+import { annota } from "./base/diario.js";
+import { statoVocabolario, quanteImparate } from "./api/vocabolario.js";
+import { saluteIA } from "./base/salute-ia.js";
+import { rispostaPrezziV1 } from "./api/contratto-v1.js";
+import { consumoDiOggi, controllaChiave } from "./api/chiavi.js";
+import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./api/catalogo.js";
+import { paesiConCatalogo } from "./api/catalogo-fonti.js";
+import { negoziInCitta, statoNegozi, tuttiINegozi } from "./api/negozi.js";
+import { aggiornaCatalogo, avviaCatalogoNotturno } from "./api/catalogo-notturno.js";
 import {
   AiRecipeInput,
   ChefInput,
@@ -94,14 +94,14 @@ import {
   RecipeSchema,
   WebRecipeInput,
   WebRecipeSchema,
-} from "./schemas.js";
+} from "./base/schemas.js";
 import {
   chefPrompt,
   planPrompt,
   recipePrompt,
   webExtractPrompt,
   webSynthesizePrompt,
-} from "./prompts.js";
+} from "./app/prompts.js";
 
 const app = createApp();
 

@@ -14,7 +14,7 @@ const FORME = [
   ["moltiplicatore", /\b(\d+)\s?[x\u00d7]\s?(\d+(?:[.,]\d+)?)\s?(kg|g|gr|ml|cl|l)\b/i],
 ];
 
-const { catalogoDi } = await import("../src/catalogo.js");
+const { catalogoDi } = await import("../src/api/catalogo.js");
 
 for (const paese of PAESI) {
   const cat = await catalogoDi(paese);
