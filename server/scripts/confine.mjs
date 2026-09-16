@@ -20,11 +20,10 @@
  *
  * COME FUNZIONA, E PERCHE' NON FALLISCE SUBITO
  * --------------------------------------------
- * Oggi i fili ci sono gia': sono tre, misurati. Uno script che fallisse per
- * quelli renderebbe il build rosso da adesso fino a quando non sono tutti
- * tagliati, e un build sempre rosso e' un build che si smette di guardare.
+ * Un filo che c'e' gia' non puo' far fallire il build da adesso fino a quando
+ * non e' tagliato: un build sempre rosso e' un build che si smette di guardare.
  *
- * Allora fa il contrario, come un cricchetto: i tre di oggi stanno scritti qui
+ * Allora fa il contrario, come un cricchetto: i fili di oggi stanno scritti qui
  * sotto in `TOLLERATI`, con accanto il motivo e quando spariranno. Passano. Un
  * filo NUOVO invece ferma tutto.
  *
@@ -63,6 +62,22 @@ const SORGENTE = "src";
  *   app    il servizio al cliente: menu, ricette, utenti, liste salvate
  *   base   quel che serve a tutti e due, e che seguirebbe l'API se se ne va
  *   radice il punto in cui si montano tutti e due: puo' importare da ovunque
+ *
+ * IL PRINCIPIO, perche' «api» non diventi «tutto quello che mi fa comodo»
+ * ---------------------------------------------------------------------
+ * L'API e' IL NOSTRO catalogo, LA NOSTRA lettura dei prezzi, I NOSTRI negozi.
+ * Dati che abbiamo raccolto, su cui rispondiamo noi.
+ *
+ * Non ne fa parte chi prende i dati da una ricerca di terzi — quello e'
+ * rivendere il lavoro di un altro — ne' chi ripara l'esperienza al posto di
+ * dire com'e' andata. Quando una scheda non si apre, un'API onesta risponde
+ * `non-raggiungibile`; costruire un link di ricerca su Amazon perche' l'utente
+ * abbia comunque un bottone da premere e' una scelta di prodotto, e la fa chi
+ * l'app la disegna.
+ *
+ * La prova che una riclassificazione e' onesta e non un modo di zittire questo
+ * script: se staccassimo `api/` domani, funzionerebbe lo stesso senza quel
+ * file? Se si', quel file non era dell'API.
  */
 const PADRONI = {
   // ── api ────────────────────────────────────────────────────────────
@@ -74,13 +89,11 @@ const PADRONI = {
   "prezzi-magazzino": "api",
   "price-page": "api",
   "prices-catalogo": "api",
-  "prices-serpapi": "api",
   "prezzi-api": "api",
   negozi: "api",
   "insegne-online": "api",
   vocabolario: "api",
   sinonimi: "api",
-  "fallback-link": "api",
 
   // ── app ────────────────────────────────────────────────────────────
   /* Il modello e la ricerca sul web stanno di qua per una ragione precisa:
@@ -92,9 +105,20 @@ const PADRONI = {
   prompts: "app",
   gemini: "app",
   search: "app",
+
+  /* Un link di ricerca costruito perche' la scheda vera e' morta: e' una
+     riparazione dell'esperienza, non un dato. L'API dice `non-raggiungibile`
+     e chi disegna decide cosa offrire. Staccata, l'API funziona senza. */
+  "fallback-link": "app",
   amazon: "app",
   "amazon-search": "app",
+
+  /* Prezzi presi dalla ricerca di SerpAPI: e' il catalogo di un altro, e il
+     nostro prodotto sono i dati che raccogliamo noi. Oggi non si usa —
+     PRICE_SOURCE e' `catalogo` — e va tolto o spostato del tutto. */
+  "prices-serpapi": "app",
   shopping: "app",
+
   auth: "app",
 
   // ── base ───────────────────────────────────────────────────────────
@@ -123,19 +147,18 @@ const TOLLERATI = [
     perche: "la scelta del modello fra i candidati, e il ripiego del dizionario",
     quando: "Fase 3: sparisce quando il modello esce dalla strada dei prezzi",
   },
-  {
-    da: "fallback-link",
-    a: "amazon",
-    perche: "il link di ricerca su Amazon quando non c'e' una scheda",
-    quando: "Fase 1: il link di ripiego e' roba dell'app, non un dato",
-  },
-  {
-    da: "prices-serpapi",
-    a: "shopping",
-    perche: "la strada prezzi via SerpAPI, che oggi non usiamo",
-    quando: "Fase 1: o si sposta in app/, o si toglie del tutto",
-  },
 ];
+
+/* IL DEBITO CHE RESTA, E CHE QUESTO SCRIPT NON VEDE
+   --------------------------------------------------
+   `index.ts` e' radice, quindi puo' importare da ovunque, e oggi ci si
+   approfitta: applica `linkDiRipiego` anche alle righe che vengono dal
+   catalogo, non solo a quelle del modello. Cioe' l'API, passando di li',
+   restituisce un link di ricerca al posto di un `non-raggiungibile`.
+
+   Non e' un filo fra file — lo script non puo' vederlo — ma e' la stessa
+   confusione, e va sistemata quando arrivano i quattro esiti (Fase 1). Scritto
+   qui perche' un debito non registrato e' un debito dimenticato. */
 
 /* ─────────────────────────── il lavoro ─────────────────────────────── */
 
