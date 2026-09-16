@@ -216,6 +216,57 @@ Magazzino Mongo collegato: Italia si carica in 2–3 s, Regno Unito in 1 s (eran
 > Righe nuove **in cima**. Chi pusha scrive: data, chi, cosa cambia per l'altro.
 > Se una modifica tocca il file dell'altro, si dice qui **prima** di farla.
 
+**16 settembre 2026 — Alberto → Antonio: i numeri per decidere dove lavorare**
+
+Adesso c'e' uno strumento che misura, e i suoi numeri dicono dove conviene
+mettere le mani. Si lancia cosi':
+
+```
+npx tsx scripts/metro-ricerca.mjs --senza-modello
+npx tsx scripts/dove-si-perde.mjs        # dove si perdono le voci
+```
+
+**La ricerca sta bene in tutti e cinque i paesi:**
+
+| | IT | GB | DE | ES | FR |
+|---|---|---|---|---|---|
+| voci giuste su 40 | 36 · 90% | 38 · 95% | 38 · 95% | 38 · 95% | 36 · 90% |
+
+Il tuo lavoro sulla Germania si vede: era la piu' debole, adesso e' alla pari
+con le migliori.
+
+**Dove invece c'e' da lavorare: le insegne MUTE**, quelle che hanno il prodotto
+ma il prezzo non lo pubblicano in una forma leggibile.
+
+| paese | insegne | mute | quali |
+|---|---|---|---|
+| **IT** | 18 | **8** | CoopShop, Iperal, Esselunga a Casa, Ali', Tigros, Basko, NaturaSi', Pam |
+| **ES** | 8 | **5** | Alcampo, Consum, Mercadona, Aldi España, El Corte Inglés |
+| GB | 11 | 1 | Co-op |
+| DE | 7 | 1 | Aldi Nord |
+| FR | 6 | 1 | Greenweez |
+
+**L'Italia e la Spagna sono il lavoro che rende di piu'.** Otto insegne
+italiane su diciotto e cinque spagnole su otto entrano nel confronto, prendono
+un posto, e non danno una cifra. Non e' che manchino i prodotti: manca il
+prezzo, e per l'utente e' la stessa cosa.
+
+Prima di dare per mute quelle insegne, due cose che ci sono gia' costate:
+
+1. **403 e 429 non sono divieti.** Ci siamo cascati tre volte. Una pagina alla
+   volta con un secondo e mezzo di pausa, e parecchie rispondono.
+2. **Certi negozi il prezzo lo disegnano con JavaScript** e nell'HTML non c'e'
+   davvero — Tigros, Iperal, Esselunga sono di questi. Li' non e' questione di
+   pazienza: o esiste un'API dietro (come per le insegne EBSN), o quella
+   insegna resta muta e va bene cosi', purche' lo si sappia.
+
+**Una cosa che ho rotto e che ti riguarda.** Per misurare il prezzo al chilo ho
+cancellato 18.067 schede dal magazzino prezzi: vanno riaperte, e le riapre il
+traffico normale. Se vedi le prime richieste piu' lente del solito per qualche
+ora, e' quello. Colpa mia, non si ripetera' senza avvisare.
+
+---
+
 **16 settembre 2026 — Alberto ⚠ LEGGI PRIMA DI RIPRENDERE**
 
 **I file si sono spostati.** `server/src/` adesso ha tre cartelle:

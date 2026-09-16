@@ -427,6 +427,13 @@ export function parole(testo: string): string[] {
  * Misurato: vincevano pure, perche' costano meno.
  */
 const NON_ALIMENTARI = [
+  /* ── oggetti che si chiamano come il cibo ────────────────────────
+     Per «Tonno in scatola» e' uscita una SCATOLA REGALO con cinquanta led,
+     perche' «scatola» sta in tutti e due. Sono oggetti da vetrina che i
+     supermercati vendono davvero, e che nessuna lista della spesa chiede. */
+  /\b(scatola regalo|confezione regalo|addobb|ghirland|presepe|candel|tovagli|bicchier|stovigli|posate|pentol|padell|barattolo vuot|sacchetti per)/i,
+  /\b([0-9]+\s?led|luci led|lucine|catena luminosa|lampadin|batteri[ae]|pil[ae] stilo)/i,
+
   // ── animali ──────────────────────────────────────────────────────
   /* I supermercati veri il cibo per animali lo vendono, e ha nomi da cibo:
      «wet adult cat food tuna» rispondeva alla voce «Tuna tin». Togliere i
@@ -502,7 +509,7 @@ const NON_ALIMENTARI_EN = [
   /\b(lion|mars|twirl|ripple|flake)\s+(bar|duo|milk|choc)/i,
 ];
 
-function alimentarePlausibile(nome: string): boolean {
+export function alimentarePlausibile(nome: string): boolean {
   return (
     !NON_ALIMENTARI.some((re) => re.test(nome)) && !NON_ALIMENTARI_EN.some((re) => re.test(nome))
   );
@@ -518,7 +525,7 @@ function alimentarePlausibile(nome: string): boolean {
  * serve per cucinare.
  */
 const PREPARAZIONI =
-  /\b(frollin|biscott|merendin|brioche|briochin|croissant|cornett|snack|gelat[oi]|budin|torta|tortin|crostat|wafer|crackers|grissin|pandoro|panettone|colomba|ripien[oi]|farcit|arrost|affettat|precott|impanat|affumicat|stagionat|al forno|sfoglia|insalat|condit|saltat|grigliat|marinat|panat|pronto in|gia' pronto|monoporzion)/i;
+  /\b(frollin|biscott|merendin|brioche|briochin|croissant|cornett|snack|gelat[oi]|budin|torta|tortin|crostat|wafer|crackers|grissin|pandoro|panettone|colomba|ripien[oi]|farcit|arrost|affettat|precott|impanat|affumicat|stagionat|al forno|sfoglia|insalat|condit|saltat|grigliat|marinat|panat|pronto in|gia' pronto|monoporzion|salad|gia pronto)/i;
 
 /**
  * La stessa trappola, in inglese.
@@ -561,7 +568,7 @@ const PIATTI_IT =
   /\b(zuppa|minestr|vellutata|passato di|sugo|rag[uù]|risotto|lasagn|cannellon|tortell|raviol|insalat|panin|tramezzin|piadin|pizza|polpett|parmigiana|cotolett|spiedin|hamburger)/i;
 
 /** Una preparazione o un piatto, in una qualunque delle lingue che copriamo. */
-function paPreparazione(nome: string): boolean {
+export function paPreparazione(nome: string): boolean {
   return (
     PREPARAZIONI.test(nome) ||
     PREPARAZIONI_EN.test(nome) ||

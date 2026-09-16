@@ -45,6 +45,19 @@ export interface PagePrice {
   /** Fino a quando è valido, se dichiarato (ISO). */
   validUntil?: string;
   currency?: string;
+  /**
+   * Il nome che la PAGINA dichiara, che spesso e' piu' completo di quello che
+   * si ricava dall'indirizzo.
+   *
+   * Il catalogo prende i nomi dalle sitemap, cioe' dagli indirizzi, e li' il
+   * formato spesso non c'e': `latte-intero` invece di «Latte intero UHT 1 l».
+   * La pagina invece lo dichiara quasi sempre, e la stiamo gia' aprendo per
+   * leggere il prezzo — quindi costa zero richieste in piu'.
+   *
+   * Serve al prezzo al chilo: senza il peso non si puo' calcolare, e oggi si
+   * riesce solo per un terzo delle offerte.
+   */
+  nome?: string;
 }
 
 /**
@@ -77,6 +90,7 @@ export interface VerifiedPrice {
 }
 
 import { haLettoreApi, prezzoDaApi } from "./prezzi-api.js";
+import { quantitaDa } from "./quantita.js";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
@@ -329,8 +343,48 @@ function leggiDa(html: string): PagePrice | null {
     if (sane(computed) && computed > current) list = computed;
   }
 
+  /* IL NOME DEL PRODOTTO, e la parte difficile e' che non sia quello del
+     NEGOZIO.
+     Il primo tentativo cercava il primo `"name"` della pagina, e campionando
+     dodici schede italiane e' venuto fuori cosa c'e' davvero li' dentro:
+     «Bologna» — la citta' del punto vendita — e «La Maremmana», il produttore.
+     I dati strutturati di un negozio descrivono anche il negozio, e il suo
+     nome viene quasi sempre prima di quello del prodotto.
+
+     Quindi si cerca in tre posti, nell'ordine in cui e' probabile che parlino
+     del prodotto:
+
+       1. dentro un oggetto marcato `"@type":"Product"` — non c'e' dubbio
+       2. `og:title`, che i siti riempiono per far bella figura quando il link
+          si condivide: e' il nome del prodotto, a volte con la coda del
+          negozio dopo una barra
+       3. il titolo della pagina, per ultimo perche' e' quello piu' sporco
+
+     Un nome sbagliato non fa danni — viene usato solo se contiene un peso, e
+     «Bologna» un peso non ce l'ha — ma ogni nome sbagliato e' un'occasione
+     persa di calcolare un prezzo al chilo. */
+  const dentroProdotto = html.match(
+    /"@type"\s*:\s*"Product"[^]{0,600}?"name"\s*:\s*"([^"]{3,120})"/i,
+  )?.[1];
+  const daOg = html
+    .match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']{3,140})["']/i)?.[1]
+    ?.split(/[|–—]/)[0]
+    ?.trim();
+  const daTitolo = html.match(/<title[^>]*>([^<]{3,140})<\/title>/i)?.[1]
+    ?.split(/[|–—]/)[0]
+    ?.trim();
+
+  /* Si tiene il primo che porta una quantita': e' l'unica cosa per cui questo
+     nome serve, e sceglierlo cosi' evita di preferire un nome piu' «bello» ma
+     inutile a uno brutto che pero' dice quanto pesa. */
+  const candidati = [dentroProdotto, daOg, daTitolo].filter(
+    (x): x is string => typeof x === "string" && x.length >= 3,
+  );
+  const nome = candidati.find((x) => quantitaDa(x)) ?? candidati[0];
+
   const out: PagePrice = {
     current,
+    nome,
     validUntil: html.match(/"priceValidUntil"\s*:\s*"([\d-]{8,10})"/i)?.[1] ?? undefined,
     currency: html.match(/"priceCurrency"\s*:\s*"([A-Z]{3})"/)?.[1] ?? undefined,
   };
@@ -475,6 +529,8 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
 
 /** Una riga di prezzo dopo il controllo, pronta per il client. */
 export interface CheckedRow {
+  /** Quanto era pertinente il candidato: 0 e' il primo della classifica. */
+  posto?: number;
   /**
    * Quando quella pagina e' stata guardata, in ISO.
    *
@@ -590,8 +646,19 @@ export async function verifyPrices(
            listino barrato e lo sconto li dichiara l'API stessa — passava di qui
            e usciva senza. La promozione veniva raccolta e poi buttata. */
         const p = v.page;
+        /* IL NOME PIU' COMPLETO, se la pagina ne dichiara uno che porta il
+           formato e quello che abbiamo non ce l'ha.
+           Vale soprattutto per la strada italiana: quelle righe arrivano dalle
+           API dei negozi e dai volantini, con nomi corti e spesso in
+           maiuscolo, e la pagina non la aprono mai. Qui pero' si apre — per
+           verificare il link — e leggere anche il nome non costa una richiesta
+           in piu'. Senza formato non c'e' prezzo al chilo. */
+        const nomeMigliore =
+          p?.nome && quantitaDa(p.nome) && !quantitaDa(row.nome) ? p.nome.trim() : row.nome;
+
         return {
           ...row,
+          nome: nomeMigliore,
           prezzo: p?.current ?? row.prezzo,
           verifica: v.status,
           prezzoListino: p?.list ?? row.prezzoListino,
@@ -773,6 +840,8 @@ export interface Offer {
    * un'API di prezzi non si puo' permettere.
    */
   letto?: string;
+  /** Quanto era pertinente il candidato: 0 e' il primo della classifica. */
+  posto?: number;
   /** Il negozio dell'insegna piu' vicino a chi chiede. NON e' la fonte del prezzo. */
   negozioPiuVicino?: string;
   /** Presenti solo se il prodotto è in promozione in quel negozio. */
@@ -839,6 +908,7 @@ export function groupByProduct(rows: CheckedRow[]): ProductOffers[] {
       link: r.verifica === "non-raggiungibile" ? "" : r.link,
       verifica: r.verifica,
       letto: r.letto,
+      posto: r.posto,
       prezzoListino: r.prezzoListino,
       risparmio: r.risparmio,
       scontoPercento: r.scontoPercento,
@@ -862,9 +932,42 @@ export function groupByProduct(rows: CheckedRow[]): ProductOffers[] {
     // prezzi di cui abbiamo aperto la pagina.
     // Le righe senza prezzo restano in fondo: sono un posto dove andare, non
     // un prezzo, e non devono mai finire in cima come «piu' conveniente».
+    /* CHI C'ENTRA POCO NON PUO' PRENDERE IL POSTO D'ONORE.
+       Ordinando per solo prezzo, un prodotto che c'entra poco ma costa meno
+       finiva primo e l'app lo chiamava «il piu' conveniente». Misurato su
+       duecento voci: undici volte il prodotto giusto c'era, ma piu' in basso.
+
+         «Butter»          mostrava  Biona butter beans 400g
+                           il giusto era in seconda posizione: Anchor salted butter
+         «Mozzarella»      mostrava  12 mozzarella sticks 175g
+                           il giusto in terza: Galbani mozzarella
+         «Mature cheddar»  mostrava  Taylors mature cheddar ONION (patatine)
+                           il giusto in seconda: Cathedral city mature cheddar
+
+       Non e' che costassero meno «della stessa cosa»: erano un'altra cosa.
+
+       La cura non e' smettere di ordinare per prezzo — quello resta, ed e' cio'
+       che l'utente e' venuto a fare. E' che sul prezzo si compete SOLO fra pari
+       pertinenza. Il gruppo di testa e' chi sta entro una posizione dal
+       migliore; dentro quel gruppo vince il piu' economico, e chi sta piu'
+       indietro resta sotto per quanto costi poco.
+
+       Una posizione di tolleranza e non zero, perche' fra il primo e il secondo
+       candidato la differenza e' spesso il nome della marca, e li' il prezzo
+       deve poter decidere. */
+    const pertinenzaMigliore = Math.min(
+      ...offerte.map((o) => (typeof o.posto === "number" ? o.posto : 99)),
+    );
+    const inTesta = (o: Offer) =>
+      (typeof o.posto === "number" ? o.posto : 99) <= pertinenzaMigliore + 1;
+
     offerte.sort((a, b) => {
+      // Le righe senza prezzo restano in fondo: sono un posto dove andare, non
+      // un prezzo, e non devono mai finire in cima come «piu' conveniente».
       if (a.prezzo == null) return b.prezzo == null ? 0 : 1;
       if (b.prezzo == null) return -1;
+      const ta = inTesta(a), tb = inTesta(b);
+      if (ta !== tb) return ta ? -1 : 1;
       return a.prezzo - b.prezzo;
     });
 

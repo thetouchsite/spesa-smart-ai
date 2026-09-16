@@ -62,6 +62,21 @@ export interface OffertaV1 {
   /** Quando quella pagina e' stata guardata, in ISO. Un prezzo senza data e' una diceria. */
   letto: string | null;
   /**
+   * Quanto ci si puo' fidare di questo prezzo.
+   *
+   *   `verificato`  la pagina si e' aperta e il prezzo e' stato letto li' dentro
+   *   `pagina-ok`   la pagina si e' aperta, il prezzo non era leggibile dal
+   *                 codice — succede quando il negozio lo disegna con
+   *                 JavaScript. Il prodotto e il link valgono lo stesso
+   *   `bloccato`    il sito rifiuta le richieste automatiche: la pagina esiste
+   *                 e da un telefono si apre, ma il prezzo non e' confermato
+   *
+   * Non e' la stessa cosa di `esito`, che parla della VOCE. Questo parla della
+   * singola offerta, e serve a chi vuole mostrare due prezzi con due gradi di
+   * fiducia diversi senza far finta che siano uguali.
+   */
+  fiducia: "verificato" | "pagina-ok" | "bloccato" | null;
+  /**
    * Quanto ce n'e' dentro, letto dal nome: grammi, millilitri o pezzi.
    * `null` per la roba sfusa, che un peso non ce l'ha.
    */
@@ -88,8 +103,38 @@ export interface VoceV1 {
   offerte: OffertaV1[];
 }
 
+/**
+ * Quanto verrebbe a costare la spesa in una singola insegna.
+ *
+ * E' la domanda che l'utente si fa davvero — «dove mi conviene andare?» — e
+ * non si risponde sommando i prezzi piu' bassi: quelli stanno sparsi in sei
+ * negozi diversi, e nessuno fa sei spese.
+ */
+export interface InsegnaV1 {
+  insegna: string;
+  /** La somma dei soli prezzi la cui pagina si e' aperta davvero. */
+  totale: number;
+  /** Quante voci della lista questa insegna copre, con un prezzo verificato. */
+  vociCoperte: number;
+  /**
+   * Ha abbastanza voci da poter essere confrontata con le altre.
+   *
+   * Un'insegna che copre tre voci su venti avrebbe il totale piu' basso di
+   * tutte, e sarebbe una risposta falsa: e' bassa perche' manca, non perche'
+   * costa poco.
+   */
+  confrontabile: boolean;
+}
+
 export interface RispostaPrezziV1 {
   voci: VoceV1[];
+  /**
+   * Il confronto fra insegne, dalla piu' conveniente. Vuoto quando non c'e'
+   * abbastanza copertura per confrontare onestamente.
+   */
+  insegne: InsegnaV1[];
+  /** Quanto si risparmia scegliendo la prima invece dell'ultima confrontabile. */
+  risparmio: number | null;
   copertura: {
     paese: string;
     /** Abbiamo un catalogo per quel paese? Se no, `nessun-prodotto` vuol dire un'altra cosa. */
@@ -127,7 +172,15 @@ interface Dentro {
       prezzoListino?: number | null;
     }>;
   }>;
-  catene?: Array<unknown>;
+  catene?: Array<{
+    negozio: string;
+    totale: number;
+    verificati: number;
+    proposti: number;
+    utilizzabile: boolean;
+  }>;
+  vincitore?: { negozio: string; totale: number } | null;
+  risparmioVsPiuCara?: number | null;
   totali?: { spesaAlMiglioPrezzo?: number; valuta?: string };
   meta?: { secondiPrezzi?: number };
 }
@@ -176,6 +229,10 @@ function offertaDi(
           : null,
     link: o.link || null,
     letto: o.letto ?? null,
+    fiducia:
+      o.verifica === "verificato" || o.verifica === "pagina-ok" || o.verifica === "bloccato"
+        ? o.verifica
+        : null,
     quantita,
     prezzoNormalizzato: prezzoNormalizzato(prezzo, quantita),
   };
@@ -211,8 +268,61 @@ export function rispostaPrezziV1(
     };
   });
 
+  /* CONFRONTABILE RISPETTO A COSA E' STATO CHIESTO, non a cio' che l'insegna
+     ha proposto.
+     Dentro, un'insegna passa il controllo se verifica meta' dei prodotti CHE
+     HA PROPOSTO LEI. Vuol dire che una che ne propone due e li verifica
+     entrambi e' «confrontabile» anche se la lista ne aveva venti — e siccome
+     il suo totale e' la somma di due prezzi, vince. Visto succedere: su una
+     lista di cinque voci, Bennet «piu' conveniente» a 3,19 € coprendone due.
+
+     E' bassa perche' MANCA, non perche' costa poco, e dirlo a un utente e' una
+     bugia che gli fa fare chilometri.
+
+     Meta' della lista e' la soglia: sotto, non e' un confronto — e' una
+     coincidenza. */
+  const minimo = Math.max(2, Math.ceil(chieste.length / 2));
+
+  /* E NON BASTA LA META': SI CONFRONTA CHI COPRE QUANTO CHI COPRE DI PIU'.
+     Con la sola soglia di meta' lista restava fuori il caso peggiore. Su otto
+     voci, misurato: Eurospin le copriva tutte e otto per 10,84 €, Eataly ne
+     copriva cinque per 211,90 — perche' vende roba da regalo — e il
+     «risparmio» diventava 201 euro. Vero come sottrazione, insensato come
+     informazione: nessuno fa la spesa di tutti i giorni da Eataly, e comunque
+     quei due totali non contano le stesse cose.
+
+     Quindi si guarda chi copre di piu', e si confronta solo con chi gli sta
+     vicino — una voce di tolleranza, perche' pretendere lo stesso identico
+     numero lascerebbe spesso una sola insegna e niente da confrontare. */
+  const coperturaMigliore = Math.max(
+    0,
+    ...(dentro.catene ?? []).filter((c) => c.utilizzabile).map((c) => c.verificati),
+  );
+  const soglia = Math.max(minimo, coperturaMigliore - 1);
+
+  const insegne: InsegnaV1[] = (dentro.catene ?? []).map((c) => ({
+    insegna: c.negozio,
+    totale: c.totale,
+    vociCoperte: c.verificati,
+    confrontabile: c.utilizzabile && c.verificati >= soglia,
+  }));
+
+  /* E il risparmio si calcola SOLO fra chi e' davvero confrontabile.
+     Adesso chi e' rimasto copre tutti piu' o meno le stesse voci, quindi la
+     sottrazione confronta cose confrontabili. */
+  const confrontabili = insegne.filter((i) => i.confrontabile && i.totale > 0);
+  const risparmio =
+    confrontabili.length >= 2
+      ? Math.round(
+          (Math.max(...confrontabili.map((i) => i.totale)) -
+            Math.min(...confrontabili.map((i) => i.totale))) * 100,
+        ) / 100
+      : null;
+
   return {
     voci,
+    insegne,
+    risparmio,
     copertura: {
       paese: paese.toUpperCase(),
       coperto: paeseCoperto,

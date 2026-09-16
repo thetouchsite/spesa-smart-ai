@@ -525,6 +525,54 @@ nessuna riga di logica cambiata, così il diff si legge e il merge non fa male.
 > Le misure si scrivono qui: numero, data, e **come** è stato ottenuto. Un
 > numero senza il metodo è un'opinione con le cifre.
 
+**16 settembre 2026 — la risposta: il modello usciva di scena da solo**
+
+La domanda da cui dipendeva tutta la Fase 3 aveva una risposta, e non era
+quella che ci aspettavamo.
+
+| | sola ricerca | prezzi SENZA IA | prezzi CON IA |
+|---|---|---|---|
+| IT | 36 · 90% | 34 · 85% | 34 · 85% |
+| GB | 38 · 95% | 33 · 83% | 33 · 83% |
+| DE | 38 · 95% | 27 · 68% | 22 · 55% |
+| ES | 38 · 95% | 27 · 68% | 28 · 70% |
+| FR | 36 · 90% | 36 · 90% | 34 · 85% |
+| **totale** | **186 · 93%** | **157 · 79%** | **151 · 76%** |
+
+**Con il modello si azzecca MENO.** Due misure indipendenti, stessa direzione —
+la prima dava tredici voci di scarto, questa sei. Il numero balla, perche' la
+strada apre pagine vere e i negozi rispondono come vogliono; il verso no.
+
+Quindi la scelta del modello e' spenta di predefinito, come prevedeva il piano:
+*«solo alla fine togliere il modello, se il metro dice che non si peggiora»*. Il
+metro ha detto meglio di cosi'. Si riaccende con `SCELTA_MODELLO=si`, e serve a
+rifare questo confronto quando la ricerca sara' cambiata.
+
+**Criterio 3, provato non affermato.** Due servizi, uno con la chiave dell'IA e
+uno con la chiave staccata del tutto (`aiConfigured: false`). Stessa lista di
+dieci voci: 10 su 10 tutti e due, e le risposte **identiche** — stessi
+prodotti, stesse insegne, stessi prezzi, stessi link.
+
+**Criterio 4, rimisurato a modello spento:** 2,7s / 2,0s / 1,0s su dieci voci,
+10 su 10 trovate, **zero** chiamate al modello, **$0** di costo. Erano 17
+secondi.
+
+**Una correzione a quel che era scritto prima.** I 14,6 secondi erano di
+`gemini-3-flash-preview`. Con `gemini-3.5-flash-lite` la stessa scelta costa
+due secondi e $0,0004 — quindi il modello non era caro, era solo inutile. La
+ragione per spegnerlo non e' il risparmio: e' che sceglie peggio e che senza di
+lui la risposta e' sempre la stessa.
+
+**IL NUMERO PIU' INTERESSANTE E' UN ALTRO: 186 contro 157.** La ricerca da sola
+azzecca il 93%, la strada dei prezzi il 79%. Ventinove voci si perdono FRA la
+ricerca e quel che l'app mostra, e non e' colpa del modello — e' che si mostra
+per prima l'offerta piu' ECONOMICA fra quelle tenute, e la piu' economica e'
+spesso la confezione piu' piccola o il prodotto sbagliato. `12 mozzarella
+sticks` per «mozzarella», `Biona butter beans` per «butter».
+
+E' quattro volte il problema del modello, ed e' lo stesso difetto del prezzo al
+chilo visto da un'altra parte. E' li' che va il prossimo lavoro.
+
 **16 settembre 2026 — Fase 3 e Fase 4**
 
 | fatto | misura |

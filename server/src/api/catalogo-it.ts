@@ -107,6 +107,14 @@
  */
 
 import { readPrices, porzioneConPrezzi } from "./price-page.js";
+/* I FILTRI SONO DI TUTTI E DUE, QUINDI STANNO IN UN POSTO SOLO.
+   Questo file ne teneva una copia. Erano quasi uguali — due parole di
+   differenza — e «quasi» e' il problema: stamattina una correzione alle
+   preparazioni ha dovuto essere scritta due volte, e se qualcuno ne avesse
+   fatta una sola, la strada italiana avrebbe continuato a rispondere «pasta
+   sfoglia» a chi chiedeva la pasta. Le due parole che c'erano solo qui —
+   `salad`, `gia pronto` — sono state portate di la'. */
+import { alimentarePlausibile, paPreparazione } from "./catalogo.js";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
@@ -307,9 +315,6 @@ const NON_ALIMENTARI = [
   /\b(quaderno|portamine|matite|penna a sfera|astuccio|pila|batteri)/i,
 ];
 
-function alimentarePlausibile(slug: string): boolean {
-  return !NON_ALIMENTARI.some((re) => re.test(slug));
-}
 
 /**
  * La trappola dell'ingrediente dentro la preparazione.
@@ -323,8 +328,6 @@ function alimentarePlausibile(slug: string): boolean {
  * dentro di me»: se compaiono nel nome del prodotto ma NON nella voce cercata,
  * il prodotto non e' quello che serve per cucinare.
  */
-const PREPARAZIONI =
-  /\b(frollin|biscott|merendin|brioche|briochin|croissant|cornett|snack|gelat[oi]|budin|torta|tortin|crostat|wafer|crackers|grissin|pandoro|panettone|colomba|ripien[oi]|farcit|arrost|affettat|precott|impanat|affumicat|stagionat|al forno|sfoglia|insalat|salad|pronto in|gia' pronto|gia pronto|monoporzion|condit|saltat|grigliat|marinat|panat)/i;
 
 function parole(s: string): string[] {
   let t = s;
@@ -652,7 +655,7 @@ function cerca(idx: Indice, richiesta: string): { voce: Voce; score: number } | 
     if (!tutte) continue;
 
     // Una preparazione vale solo se e' stata chiesta.
-    if (PREPARAZIONI.test(v.slug) && !v.parole.some((w) => chieste.has(w) && PREPARAZIONI.test(w))) {
+    if (paPreparazione(v.slug) && !v.parole.some((w) => chieste.has(w) && paPreparazione(w))) {
       continue;
     }
 
@@ -958,7 +961,7 @@ async function cercaNeiVolantini(items: string[], valuta: string): Promise<RigaC
       const v = voci.find(
         (x) =>
           q.every((w) => [...x.set].some((t) => t.startsWith(w) || w.startsWith(t))) &&
-          (!PREPARAZIONI.test(x.nome) || q.some((w) => PREPARAZIONI.test(w))),
+          (!paPreparazione(x.nome) || q.some((w) => paPreparazione(w))),
       );
       if (!v) continue;
       fuori.push({
@@ -1089,7 +1092,7 @@ async function cercaSuEbsn(
         if (!nome || !p.itemUrl) continue;
         if (vuoleIlPrezzo && prezzo == null) continue;
         if (!alimentarePlausibile(nome)) continue;
-        if (PREPARAZIONI.test(nome) && !q.some((w) => PREPARAZIONI.test(w))) continue;
+        if (paPreparazione(nome) && !q.some((w) => paPreparazione(w))) continue;
         if (!combacia(nome, q)) continue;
 
         const riga: RigaCatalogo = {

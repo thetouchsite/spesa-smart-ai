@@ -163,6 +163,133 @@ type ServerResponse = Omit<MenuResponse, "meta"> &
   };
 
 
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DA /v1/prezzi ALLA FORMA CHE QUESTA APP CONOSCE
+
+   L'API adesso ha un contratto — `/v1/prezzi` — e questa e' l'unica funzione
+   che lo conosce. Tutto il resto dell'app continua a lavorare con le forme di
+   sempre.
+
+   PERCHE' UN ADATTATORE E NON RISCRIVERE LE SCHERMATE
+   ---------------------------------------------------
+   Perche' sono due cambiamenti diversi e non vanno fatti insieme. Passare a
+   /v1 e' una cosa sola e si puo' verificare da sola: se le schermate mostrano
+   quel che mostravano prima, e' riuscito. Riscriverle nello stesso momento
+   vorrebbe dire non sapere piu' quale dei due ha rotto cosa.
+
+   Quando le schermate useranno direttamente `voci` ed `esito` — che dicono
+   cose che la forma vecchia non sa dire — questa funzione sparisce.
+
+   COSA SI GUADAGNA SUBITO, senza toccare una schermata:
+
+     · la quantita' e il PREZZO AL CHILO su ogni offerta
+     · `letto`, cioe' di quando e' quel prezzo
+     · il confronto fra insegne reso onesto: prima un negozio che copriva due
+       voci su otto poteva risultare «il piu' conveniente», e il risparmio
+       arrivava a dire 201 € su una spesa da 11
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** La risposta di `/v1/prezzi`, per quel che serve tradurre. */
+interface RispostaV1 {
+  voci: Array<{
+    voce: string;
+    esito: "trovato" | "nessun-prezzo-pubblicato" | "nessun-prodotto" | "non-raggiungibile";
+    offerte: Array<{
+      insegna: string;
+      nome: string;
+      prezzo: number | null;
+      valuta: string;
+      prezzoPieno: number | null;
+      sconto: number | null;
+      link: string | null;
+      letto: string | null;
+      fiducia: "verificato" | "pagina-ok" | "bloccato" | null;
+      quantita: { valore: number; unita: string; testo: string } | null;
+      prezzoNormalizzato: { valore: number; unita: string } | null;
+    }>;
+  }>;
+  insegne: Array<{ insegna: string; totale: number; vociCoperte: number; confrontabile: boolean }>;
+  risparmio: number | null;
+  copertura: { paese: string; coperto: boolean; insegne: number };
+  riepilogo: { chieste: number; trovate: number; totaleAlMiglioPrezzo: number; valuta: string };
+  secondi: number;
+}
+
+function daV1(r: RispostaV1, valuta: string): PricesResponse {
+  const offerta = (o: RispostaV1["voci"][number]["offerte"][number]): Offer => ({
+    negozio: o.insegna,
+    nome: o.nome,
+    prezzo: o.prezzo,
+    valuta: o.valuta || valuta,
+    link: o.link ?? "",
+    // `fiducia` non c'e' quando la pagina non si e' aperta: allora la riga non
+    // arriva nemmeno qui, ma il tipo vuole un valore e questo e' quello onesto.
+    verifica: o.fiducia ?? "non-raggiungibile",
+    ...(o.prezzoPieno != null ? { prezzoListino: o.prezzoPieno } : {}),
+    ...(o.sconto != null ? { scontoPercento: o.sconto } : {}),
+  });
+
+  const prodotti: ProductOffers[] = r.voci
+    .filter((v) => v.offerte.length > 0)
+    .map((v) => {
+      const offerte = v.offerte.map(offerta);
+      const conPrezzo = offerte.filter((o) => o.prezzo != null).map((o) => o.prezzo as number);
+      return {
+        prodotto: v.voce,
+        offerte,
+        differenza:
+          conPrezzo.length >= 2
+            ? Math.round((Math.max(...conPrezzo) - Math.min(...conPrezzo)) * 100) / 100
+            : null,
+      };
+    });
+
+  // La prima offerta di ogni voce: e' quella che l'app mostra in elenco.
+  const prezzi = prodotti
+    .filter((p) => p.offerte.length > 0)
+    .map((p) => ({ ...p.offerte[0], prodotto: p.prodotto, alternative: p.offerte.length - 1 }));
+
+  const catene: StoreTotal[] = r.insegne.map((i) => ({
+    negozio: i.insegna,
+    totale: i.totale,
+    verificati: i.vociCoperte,
+    proposti: i.vociCoperte,
+    utilizzabile: i.confrontabile,
+  }));
+  const confrontabili = catene.filter((c) => c.utilizzabile && c.totale > 0);
+
+  return {
+    prezzi,
+    prodotti,
+    catene,
+    vincitore: confrontabili.length ? confrontabili[0] : null,
+    risparmioVsPiuCara: r.risparmio,
+    totali: {
+      spesaAlMiglioPrezzo: r.riepilogo.totaleAlMiglioPrezzo,
+      valuta: r.riepilogo.valuta,
+      prodottiSenzaPrezzo: r.riepilogo.chieste - r.riepilogo.trovate,
+      vociInLista: r.riepilogo.chieste,
+    },
+    meta: {
+      motorePrezzi: "catalogo proprietario (sitemap + lettura della pagina)",
+      secondiPrezzi: r.secondi,
+      /* Quanto lavoro e' costato in ricerche e in denaro: da quando i prezzi
+         vengono dal catalogo sono zero tutti e due, e dirlo e' piu' onesto che
+         lasciare i campi vuoti. */
+      ricerche: 0,
+      ricercaEffettuata: true,
+      costoStimatoUsd: 0,
+      prezziVerificati: prezzi.filter((p) => p.verifica === "verificato").length,
+      prezziTotali: prodotti.reduce((n, p) => n + p.offerte.length, 0),
+      insegneConfrontate: r.copertura.insegne,
+      prodottiConAlternative: prodotti.filter((p) => p.offerte.length > 1).length,
+      prodottiInOfferta: prezzi.filter((p) => p.scontoPercento != null).length,
+      generatoIl: new Date().toISOString(),
+    },
+  };
+}
+
 /* ─────────── Abbinare le voci della lista alle offerte trovate ─────────── */
 
 /** Toglie accenti, punteggiatura e doppi spazi: resta solo la sostanza. */
@@ -635,8 +762,8 @@ async function menuPrima(
   let prices: PricesResponse | null = null;
   try {
     prices = await withTimeout(
-      post<PricesResponse>(
-        "/ai/prices",
+      post<RispostaV1>(
+        "/v1/prezzi",
         {
           items,
           city,
@@ -645,7 +772,7 @@ async function menuPrima(
           ...(PRICE_SOURCE ? { priceSource: PRICE_SOURCE } : {}),
         },
         PRICES_TIMEOUT_MS,
-      ),
+      ).then((r) => daV1(r, currency)),
       PRICES_TIMEOUT_MS,
     );
   } catch (err) {
@@ -822,11 +949,11 @@ async function spesaPrima(
   let prices: PricesResponse | null = null;
   try {
     prices = await withTimeout(
-      post<PricesResponse>(
-        "/ai/prices",
+      post<RispostaV1>(
+        "/v1/prezzi",
         { items, city, country, currency, ...(PRICE_SOURCE ? { priceSource: PRICE_SOURCE } : {}) },
         PRICES_TIMEOUT_MS,
-      ),
+      ).then((r) => daV1(r, currency)),
       PRICES_TIMEOUT_MS,
     );
   } catch (err) {

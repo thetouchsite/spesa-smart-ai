@@ -58,6 +58,8 @@ import {
   generatePricesParallel,
   GROUNDED_MODEL,
   MENU_MODEL,
+  chiamaMenu,
+  parseJson,
 } from "./app/plan-grounded.js";
 import type { CheckedRow } from "./api/price-page.js";
 import {
@@ -80,6 +82,7 @@ import { annota } from "./base/diario.js";
 import { statoVocabolario, quanteImparate } from "./api/vocabolario.js";
 import { saluteIA } from "./base/salute-ia.js";
 import { rispostaPrezziV1 } from "./api/contratto-v1.js";
+import { collegaTraduttore } from "./api/aiuti-esterni.js";
 import { consumoDiOggi, controllaChiave } from "./api/chiavi.js";
 import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./api/catalogo.js";
 import { paesiConCatalogo } from "./api/catalogo-fonti.js";
@@ -1225,23 +1228,64 @@ async function prezziDiLista(data: z.infer<typeof PricesInput>) {
 
   const esito = await prezzaLista(data.items, data.city, data.country, data.currency, fonte);
 
-  /* Scade insieme ai prezzi che contiene — ventiquattro ore, la stessa soglia
-     del magazzino. Erano sette giorni, ed erano sette giorni di troppo: la
-     risposta salvata si serve PRIMA del magazzino, quindi quella durata piu'
-     lunga non aggiungeva velocita', copriva soltanto la regola di freschezza. */
-  memorySet(key, esito, FRESCHEZZA_MS);
-  if (isDbConfigured()) {
-    try {
-      await (await cache(key)).insertOne({
-        _id: key,
-        value: esito,
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + FRESCHEZZA_MS),
-      });
-    } catch {
-      /* gia' presente */
+  /* UNA RISPOSTA VUOTA NON SI SALVA.
+     Il catalogo di un paese sono duecentomila prodotti che si caricano dal
+     database, e nei primi secondi dopo un riavvio non c'e' ancora. Chi chiede
+     in quel momento riceve una risposta ben formata e vuota — e' voluto, si
+     preferisce rispondere magri che far aspettare un minuto.
+     Quello che NON era voluto e' che quella risposta finisse in cache per
+     ventiquattro ore: un attimo di freddo avvelenava un giorno intero, e
+     ogni richiesta successiva per quella lista continuava a dire «nessun
+     negozio ha questo prodotto» mentre il catalogo era li', pieno.
+
+     Misurato: lanciando una misura diciotto secondi dopo un riavvio, Italia,
+     Regno Unito e Germania davano zero su quaranta. Non era la ricerca, non
+     era il modello: era la cache che ripeteva un vuoto di diciotto secondi
+     prima.
+
+     Su Render conta il doppio, perche' il piano gratuito si spegne e riparte
+     di continuo: e' esattamente la condizione in cui questo succede. */
+  /* SI GUARDA QUELLO CHE L'UTENTE RICEVE, non quello che abbiamo raccolto.
+     La prima versione di questa guardia controllava `prezzi`, cioe' le righe
+     grezze. Ma fra quelle e la risposta c'e' il raggruppamento, che ne scarta
+     — una riga senza prezzo e senza un link che si apra non e' un'offerta — e
+     quando ne scartava TUTTE la risposta usciva vuota con `prezzi` pieno: la
+     guardia la lasciava passare e il vuoto finiva in cache per ventiquattro
+     ore.
+
+     Si e' visto sbattendoci contro per un'ora: la stessa lista di venti voci
+     dava ottanta offerte appena calcolata e zero un minuto dopo, e sembrava
+     che il motore si rompesse a intermittenza. Era la cache che ripeteva un
+     vuoto di prima.
+
+     Adesso si guarda `prodotti`, che e' cio' che diventa la risposta. */
+  const utile = (esito.prodotti?.length ?? 0) > 0;
+
+  if (utile) {
+    /* Scade insieme ai prezzi che contiene — ventiquattro ore, la stessa
+       soglia del magazzino. Erano sette giorni, ed erano sette di troppo: la
+       risposta salvata si serve PRIMA del magazzino, quindi quella durata piu'
+       lunga non aggiungeva velocita', copriva soltanto la freschezza. */
+    memorySet(key, esito, FRESCHEZZA_MS);
+    if (isDbConfigured()) {
+      try {
+        await (await cache(key)).insertOne({
+          _id: key,
+          value: esito,
+          createdAt: new Date(),
+          expiresAt: new Date(Date.now() + FRESCHEZZA_MS),
+        });
+      } catch {
+        /* gia' presente */
+      }
     }
+  } else {
+    console.warn(
+      `[cache] risposta vuota per ${data.items.length} voci in ${data.country}: ` +
+        `NON la salvo, cosi' la prossima richiesta riprova invece di ripetere il vuoto`,
+    );
   }
+
   return esito;
 }
 
@@ -1567,9 +1611,18 @@ async function apriLaPorta(
   /** Lo stato non pesa sul tetto: serve proprio a chi il tetto l'ha finito. */
   pesaSulTetto = true,
 ): Promise<void> {
-  const intestazione = (req as { headers?: Record<string, unknown> })?.headers?.authorization;
+  /* DUE POSTI DOVE GUARDARE, e non e' un vezzo.
+     `Authorization` nell'app di MealMint porta gia' il token dell'UTENTE, che
+     serve alle liste salvate. Se ci mettesse anche la chiave dell'API una
+     delle due dovrebbe sloggiare, e sarebbe l'utente a perderci.
+
+     Quindi la chiave si accetta anche da `X-Api-Key`. Chi chiama da un server
+     — che utenti non ne ha — continua a usare `Authorization: Bearer`, che e'
+     la forma che si aspetta chiunque. */
+  const h = (req as { headers?: Record<string, unknown> })?.headers ?? {};
+  const daHeader = (nome: string) => (typeof h[nome] === "string" ? (h[nome] as string) : undefined);
   const esito = await controllaChiave(
-    typeof intestazione === "string" ? intestazione : undefined,
+    daHeader("x-api-key") ?? daHeader("authorization"),
     costa,
     pesaSulTetto,
   );
@@ -1750,6 +1803,56 @@ process.on("unhandledRejection", (reason) => {
 process.on("uncaughtException", (err) => {
   console.error("[server] eccezione non gestita, resto in piedi:", err);
 });
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DOVE I DUE BLOCCHI SI DANNO LA MANO
+
+   `api/` non importa niente da `app/` — lo verifica il build, e da oggi e'
+   vero senza eccezioni. Ma l'API una cosa dall'app la vorrebbe: quando il
+   dizionario della spesa incontra una parola che non conosce, qualcuno che
+   gliela traduca.
+
+   Invece di andarsela a prendere, la dichiara e aspetta. Qui gliela diamo.
+
+   E' l'unico punto del programma in cui i due blocchi si toccano, ed e' in
+   radice — cioe' fuori da tutti e due. Staccando `api/` questo file non parte
+   con lei, e l'API funziona lo stesso: senza traduttore, con il dizionario da
+   solo, che copre la stragrande maggioranza delle liste.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+collegaTraduttore(async (parole, lingua) => {
+  const prompt =
+    `Come si chiamano queste cose al supermercato in ${lingua}? Il nome ` +
+    `commerciale, quello scritto sullo scaffale, non la traduzione letterale: ` +
+    `«funghi» in inglese e' "mushrooms", non "fungi".
+` +
+    `Una parola o due per voce, minuscolo, stesso ordine, stessa lunghezza. ` +
+    `Solo JSON:
+{"tradotte":["...","..."]}
+
+${JSON.stringify(parole)}`;
+
+  try {
+    const r = await chiamaMenu(MENU_MODEL, prompt, 45_000);
+    recordCost(r.cost, "api");
+    const dati = parseJson(r.text) as { tradotte?: unknown };
+    const fuori = dati.tradotte;
+    if (!Array.isArray(fuori) || fuori.length !== parole.length) return null;
+    return fuori.map((x) => (typeof x === "string" ? x : ""));
+  } catch (err) {
+    /* Non si rilancia: chi ha chiesto sta gia' rispondendo a qualcuno, e una
+       traduzione mancata non deve spegnere il catalogo. `null` vuol dire «non
+       ce l'ho fatta», e di la' sanno cosa farne. */
+    console.warn("[traduttore] non riuscito, il dizionario fa da solo:", err);
+    return null;
+  }
+});
+
+/* Il selettore NON si collega, ed e' una decisione presa con dei numeri: su
+   duecento prove il modello sceglieva 151 volte giusto contro le 157 della
+   classifica. Il posto resta perche' il confronto va rifatto quando la ricerca
+   cambiera' — si scrive una riga qui e torna com'era. */
 
 const port = Number(process.env.PORT ?? 3000);
 if (!isConfigured()) console.warn("ATTENZIONE: GOOGLE_GENERATIVE_AI_API_KEY assente — /ai/* risponde 503.");

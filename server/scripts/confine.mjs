@@ -103,6 +103,9 @@ const PADRONI = {
   /* Quanto ce n'e' dentro, letto dal nome del prodotto. E' il pezzo che manca
      al prezzo al chilo, cioe' all'unica cosa che l'utente e' venuto a fare. */
   quantita: "api",
+  /* Quel poco che l'API si fa dare da fuori, senza sapere da chi. E' il file
+     che ha permesso di tagliare l'ultimo filo verso app/. */
+  "aiuti-esterni": "api",
   sinonimi: "api",
 
   // ── app ────────────────────────────────────────────────────────────
@@ -155,12 +158,16 @@ const PADRONI = {
  * script.
  */
 const TOLLERATI = [
-  {
-    da: "prices-catalogo",
-    a: "plan-grounded",
-    perche: "la scelta del modello fra i candidati, e il ripiego del dizionario",
-    quando: "Fase 3: sparisce quando il modello esce dalla strada dei prezzi",
-  },
+  /* VUOTO, e la data merita di essere scritta: 16 settembre 2026.
+     I fili erano tre. Due non erano dell'API e sono tornati a casa loro; il
+     terzo — la traduzione che chiedeva al modello — e' stato tagliato
+     rovesciando il verso: adesso l'API dichiara che le servirebbe un
+     traduttore e aspetta che qualcuno glielo dia, invece di andarselo a
+     prendere. Vedi `src/api/aiuti-esterni.ts`.
+
+     Da qui in poi questo elenco deve restare vuoto. Se qualcuno ci aggiunge
+     una voce, sta rimandando un problema: che sia una decisione, non una
+     distrazione, e che accanto ci sia scritto quando sparisce. */
 ];
 
 /* IL DEBITO CHE RESTA, E CHE QUESTO SCRIPT NON VEDE

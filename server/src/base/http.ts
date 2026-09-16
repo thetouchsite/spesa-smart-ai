@@ -80,7 +80,7 @@ function applyCors(req: IncomingMessage, res: ServerResponse) {
   // PRIMA di inviarla, nel controllo preliminare. L'app nativa non passa da
   // qui — CORS e' una regola del browser — quindi il difetto era invisibile
   // finche' non si prova la versione web.
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Api-Key");
   res.setHeader("Access-Control-Max-Age", "86400");
 }
 
