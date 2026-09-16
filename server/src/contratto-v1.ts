@@ -16,8 +16,10 @@
  * Questo file e' la cerniera fra le due. Dentro cambia quando vogliamo; qui si
  * cambia solo passando a `/v2`.
  *
- * E' una funzione pura, senza import da nessuna parte: e' cio' che le permette
- * di stare dalla parte dell'API senza portarsi dietro mezzo server.
+ * Non chiama niente e non sa che esiste un database: le uniche cose che si
+ * porta dietro sono altre funzioni pure. E' cio' che le permette di stare
+ * dalla parte dell'API senza trascinarsi mezzo server, e cio' che la rende
+ * facile da provare — si passa un oggetto e si guarda cosa esce.
  *
  * LA COSA CHE CAMBIA DI PIU': SI RISPONDE PER OGNI VOCE CHIESTA
  * -------------------------------------------------------------
@@ -29,6 +31,8 @@
  *
  * Qui ogni voce chiesta torna, sempre, con scritto cosa le e' successo.
  */
+
+import { type Quantita, prezzoNormalizzato, quantitaDa } from "./quantita.js";
 
 /** Cosa e' successo a una voce della spesa. Quattro cose diverse. */
 export type Esito =
@@ -57,6 +61,23 @@ export interface OffertaV1 {
   link: string | null;
   /** Quando quella pagina e' stata guardata, in ISO. Un prezzo senza data e' una diceria. */
   letto: string | null;
+  /**
+   * Quanto ce n'e' dentro, letto dal nome: grammi, millilitri o pezzi.
+   * `null` per la roba sfusa, che un peso non ce l'ha.
+   */
+  quantita: Quantita | null;
+  /**
+   * QUANTO COSTA UN CHILO. O un litro.
+   *
+   * E' il campo che rende onesto il confronto, e senza il quale l'app faceva
+   * scegliere male: 500 g a 1,39 € sembrano meno di 1 kg a 2,19 €, e invece
+   * sono 2,78 €/kg contro 2,19.
+   *
+   * `null` per i prodotti a pezzo — sei uova non si confrontano al chilo — e
+   * per quelli senza peso nel nome. Dire «non lo so» e' un'informazione;
+   * riempire la casella con un numero inventato e' il contrario.
+   */
+  prezzoNormalizzato: { valore: number; unita: "kg" | "l" } | null;
 }
 
 export interface VoceV1 {
@@ -133,6 +154,14 @@ function offertaDi(
   o: Dentro["prodotti"][number]["offerte"][number],
   valutaPredefinita: string,
 ): OffertaV1 {
+  /* La quantita' si legge QUI e non nelle strade dei prezzi, per due motivi.
+     Vale per tutte e due — quella italiana e quella generica — senza doverla
+     scrivere in due posti e senza il rischio che divergano, che e' gia'
+     costato degli errori. E resta fuori dal motore: e' una cosa del
+     contratto, cioe' di come si racconta un prezzo a chi lo riceve. */
+  const quantita = quantitaDa(o.nome);
+  const prezzo = typeof o.prezzo === "number" ? o.prezzo : null;
+
   return {
     insegna: o.negozio,
     nome: o.nome,
@@ -147,6 +176,8 @@ function offertaDi(
           : null,
     link: o.link || null,
     letto: o.letto ?? null,
+    quantita,
+    prezzoNormalizzato: prezzoNormalizzato(prezzo, quantita),
   };
 }
 

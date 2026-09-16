@@ -35,6 +35,8 @@ curl -X POST https://api.esempio.it/v1/prezzi \
           "valuta": "EUR",
           "prezzoPieno": null,
           "sconto": null,
+          "quantita": { "valore": 1000, "unita": "ml", "testo": "1 l" },
+          "prezzoNormalizzato": { "valore": 0.85, "unita": "l" },
           "link": "https://...",
           "letto": "2026-09-16T17:37:41.000Z"
         }
@@ -107,6 +109,24 @@ disegna di dire una cosa vera invece di «non disponibile».
 
 Se `copertura.coperto` e' `false`, `nessun-prodotto` vuol dire un'altra cosa
 ancora: quel paese non lo copriamo affatto.
+
+#### `prezzoNormalizzato` — quanto costa un chilo
+
+E' il campo che rende onesto il confronto. Senza, due confezioni di dimensione
+diversa si confrontano guardando il cartellino, e il cartellino mente:
+
+```
+Carrefour   zucchine 500 g   1,39 €      2,78 €/kg
+Aldi        zucchine 1 kg    2,19 €      2,19 €/kg   ← la piu' conveniente
+```
+
+Accanto c'e' `quantita`, con quanto ce n'e' dentro — grammi, millilitri o
+pezzi — e com'era scritto nel nome, cosi' puoi verificare.
+
+**`null` in tre casi, e sono tre cose diverse:** la roba a pezzo (sei uova non
+si confrontano al chilo), la roba sfusa (un peso non ce l'ha), e i prodotti
+il cui negozio il formato nel nome non lo scrive. Nessuno dei tre e' un
+errore, e in nessuno inventiamo un numero per riempire la casella.
 
 #### `letto` — quando quel prezzo e' stato visto
 
@@ -216,8 +236,10 @@ e' spenta. Per un'API di dati e' l'unica promessa che conti.
   `nessun-prezzo-pubblicato` e resta il link.
 - **Tesco, Asda e Sainsbury's** non sono coperte per intero: ci sono modi per
   aggirare le loro protezioni e non li usiamo.
-- **Le grammature non sono ancora un dato.** Il peso e' scritto nel nome del
-  prodotto ma non lo restituiamo come numero, quindi **non c'e' il prezzo al
-  chilo**: due confezioni di dimensione diversa oggi le confronti tu.
+- **Il prezzo al chilo c'e' per circa un terzo delle offerte.** Il peso lo
+  leggiamo dal nome del prodotto, e non tutti i negozi lo scrivono li':
+  misurato su 88 offerte vere, 23% in Italia e 50% nel Regno Unito. Dove non
+  c'e', `quantita` e `prezzoNormalizzato` sono `null` — e la roba sfusa un
+  peso non ce l'ha proprio.
 - Il conteggio delle chiamate vive in memoria e si azzera se il servizio si
   riavvia. E' un freno, non una contabilita'.
