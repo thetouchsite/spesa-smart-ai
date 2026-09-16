@@ -38,7 +38,7 @@ import { z } from "zod";
 import { createApp, HttpError } from "./http.js";
 import { isConfigured, model, MODEL_ID } from "./gemini.js";
 import { fetchPageContext, rankHits, searchProvider } from "./search.js";
-import { cache, isDbConfigured, plans, users } from "./db.js";
+import { cache, cacheVecchia, isDbConfigured, plans, users } from "./db.js";
 import { hashPassword, issueToken, requireUser, verifyPassword } from "./auth.js";
 import { isShoppingConfigured, searchShopping } from "./shopping.js";
 import {
@@ -139,7 +139,7 @@ function memoryGet(key: string): unknown | undefined {
     memoryCache.delete(key);
     return undefined;
   }
-  return hit.value;
+  return hit;
 }
 
 function memorySet(key: string, value: unknown, durataMs?: number): void {
@@ -153,6 +153,26 @@ function memorySet(key: string, value: unknown, durataMs?: number): void {
     value,
     expires: Date.now() + (durataMs ?? CACHE_TTL_DAYS * 86_400_000),
   });
+}
+
+/**
+ * Cerca nella cache, e nel posto vecchio se nel nuovo non c'e'.
+ *
+ * La cache e' appena stata divisa in due collezioni — una dell'API e una
+ * dell'app — e quella di prima e' ancora piena. Senza questo ripiego, il
+ * giorno del passaggio ogni risposta salvata smetterebbe di valere e tutti
+ * ripagherebbero un lavoro gia' fatto. Su un servizio che al risveglio ci mette
+ * cinquantacinque secondi non e' un dettaglio.
+ *
+ * Le voci vecchie hanno una scadenza e Mongo le toglie da sola: fra qualche
+ * giorno la collezione `cache` sara' vuota, questa funzione potra' tornare una
+ * riga sola e `cacheVecchia` sparire.
+ */
+async function dallaCache(key: string): Promise<unknown | undefined> {
+  const nella = await (await cache(key)).findOne({ _id: key });
+  if (nella) return nella.value;
+  const prima = await (await cacheVecchia()).findOne({ _id: key });
+  return prima?.value;
 }
 
 function cacheKey(endpoint: string, payload: unknown): string {
@@ -185,11 +205,11 @@ async function generate<T extends z.ZodTypeAny>(
 
   if (isDbConfigured()) {
     try {
-      const hit = await (await cache()).findOne({ _id: key });
-      if (hit) {
+      const hit = await dallaCache(key);
+      if (hit !== undefined) {
         console.info(`[cache] HIT database ${key}`);
-        memorySet(key, hit.value);
-        return hit.value as z.infer<T>;
+        memorySet(key, hit);
+        return hit as z.infer<T>;
       }
     } catch (err) {
       // Una cache irraggiungibile non deve impedire la generazione.
@@ -213,7 +233,7 @@ async function generate<T extends z.ZodTypeAny>(
 
   if (isDbConfigured()) {
     try {
-      await (await cache()).insertOne({
+      await (await cache(key)).insertOne({
         _id: key,
         value: output,
         createdAt: new Date(),
@@ -973,10 +993,10 @@ app.post("/ai/menu", async (body) => {
   }
   if (isDbConfigured()) {
     try {
-      const hit = await (await cache()).findOne({ _id: key });
-      if (hit) {
-        memorySet(key, hit.value);
-        return hit.value;
+      const hit = await dallaCache(key);
+      if (hit !== undefined) {
+        memorySet(key, hit);
+        return hit;
       }
     } catch {
       /* cache irraggiungibile: si prosegue */
@@ -1012,7 +1032,7 @@ app.post("/ai/menu", async (body) => {
   memorySet(key, result);
   if (isDbConfigured()) {
     try {
-      await (await cache()).insertOne({
+      await (await cache(key)).insertOne({
         _id: key,
         value: result,
         createdAt: new Date(),
@@ -1181,8 +1201,8 @@ async function prezziDiLista(data: z.infer<typeof PricesInput>) {
   }
   if (isDbConfigured()) {
     try {
-      const hit = await (await cache()).findOne({ _id: key });
-      if (hit) {
+      const hit = await dallaCache(key);
+      if (hit !== undefined) {
         /* SI DICE ANCHE QUANDO ARRIVA DAL DATABASE.
            Questa riga non c'era, e quella di memoria si': una risposta che
            arriva dal database non lasciava traccia. Misurando due strade
@@ -1191,8 +1211,8 @@ async function prezziDiLista(data: z.infer<typeof PricesInput>) {
            dirlo. Una cache silenziosa e' il modo piu' facile di misurare
            una cosa e crederne un'altra. */
         console.info(`[cache] HIT database ${key}`);
-        memorySet(key, hit.value);
-        return hit.value;
+        memorySet(key, hit);
+        return hit;
       }
     } catch {
       /* cache irraggiungibile */
@@ -1212,7 +1232,7 @@ async function prezziDiLista(data: z.infer<typeof PricesInput>) {
   memorySet(key, esito, FRESCHEZZA_MS);
   if (isDbConfigured()) {
     try {
-      await (await cache()).insertOne({
+      await (await cache(key)).insertOne({
         _id: key,
         value: esito,
         createdAt: new Date(),
@@ -1250,11 +1270,11 @@ app.post("/ai/plan-full", async (body) => {
   }
   if (isDbConfigured()) {
     try {
-      const hit = await (await cache()).findOne({ _id: key });
-      if (hit) {
+      const hit = await dallaCache(key);
+      if (hit !== undefined) {
         console.info(`[cache] HIT database ${key}`);
-        memorySet(key, hit.value);
-        return hit.value;
+        memorySet(key, hit);
+        return hit;
       }
     } catch (err) {
       console.warn("[cache] lettura fallita, proseguo senza:", err);
@@ -1290,7 +1310,7 @@ app.post("/ai/plan-full", async (body) => {
   memorySet(key, result);
   if (isDbConfigured()) {
     try {
-      await (await cache()).insertOne({
+      await (await cache(key)).insertOne({
         _id: key,
         value: result,
         createdAt: new Date(),
@@ -1343,11 +1363,11 @@ app.post("/product/amazon", async (body) => {
   }
   if (isDbConfigured()) {
     try {
-      const hit = await (await cache()).findOne({ _id: key });
-      if (hit) {
-        memorySet(key, hit.value);
+      const hit = await dallaCache(key);
+      if (hit !== undefined) {
+        memorySet(key, hit);
         console.info(`[cache] HIT database ${key} — nessun credito consumato`);
-        return hit.value;
+        return hit;
       }
     } catch {
       /* cache irraggiungibile: si prosegue */
@@ -1369,7 +1389,7 @@ app.post("/product/amazon", async (body) => {
     memorySet(key, risultato);
     if (isDbConfigured()) {
       try {
-        await (await cache()).insertOne({
+        await (await cache(key)).insertOne({
           _id: key,
           value: risultato,
           createdAt: new Date(),
@@ -1419,10 +1439,10 @@ app.post("/product/shopping", async (body) => {
   }
   if (isDbConfigured()) {
     try {
-      const hit = await (await cache()).findOne({ _id: key });
-      if (hit) {
-        memorySet(key, hit.value);
-        return hit.value;
+      const hit = await dallaCache(key);
+      if (hit !== undefined) {
+        memorySet(key, hit);
+        return hit;
       }
     } catch {
       /* cache irraggiungibile: si prosegue */
@@ -1438,7 +1458,7 @@ app.post("/product/shopping", async (body) => {
     memorySet(key, result);
     if (isDbConfigured()) {
       try {
-        await (await cache()).insertOne({
+        await (await cache(key)).insertOne({
           _id: key,
           value: result,
           createdAt: new Date(),

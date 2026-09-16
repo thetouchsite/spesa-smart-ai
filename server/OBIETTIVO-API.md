@@ -525,6 +525,35 @@ nessuna riga di logica cambiata, così il diff si legge e il merge non fa male.
 > Le misure si scrivono qui: numero, data, e **come** è stato ottenuto. Un
 > numero senza il metodo è un'opinione con le cifre.
 
+**16 settembre 2026 — Fase 3 e Fase 4**
+
+| fatto | misura |
+|---|---|
+| il peso non e' una parola del prodotto | 180 → 185 su 200 |
+| le dieresi tedesche | `Olivenöl` 0→5, `Hähnchenbrust` 0→5 |
+| le parole rare pesano di piu' | 185 → 186 (IT −1: da guardare) |
+| **prezzo al chilo** | lettore 19/19; copertura 35% delle offerte |
+| **cache divisa in due** | `cache_api` / `cache_app`, col ripiego sulla vecchia |
+| il ping che tiene sveglio Render | 55 s → 0,2 s, provato in esecuzione |
+| determinismo | due giri senza cache: risposte **identiche** |
+
+**Il determinismo e' provato per meta', e va detto quale meta'.** Due
+chiamate uguali, con la cache di mezzo tolta, danno lo stesso identico
+risultato — stessi prodotti, stesse insegne, stessi prezzi, stessi link — e la
+strada dei prezzi fa **zero** chiamate al modello. Quello che manca e'
+confrontare «col modello acceso» contro «spento»: la quota Google e' finita, e
+finche' non riparte quel numero non si puo' avere. Il metro si rifiuta di
+stamparlo, che e' il comportamento giusto.
+
+**Una cosa da sapere sul prezzo al chilo.** Sul catalogo la copertura e' 55% in
+Italia e 37% nel Regno Unito, ma nelle RISPOSTE si ribalta: 23% IT e 50% GB. La
+causa e' che la classifica preferisce i nomi in cui la cosa cercata occupa la
+quota maggiore — cioe' i nomi corti — e i nomi corti il formato non ce l'hanno.
+In Italia vince «latte intero», in Inghilterra «Warburtons soft farmhouse
+medium sliced bread 400g». La ricerca e il prezzo al chilo vogliono due cose
+diverse dallo stesso nome, e il modo di averle tutte e due e' leggere il peso
+dalla PAGINA invece che dal nome.
+
 **16 settembre 2026 — duecento prove sui cinque paesi, e la velocita'**
 
 `prove/ricerca.json` e' completo: 40 voci per paese, 200 in tutto, con le
