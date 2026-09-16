@@ -46,6 +46,7 @@
 
 import { gunzipSync } from "node:zlib";
 import { fontiDi, paesiConCatalogo, partiSuccessive, type FonteCatalogo } from "./catalogo-fonti.js";
+import { conSinonimi } from "./sinonimi.js";
 
 /** Un prodotto del catalogo. */
 export interface VoceCatalogo {
@@ -55,6 +56,14 @@ export interface VoceCatalogo {
   insegna: string;
   /** Parole del nome, gia' ripulite: si calcolano una volta, non a ogni ricerca. */
   parole: string[];
+  /**
+   * Quanto rende l'insegna di questa voce: vedi `FonteCatalogo.resa`.
+   *
+   * Si copia qui perche' l'ordinamento dei candidati la consulta per ogni
+   * riga, e risalire alla fonte a ogni confronto costerebbe piu' di un numero
+   * duplicato.
+   */
+  resa: number;
 }
 
 interface CatalogoPaese {
@@ -120,6 +129,23 @@ const MAX_PER_INSEGNA = 50_000;
  * tenga occupato il lavoro notturno per ore.
  */
 const MAX_FIGLIE = 200;
+
+/**
+ * Le sitemap figlie che dichiarano nel nome di non contenere prodotti.
+ *
+ * Si guarda il solo percorso, e prima si toglie la parola «sitemap»: contiene
+ * «item», e senza toglierla combacerebbe con qualunque file al mondo.
+ */
+const NON_E_UN_ELENCO_PRODOTTI =
+  /(categor|kategor|categoria|rubrique|recipe|ricett|rezept|receta|collection|store|negoz|filial|content|contenut|page|pagina|brand|marca|blog|news|article|author|tag)/i;
+
+function percorsoDi(u: string): string {
+  try {
+    return new URL(u).pathname.replace(/sitemaps?/gi, "");
+  } catch {
+    return u.replace(/sitemaps?/gi, "");
+  }
+}
 
 /** Chi e' stato tagliato dal tetto, e di quanto. Solo per dirlo, non per usarlo. */
 const troncati = new Map<string, { insegna: string; tenuti: number; visteAlmeno: number }>();
@@ -274,10 +300,47 @@ export function parole(testo: string): string[] {
  * Misurato: vincevano pure, perche' costano meno.
  */
 const NON_ALIMENTARI = [
-  /\b(crocchett|croccantin|gatt[oi]?|cane|cani|cucciol|cuccioli|mangim)/i,
-  /\b(detersiv|detergent|ammorbid|candeggi|sgrassat|anticalcar|shampoo|balsamo|bagnoschiuma|sapone|dentifric|deodorant|assorbent|pannolin|salviett|tovagliol|carta igienic|polish|insettic)/i,
-  /\b(haribo|caramell|gommos|liquiriz|chewing|lecca lecca)/i,
-  /\b(quaderno|portamine|matite|penna a sfera|astuccio|pila|batteri)/i,
+  // ── animali ──────────────────────────────────────────────────────
+  /\b(crocchett|croccantin|gatt[oi]?|cane|cani|cucciol|cuccioli|mangim|croquett|katzen|hunde|tierfutter|pienso|racao|kattenvoer|hondenvoer)/i,
+
+  // ── pulizia e igiene ─────────────────────────────────────────────
+  /\b(detersiv|detergent|ammorbid|candeggi|sgrassat|anticalcar|shampoo|shampooing|champu|champo|balsamo|bagnoschiuma|sapone|savon|jabon|seife|dentifric|toothpaste|zahnpasta|deodorant|assorbent|pannolin|couches|windeln|salviett|tovagliol|carta igienic|papier toilette|toilettenpapier|polish|insettic|lessive|waschmittel|limpiador)/i,
+
+  /* ── COSMETICA ───────────────────────────────────────────────────
+     Si traveste da cibo piu' di ogni altra categoria, perche' usa le stesse
+     parole: «lait corporel» e «lait demaquillant» finivano fra i candidati
+     per il latte, e in profumeria ci sono creme, burri e oli come in cucina. */
+  /\b(corporel|demaq|maquillage|mascara|parfum|eau de toilette|cosmetic|haarfarbe|hidratante corporal|body lotion|body milk|creme solaire|protector solar|zonnebrand|nagellack|smalto)/i,
+
+  // ── dolciumi che non sono un ingrediente ─────────────────────────
+  /\b(haribo|caramell|gommos|liquiriz|chewing|lecca lecca|bonbon|gummibar|chicle)/i,
+
+  // ── cartoleria ───────────────────────────────────────────────────
+  /\b(quaderno|portamine|matite|penna a sfera|astuccio|pila|batteri|cahier|notizbuch)/i,
+
+  /* ── UTENSILI E ELETTRODOMESTICI ─────────────────────────────────
+     Il caso peggiore, perche' l'attrezzo porta il nome di cio' che cucina:
+     «cuiseur a riz» per il riso, «grille-pain» per il pane, «eplucheur a
+     pommes de terre» per le patate, «emulsionneur a lait» per il latte.
+     Cercando l'ingrediente arrivava l'elettrodomestico — e vinceva, perche'
+     costa di piu' e sembrava il prodotto di pregio.
+
+     Solo parole che non possono essere cibo in nessuna delle lingue in
+     catalogo: niente «pan», che in spagnolo e' il pane; niente «piatto» o
+     «prato», che stanno dentro «piatto pronto». */
+  /\b(tostapane|toaster|tostadora|torradeira|broodrooster|grille.?pain)/i,
+  /\b(bollitore|bouilloire|wasserkocher|waterkoker|hervidor|chaleira|kettle)/i,
+  /\b(pelapatate|eplucheur|peeler|pelador|descascador|schaler)/i,
+  /\b(emulsionneur|montalatte|milchaufschaumer|frother)/i,
+  /\b(cuociriso|cuiseur|rice cooker|arrocera|reiskocher)/i,
+  /\b(frullator|mixeur|blender|batidora|liquidificador|standmixer|robot menager|robot de cocina)/i,
+  /\b(padella|poele|sarten|frigideira|pfanne|koekenpan|frying pan)/i,
+  /\b(pentola|kochtopf|olla a presion|panela de pressao|pressure cooker)/i,
+  /\b(affettatric|trancheuse|aufschnittmaschine|slicer)/i,
+  /\b(macchina da caffe|cafetiere|coffee maker|kaffeemaschine|cafeteira|cafetera)/i,
+  /\b(apriscatole|tire.?bouchon|corkscrew|cavatapp|sacacorchos|korkenzieher)/i,
+  /\b(huche a pain|boite a pain|portapane|bread bin|brotkasten|stoviglie|cookware|kitchenware|geschirr|vaisselle|utensil)/i,
+  /\b(microonde|micro.?ondes|mikrowelle|microwave|frigorifer|refrigerateur|kuhlschrank|congelatore|congelador)/i,
 ];
 
 /**
@@ -477,7 +540,15 @@ export async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> 
        coda invece di aprirle qui, cosi' un indice che ne contiene un altro —
        e capita — viene seguito senza scrivere una discesa ricorsiva. */
     if (/<sitemapindex/i.test(xml)) {
+      /* LE FIGLIE CHE DICHIARANO DI NON AVERE PRODOTTI NON SI APRONO.
+         Un indice generale elenca di tutto: Morrisons ha `sitemap-products`
+         accanto a `sitemap-categories`, `-recipes`, `-collections`. Aperte
+         tutte, il suo catalogo comincia con «mini globe led light bulbs» —
+         cinquemila pagine di reparto che entrano come se fossero prodotti e
+         spingono fuori il cibo, perche' il tetto per insegna e' lo stesso.
+         Il nome del file lo dice, e fidarsi del nome costa zero richieste. */
       for (const figlia of indirizzi(xml).slice(0, MAX_FIGLIE)) {
+        if (NON_E_UN_ELENCO_PRODOTTI.test(percorsoDi(figlia))) continue;
         if (!gia.has(figlia)) daAprire.push(figlia);
       }
       continue;
@@ -496,7 +567,17 @@ export async function daUnaFonte(fonte: FonteCatalogo): Promise<VoceCatalogo[]> 
       if (!nome) continue;
       const p = parole(nome);
       if (p.length === 0) continue;
-      voci.push({ nome, url: u, insegna: fonte.insegna, parole: p });
+      /* Anche sotto il nome dell'altra lingua del paese, dove ce n'e' una.
+         Bonpreu vende `llet` e la lista chiede `leche`: senza questo passaggio
+         l'unica catena spagnola che dichiara i prezzi resta invisibile. */
+      voci.push({
+        nome,
+        url: u,
+        insegna: fonte.insegna,
+        parole: conSinonimi(p, fonte.paese),
+        resa: fonte.resa ?? 0.5,
+      });
+      if (voci.length >= MAX_PER_INSEGNA) break;
     }
 
     // Se questa era la sitemap dichiarata ed era piatta, si prova a chiedere
@@ -731,19 +812,56 @@ export async function cercaNelCatalogo(
   const usati = complete.length ? complete : validi;
 
   /** Quanta parte del nome e' la cosa cercata: 2 parole su 3 batte 2 su 5. */
-  const quota = (i: number, punti: number): number => {
-    const quante = cat.voci[i].parole.length || 1;
-    return punti / quante;
-  };
+  const quota = (i: number, punti: number): number => punti / (cat.voci[i].parole.length || 1);
 
-  return usati
-    .sort(
-      (a, b) =>
-        b[1] - a[1] ||
-        quota(b[0], b[1]) - quota(a[0], a[1]) ||
-        cat.voci[a[0]].nome.length - cat.voci[b[0]].nome.length,
-    )
-    .slice(0, quanti)
+  /* Due criteri diversi, tenuti tutti e due: la QUOTA dice quale nome parla
+     davvero del prodotto cercato — senza, per «cheddar cheese» vinceva
+     «vintage cheddar cheese twist» su «morrisons cheddar cheese» — e la
+     diversita' per insegna qui sotto impedisce che i tre candidati finiscano
+     tutti nella stessa catena. */
+  const ordinati = usati.sort(
+    (a, b) =>
+      b[1] - a[1] ||
+      quota(b[0], b[1]) - quota(a[0], a[1]) ||
+      cat.voci[a[0]].nome.length - cat.voci[b[0]].nome.length,
+  );
+
+  /* UN CANDIDATO PER INSEGNA, PRIMA DI RIPETERE.
+     Ordinando solo per parole in comune, i candidati di una voce finivano
+     quasi sempre nella STESSA catena — quella con i nomi piu' descrittivi — e
+     se quella non espone i prezzi la voce restava vuota.
+
+     Misurato in Spagna: aggiungendo quattro insegne le voci con prezzo sono
+     SCESE da quattro a una su nove. Piu' catalogo e meno prezzi, perche' i
+     candidati si concentravano invece di distribuirsi.
+
+     Ora si prende il migliore di ogni insegna prima di prenderne un secondo
+     dalla stessa. E' anche cio' che serve a un'app di confronto: tre offerte
+     dello stesso negozio non sono un confronto. */
+  /* LE INSEGNE GENEROSE PER PRIME.
+     A parita' di parole in comune conviene provare la catena che il prezzo lo
+     dichiara. In Spagna solo Bonpreu lo fa — Alcampo, Consum, Mercadona, Aldi
+     ed El Corte Ingles sono a zero — e senza questo ordine i candidati
+     finivano su quelle mute. */
+  const perResa = [...ordinati].sort(
+    (a, b) => cat.voci[b[0]].resa - cat.voci[a[0]].resa || b[1] - a[1],
+  );
+
+  const scelti: typeof ordinati = [];
+  const viste = new Set<string>();
+  for (const riga of perResa) {
+    if (scelti.length >= quanti) break;
+    const insegna = cat.voci[riga[0]].insegna;
+    if (viste.has(insegna)) continue;
+    viste.add(insegna);
+    scelti.push(riga);
+  }
+  for (const riga of ordinati) {
+    if (scelti.length >= quanti) break;
+    if (!scelti.includes(riga)) scelti.push(riga);
+  }
+
+  return scelti
     .map(([i, punti]) => ({
       nome: cat.voci[i].nome,
       url: cat.voci[i].url,

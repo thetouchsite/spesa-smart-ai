@@ -76,11 +76,18 @@ export interface EsitoCatalogo {
 /**
  * Quanti prodotti del catalogo provare per ogni voce della lista.
  *
- * Tre: il primo non e' sempre il migliore — l'abbinamento a parole sbaglia — e
- * aprendo tre pagine si ha qualche possibilita' che almeno una dichiari il
- * prezzo. Oltre, il tempo cresce e il guadagno no.
+ * SEI, ed erano tre. Il numero dipende da quante insegne ha il paese: i
+ * candidati si distribuiscono una per catena, e con tre se ne tentavano tre su
+ * sei — spesso non quelle che i prezzi li espongono davvero.
+ *
+ * Misurato in Spagna, dove le insegne sono passate da due a sei: le voci con
+ * prezzo erano SCESE da quattro a una su nove. Piu' catalogo e meno prezzi,
+ * perche' i tentativi non bastavano a coprire le catene nuove.
+ *
+ * Costa pagine aperte, che e' il tempo di questa strada. Il tetto vero resta
+ * quello dell'app: cinquantacinque secondi.
  */
-const CANDIDATI_PER_VOCE = 3;
+const CANDIDATI_PER_VOCE = 6;
 
 /** Quante pagine aprire insieme. Otto e' gentile e abbastanza veloce. */
 const INSIEME = 8;
