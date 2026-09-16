@@ -96,6 +96,19 @@ export interface EsitoCatalogo {
   prezzi: PrezzoGrezzo[];
   /** Voci per cui il catalogo non aveva nessun candidato. */
   senzaCandidati: number;
+  /**
+   * Voci che UN CANDIDATO CE L'AVEVANO, ma di cui non si e' aperta una pagina.
+   *
+   * E' la differenza fra «nessun negozio ha questo prodotto» e «il prodotto
+   * c'e', non siamo riusciti ad aprirlo». Senza questo elenco le due cose
+   * arrivano uguali a chi legge, e la prima e' una bugia: misurato, Aldi Nord
+   * ha «Tomatenmark» a catalogo con due schede, e siccome le sue pagine non si
+   * aprono spariva in silenzio.
+   *
+   * Qui non si vedeva perche' altri negozi rispondevano. Il giorno che
+   * falliscono tutti, chi riceve deve sapere che vale la pena riprovare.
+   */
+  nonRaggiungibili: string[];
   /** Pagine aperte per leggere il prezzo: e' il costo in tempo di questa strada. */
   pagineAperte: number;
   secondi: number;
@@ -551,7 +564,7 @@ export async function generatePricesCatalogo(
 
   if (!catalogoDisponibilePer(paeseIso)) {
     console.info(`[catalogo] nessuna fonte per ${paeseIso}: questa strada non e' percorribile`);
-    return { prezzi: [], senzaCandidati: items.length, pagineAperte: 0, secondi: 0 };
+    return { prezzi: [], nonRaggiungibili: [], senzaCandidati: items.length, pagineAperte: 0, secondi: 0 };
   }
 
   /* Si cerca nella lingua del negozio, ma la voce mostrata resta quella
@@ -773,6 +786,20 @@ export async function generatePricesCatalogo(
      non sono un confronto, sono la stessa voce due volte. E chi non ha il
      prezzo entra solo se non c'e' nessun altro, perche' una riga senza cifra
      vale come ripiego e non come alternativa. */
+  /* Quali voci avevano candidati e quali hanno prodotto almeno una riga: la
+     differenza e' l'elenco di chi e' caduto aprendo le pagine. */
+  const conCandidati = new Set(
+    candidature.filter((c) => c.candidati.length > 0).map((c) => c.voce),
+  );
+  const conRighe = new Set(letti.filter(Boolean).map((r) => r!.riga.prodotto));
+  const nonRaggiungibili = [...conCandidati].filter((v) => !conRighe.has(v));
+  if (nonRaggiungibili.length) {
+    console.info(
+      `[catalogo] ${nonRaggiungibili.length} voci avevano candidati ma nessuna ` +
+        `pagina si e' aperta: ${nonRaggiungibili.slice(0, 4).join(", ")}`,
+    );
+  }
+
   const perVoceInsegna = new Map<string, { riga: PrezzoGrezzo; posto: number }>();
   for (const r of letti) {
     if (!r) continue;
@@ -832,5 +859,8 @@ export async function generatePricesCatalogo(
       `di cui ${conPrezzo} con il prezzo leggibile`,
   );
 
-  return { prezzi, senzaCandidati, pagineAperte: daAprire.length, secondi };
+  return {
+    prezzi,
+    nonRaggiungibili,
+    senzaCandidati, pagineAperte: daAprire.length, secondi };
 }
