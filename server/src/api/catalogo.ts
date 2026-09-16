@@ -427,6 +427,13 @@ export function parole(testo: string): string[] {
  * Misurato: vincevano pure, perche' costano meno.
  */
 const NON_ALIMENTARI = [
+  /* ── oggetti che si chiamano come il cibo ────────────────────────
+     Per «Tonno in scatola» e' uscita una SCATOLA REGALO con cinquanta led,
+     perche' «scatola» sta in tutti e due. Sono oggetti da vetrina che i
+     supermercati vendono davvero, e che nessuna lista della spesa chiede. */
+  /\b(scatola regalo|confezione regalo|addobb|ghirland|presepe|candel|tovagli|bicchier|stovigli|posate|pentol|padell|barattolo vuot|sacchetti per)/i,
+  /\b([0-9]+\s?led|luci led|lucine|catena luminosa|lampadin|batteri[ae]|pil[ae] stilo)/i,
+
   // ── animali ──────────────────────────────────────────────────────
   /* I supermercati veri il cibo per animali lo vendono, e ha nomi da cibo:
      «wet adult cat food tuna» rispondeva alla voce «Tuna tin». Togliere i

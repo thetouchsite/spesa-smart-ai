@@ -42,6 +42,7 @@
  */
 
 import { cercaNelCatalogo } from "./catalogo.js";
+import { quantitaDa } from "./quantita.js";
 import { paesiConCatalogo } from "./catalogo-fonti.js";
 import { verifyProductPage } from "./price-page.js";
 import { ilSelettore, ilTraduttore } from "./aiuti-esterni.js";
@@ -666,6 +667,23 @@ export async function generatePricesCatalogo(
        vogliamo fare. */
     const prezzo = v.page?.current ?? null;
 
+    /* IL NOME PIU' COMPLETO FRA I DUE, e conta perche' ci sta dentro il peso.
+       Il nome del catalogo viene dall'indirizzo: `latte-intero`. Quello che la
+       pagina dichiara di solito e' per esteso: «Latte intero UHT 1 l». Il peso
+       sta nel secondo, e senza peso non c'e' prezzo al chilo — che oggi si
+       riesce a dare solo per un terzo delle offerte.
+
+       Non si prende sempre quello della pagina: a volte e' un titolo di
+       vetrina, con dentro il nome del negozio e uno slogan. Si prende solo
+       quando aggiunge una QUANTITA' che l'altro non aveva, cioe' solo quando
+       porta l'informazione che ci manca. */
+    const nomeCatalogo = c.nome.charAt(0).toUpperCase() + c.nome.slice(1);
+    const nomePagina = v.page?.nome?.trim();
+    const nome =
+      nomePagina && !quantitaDa(nomeCatalogo) && quantitaDa(nomePagina)
+        ? nomePagina
+        : nomeCatalogo;
+
     /* Si mette da parte anche quel che non si mostra.
        Sapere che una pagina non si apre, o che si apre e il prezzo non lo
        dichiara, vale quanto sapere il prezzo: evita di tornare a chiederlo
@@ -674,7 +692,7 @@ export async function generatePricesCatalogo(
       url: c.url,
       prezzo,
       valuta: v.page?.currency ?? valuta,
-      nome: c.nome.charAt(0).toUpperCase() + c.nome.slice(1),
+      nome,
       insegna: c.insegna,
       verifica: v.status,
       visto: new Date(),
@@ -686,9 +704,7 @@ export async function generatePricesCatalogo(
 
     const riga = {
       prodotto: c.voce,
-      // Il nome del catalogo viene dall'indirizzo ed e' tutto minuscolo:
-      // la prima lettera maiuscola lo rende leggibile in elenco.
-      nome: c.nome.charAt(0).toUpperCase() + c.nome.slice(1),
+      nome,
       prezzo,
       valuta: v.page?.currency ?? valuta,
       negozio: c.insegna,

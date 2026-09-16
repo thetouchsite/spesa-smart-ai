@@ -45,6 +45,19 @@ export interface PagePrice {
   /** Fino a quando è valido, se dichiarato (ISO). */
   validUntil?: string;
   currency?: string;
+  /**
+   * Il nome che la PAGINA dichiara, che spesso e' piu' completo di quello che
+   * si ricava dall'indirizzo.
+   *
+   * Il catalogo prende i nomi dalle sitemap, cioe' dagli indirizzi, e li' il
+   * formato spesso non c'e': `latte-intero` invece di «Latte intero UHT 1 l».
+   * La pagina invece lo dichiara quasi sempre, e la stiamo gia' aprendo per
+   * leggere il prezzo — quindi costa zero richieste in piu'.
+   *
+   * Serve al prezzo al chilo: senza il peso non si puo' calcolare, e oggi si
+   * riesce solo per un terzo delle offerte.
+   */
+  nome?: string;
 }
 
 /**
@@ -77,6 +90,7 @@ export interface VerifiedPrice {
 }
 
 import { haLettoreApi, prezzoDaApi } from "./prezzi-api.js";
+import { quantitaDa } from "./quantita.js";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
@@ -329,8 +343,21 @@ function leggiDa(html: string): PagePrice | null {
     if (sane(computed) && computed > current) list = computed;
   }
 
+  /* IL NOME DICHIARATO DALLA PAGINA.
+     Si guarda prima nei dati strutturati, che sono fatti per essere letti da
+     un programma, e solo dopo nel titolo — che spesso porta appiccicato il
+     nome del negozio e altra roba da vetrina.
+
+     Si scarta quel che e' troppo corto o troppo lungo: sotto i tre caratteri
+     non e' un nome, sopra i centoventi e' una frase di marketing. */
+  const nome =
+    html.match(/"name"\s*:\s*"([^"]{3,120})"/)?.[1] ??
+    html.match(/<title[^>]*>([^<]{3,120})<\/title>/i)?.[1]?.trim() ??
+    undefined;
+
   const out: PagePrice = {
     current,
+    nome,
     validUntil: html.match(/"priceValidUntil"\s*:\s*"([\d-]{8,10})"/i)?.[1] ?? undefined,
     currency: html.match(/"priceCurrency"\s*:\s*"([A-Z]{3})"/)?.[1] ?? undefined,
   };
@@ -592,8 +619,19 @@ export async function verifyPrices(
            listino barrato e lo sconto li dichiara l'API stessa — passava di qui
            e usciva senza. La promozione veniva raccolta e poi buttata. */
         const p = v.page;
+        /* IL NOME PIU' COMPLETO, se la pagina ne dichiara uno che porta il
+           formato e quello che abbiamo non ce l'ha.
+           Vale soprattutto per la strada italiana: quelle righe arrivano dalle
+           API dei negozi e dai volantini, con nomi corti e spesso in
+           maiuscolo, e la pagina non la aprono mai. Qui pero' si apre — per
+           verificare il link — e leggere anche il nome non costa una richiesta
+           in piu'. Senza formato non c'e' prezzo al chilo. */
+        const nomeMigliore =
+          p?.nome && quantitaDa(p.nome) && !quantitaDa(row.nome) ? p.nome.trim() : row.nome;
+
         return {
           ...row,
+          nome: nomeMigliore,
           prezzo: p?.current ?? row.prezzo,
           verifica: v.status,
           prezzoListino: p?.list ?? row.prezzoListino,
