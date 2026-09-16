@@ -7,11 +7,24 @@
  * qualche decina di secondi: farlo mentre qualcuno aspetta il suo piano
  * significherebbe rallentarlo per niente.
  *
- * Una volta al giorno perche' tanto basta: QUI DENTRO NON CI SONO PREZZI. La
- * sitemap e' un indice di indirizzi, e i cataloghi cambiano lentamente — un
- * prodotto nuovo compare, uno vecchio sparisce. Il PREZZO invece si legge
- * dalla pagina nel momento in cui l'utente genera il piano, quindi e' sempre
- * di oggi, qualunque cosa faccia questo lavoro notturno.
+ * DUE MESTIERI, NON UNO
+ * ---------------------
+ * Prima qui c'era scritto «qui dentro non ci sono prezzi», ed era vero: si
+ * rinfrescavano gli indirizzi e basta, mentre i prezzi li leggeva l'app una
+ * pagina alla volta con l'utente che aspettava. Il magazzino dei prezzi si
+ * riempiva solo se qualcuno lanciava uno script a mano, quindi quasi mai.
+ *
+ * Ora la notte fa tutte e due le cose, in quest'ordine:
+ *
+ *   1. il CATALOGO — gli indirizzi, dalle sitemap. Cambia lentamente: un
+ *      prodotto nuovo compare, uno vecchio sparisce.
+ *   2. i PREZZI della spesa di base — le sessanta voci che tornano in quasi
+ *      ogni lista, aperte una volta per tutti invece che una volta per
+ *      ciascuno. Vedi `prezzi-notturni.ts`.
+ *
+ * Il prezzo letto stanotte vale ventiquattro ore. Piu' vecchio di cosi' non
+ * si mostra: la pagina si riapre. Quindi al peggio l'app fa quel che faceva
+ * prima, e al meglio — quasi sempre — trova tutto pronto.
  *
  * QUESTO NON E' UN CRON, ED E' IMPORTANTE SAPERLO
  * -----------------------------------------------
@@ -37,6 +50,17 @@
 
 import { catalogoDi, statoCatalogo } from "./catalogo.js";
 import { paesiConCatalogo } from "./catalogo-fonti.js";
+import { riempiPrezzi } from "./prezzi-notturni.js";
+
+/**
+ * Quante voci della spesa di base prezzare per paese, ogni notte.
+ *
+ * Sessanta e' quanto ne serve: misurato, sessanta voci per sei paesi sono
+ * circa duemila pagine, venti minuti spalmati. Alzarlo allunga la notte senza
+ * aggiungere quasi niente — le voci oltre la sessantesima compaiono in una
+ * lista su venti.
+ */
+const VOCI_PER_PAESE = Number(process.env.PREZZI_VOCI_PER_PAESE ?? 60);
 
 /**
  * I paesi da tenere sempre pronti.
@@ -103,7 +127,23 @@ export async function aggiornaCatalogo(motivo: string): Promise<void> {
     for (const p of paesi) {
       try {
         const c = await catalogoDi(p);
-        if (!c) console.warn(`[catalogo] ${p}: nessuna fonte ha risposto`);
+        if (!c) {
+          console.warn(`[catalogo] ${p}: nessuna fonte ha risposto`);
+          continue;
+        }
+
+        /* I PREZZI SUBITO DOPO, SULLO STESSO PAESE.
+           Qui e non in un secondo giro perche' il catalogo di questo paese e'
+           in memoria adesso: rifarlo dopo costerebbe di nuovo trenta secondi e
+           mezzo gigabyte.
+
+           Se fallisce, il catalogo resta buono lo stesso — sono due mestieri
+           separati e il secondo non deve poter rovinare il primo. */
+        try {
+          await riempiPrezzi(p, VOCI_PER_PAESE);
+        } catch (err) {
+          console.warn(`[prezzi] ${p} fallito (il catalogo resta buono):`, err);
+        }
       } catch (err) {
         // Un paese che fallisce non deve fermare gli altri.
         console.warn(`[catalogo] ${p} fallito:`, err);

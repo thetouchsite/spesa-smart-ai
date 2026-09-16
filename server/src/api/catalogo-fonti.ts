@@ -208,6 +208,36 @@ export const FONTI: FonteCatalogo[] = [
 
   { paese: "IN", insegna: "JioMart", dominio: "www.jiomart.com", sitemap: "https://www.jiomart.com/sitemap.xml", resa: 0, stimati: 9332 },
 
+  /* LE ITALIANE CHE IL PREZZO NON LO DANNO, E PERCHE'. VERIFICATO A MANO
+     APRENDO LE PAGINE, IL 16 SETTEMBRE 2026. NON RIFARE QUESTO LAVORO.
+
+     Sei insegne, 114.911 prodotti, `resa: 0`. Cinque girano sulla stessa
+     piattaforma — EBSN — e all'inizio sembravano un caso solo. Non lo sono:
+
+       CoopShop    la scheda si apre e mostra tutto tranne la cifra. Serve
+                   accedere. L'API `/ebsn/api/products` e' CONSENTITA e
+                   risponde, ma il campo `price` nella risposta non c'e'.
+       Basko       identico, e la pagina apre proprio la finestra di accesso.
+                   Nessun robots.txt, quindi l'API e' consentita: e' inutile.
+       Esselunga   serve accedere.
+       Ali'        IL PREZZO SULLA PAGINA SI VEDE — 18,90 euro, e pure il
+                   prezzo al chilo. Ma l'HTML e' un guscio da 16 KB: la cifra
+                   la prende il browser da `/ebsn/api/`, che il loro
+                   robots.txt vieta per nome. Decisione commerciale, non
+                   tecnica: se un giorno si vuole trattare con loro, sono
+                   17.550 prodotti che aspettano un permesso.
+       Tigros      `Disallow: /ebsn/`. Stessa risposta.
+       Pam         guscio JavaScript, nessuna API pubblica trovata.
+
+     Per confronto, due della stessa famiglia che invece rendono:
+       Iperal      il prezzo sta nell'HTML. Era scritta `resa: 0` per un
+                   difetto nostro, e sono 23.255 prodotti.
+       Naturasi    l'API EBSN risponde con `price` e il robots.txt la
+                   consente. Vedi il lettore in `prezzi-api.ts`.
+
+     La morale, che costa piu' di quanto sembri: «e' EBSN, quindi e' muta»
+     sarebbe stata una deduzione ragionevole e sbagliata quattro volte su
+     otto. Queste cose si guardano una per una. */
   { paese: "IT", insegna: "CoopShop", dominio: "coopshop.it", sitemap: "https://coopshop.it/sitemap.xml", resa: 0, stimati: 54576 },
   { paese: "IT", insegna: "Carrefour Italia", dominio: "www.carrefour.it", sitemap: "https://www.carrefour.it/sitemap_index.xml", resa: 0.8, stimati: 28352 },
   { paese: "IT", insegna: "Iperal Spesa Online", dominio: "www.iperalspesaonline.it", sitemap: "https://www.iperalspesaonline.it/sitemap.xml", resa: 0.7, stimati: 23255 },

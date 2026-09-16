@@ -171,6 +171,50 @@ const LETTORI: Lettore[] = [
       return v === null ? null : { prezzo: v, valuta: "EUR", nome: String(p?.title ?? "") };
     },
   },
+  {
+    /* NATURASI - 7.711 prodotti, Italia.
+
+       LA PIATTAFORMA E' LA STESSA DI ALTRE SEI ITALIANE, IL PERMESSO NO.
+       CoopShop, Basko, Iperal, Tigros, Ali' e Naturasi girano tutte su EBSN,
+       e all'inizio le avevamo messe insieme come «mute». Aperte a mano una
+       per una, sono tre situazioni diverse:
+
+         Naturasi   l'API risponde con `price`, e il robots.txt la consente
+         CoopShop   l'API risponde SENZA `price`: sul sito serve accedere
+         Basko      idem, e la pagina apre una finestra di accesso
+         Ali'       il prezzo sulla pagina si VEDE, 18,90 euro, ma l'unica
+                    strada per leggerlo e' `/ebsn/api/`, che il loro
+                    robots.txt vieta per nome. Quindi no.
+         Tigros     `Disallow: /ebsn/` — stessa risposta
+         Iperal     il prezzo sta nell'HTML, non serve nessun lettore
+
+       Sei insegne, stessa tecnologia, sei esiti. E' il motivo per cui questa
+       roba si guarda una per una invece di dedurla: «e' EBSN, quindi e'
+       muta» sarebbe stata una conclusione ragionevole e sbagliata quattro
+       volte su sei.
+
+       Qui la corrispondenza e' esatta: lo `slug` che l'API restituisce e'
+       l'ultimo pezzo dell'indirizzo, quindi non si confrontano nomi. */
+    insegna: "Naturasi",
+    host: /(^|\.)naturasi\.it$/i,
+    async leggi(url) {
+      const pezzi = new URL(url).pathname.split("/").filter(Boolean);
+      const slug = pezzi.pop() ?? "";
+      if (slug.length < 4) return null;
+
+      const d = (await json(
+        `https://www.naturasi.it/ebsn/api/products?q=${encodeURIComponent(slug.replace(/-/g, " "))}&page_size=8`,
+        "it-IT,it;q=0.9",
+      )) as { data?: { products?: Array<Record<string, any>> } } | null;
+
+      for (const p of d?.data?.products ?? []) {
+        if (String(p?.slug ?? "") !== slug) continue;
+        const v = sensato(p?.price ?? p?.priceDisplay);
+        if (v !== null) return { prezzo: v, valuta: "EUR", nome: String(p?.name ?? "") };
+      }
+      return null;
+    },
+  },
 ];
 
 /**
