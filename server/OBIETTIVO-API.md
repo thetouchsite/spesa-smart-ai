@@ -304,6 +304,73 @@ veloce di perdere una giornata a entrambi.
 
 ---
 
+## L'infrastruttura è in comune, ma per comodità
+
+Oggi API e app girano nello stesso processo, sullo stesso database, con lo
+stesso deploy. È una scelta pratica e va benissimo adesso: due deploy separati
+per due cose che stanno cambiando tutti i giorni sarebbero solo due posti dove
+sbagliare.
+
+Ma «per comodità» è il modo in cui le cose diventano permanenti senza che
+nessuno lo decida. Quindi si scrive qui **cosa è condiviso e quanto costa
+separarlo**, e si ricontrolla ogni tanto. Finché questo elenco resta corto,
+staccare resta facile.
+
+### Cosa condividono, oggi
+
+| | com'è | quanto costa separarlo |
+|---|---|---|
+| **il processo** | un solo Node, un solo deploy su Render | poco: due `index.ts`, la base è già comune |
+| **il database** | stesso cluster, stesso database | **quasi niente, vedi sotto** |
+| **il tetto di spesa** | `SPESA_MAX_USD` è uno, globale | poco, ma va fatto **presto** |
+| **il `.env`** | uno solo, e non si sa quale variabile è di chi | poco, se si commenta adesso |
+| **il diario e i log** | mescolati | poco |
+
+### Il database è già quasi diviso
+
+Cinque collezioni, e quattro hanno già un padrone chiaro:
+
+```
+  prezzi      API      i prezzi letti dalle schede
+  cataloghi   API      i cataloghi per paese
+  users       app      gli utenti
+  plans       app      le liste salvate
+  cache       ENTRAMBI  ← l'unica mescolata
+```
+
+E anche `cache` è mescolata in modo gentile: le chiavi portano già un prefisso
+che dice di chi sono.
+
+```
+  "prices"                  API
+  "menu", "lista", "plan-full", "menu-da-prodotti"    app
+  "amazon", "shopping"      strade dei prezzi alternative
+```
+
+Dividerla in due collezioni è quasi gratis **adesso**. Fra sei mesi, con dentro
+qualche milione di documenti e magari un prefisso nuovo che non rispetta la
+regola, è una migrazione.
+
+### Il tetto di spesa è la cosa da sistemare presto
+
+`SPESA_MAX_USD` è un contatore solo. Vuol dire che **se la generazione di un
+menu brucia il budget, l'API smette di rispondere anche a chi paga** — e torna
+`402` a tutti.
+
+È l'unica cosa condivisa che fa male *oggi*, non un domani. Due contatori, uno
+per blocco, e il problema sparisce.
+
+### Cosa NON si separa adesso
+
+Processo, deploy e cluster Mongo restano in comune finché il confine nel codice
+non è dimostrato — cioè finché lo script del confine non passa da un po' di
+tempo senza lamentarsi.
+
+Dividere l'infrastruttura di due cose ancora intrecciate non le separa: crea
+due posti dove sistemare lo stesso errore.
+
+---
+
 ## Cosa vuol dire riuscito
 
 1. **Si chiama con una chiave.** Ogni chiamata porta una chiave, la chiave ha
