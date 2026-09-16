@@ -133,8 +133,15 @@ export interface RispostaPrezziV1 {
    * abbastanza copertura per confrontare onestamente.
    */
   insegne: InsegnaV1[];
-  /** Quanto si risparmia scegliendo la prima invece dell'ultima confrontabile. */
+  /**
+   * Quanto si risparmia scegliendo l'insegna piu' conveniente invece della
+   * meno conveniente, fra quelle confrontabili — calcolato sulle sole voci
+   * che hanno tutte, cosi' i due carrelli contengono le stesse cose.
+   * `null` quando non c'e' abbastanza da confrontare.
+   */
   risparmio: number | null;
+  /** Su quante voci e' stato fatto quel confronto. `null` se non c'e' risparmio. */
+  risparmioSuVoci: number | null;
   copertura: {
     paese: string;
     /** Abbiamo un catalogo per quel paese? Se no, `nessun-prodotto` vuol dire un'altra cosa. */
@@ -145,7 +152,22 @@ export interface RispostaPrezziV1 {
   riepilogo: {
     chieste: number;
     trovate: number;
-    /** Il totale della spesa comprando ogni voce dove costa meno. */
+    /**
+     * La somma delle offerte MOSTRATE — la prima di ogni voce, quella che si
+     * legge sullo schermo. E' il numero che deve tornare se qualcuno somma a
+     * mano quello che vede.
+     */
+    totaleMostrato: number;
+    /**
+     * La somma comprando ogni voce dove costa meno, girando fra i negozi.
+     * E' sempre minore o uguale a `totaleMostrato`.
+     *
+     * Prima questo campo esisteva gia' con questo nome e conteneva l'altro
+     * numero: era la somma della PRIMA offerta, non della piu' economica. Su
+     * una spesa da sei voci diceva 23,55 quando la piu' economica faceva
+     * 8,86. Un nome che promette e non mantiene e' peggio di un campo che
+     * manca, perche' nessuno va a controllarlo.
+     */
     totaleAlMiglioPrezzo: number;
     valuta: string;
   };
@@ -323,22 +345,59 @@ export function rispostaPrezziV1(
     confrontabile: c.utilizzabile && c.verificati >= soglia,
   }));
 
-  /* E il risparmio si calcola SOLO fra chi e' davvero confrontabile.
-     Adesso chi e' rimasto copre tutti piu' o meno le stesse voci, quindi la
-     sottrazione confronta cose confrontabili. */
+  /* IL RISPARMIO SI CALCOLA SULLE VOCI CHE HANNO TUTTI, NON SUI TOTALI.
+     La tolleranza di una voce bastava a far rientrare il caso che voleva
+     escludere: su sei voci, Eataly ne copriva cinque per 49,95 ed Eurospin
+     tutte e sei per 8,86, e il «risparmio» diventava 41,09 — su una spesa
+     che a schermo ne segnava 23,55. Un risparmio piu' grande della spesa.
+
+     La sottrazione era giusta; erano i due addendi a non contenere le stesse
+     cose. Quindi non si sottraggono piu' i totali: si prende l'insieme delle
+     voci che TUTTE le insegne confrontabili hanno a listino, e si rifa' il
+     carrello di ognuna su quelle e basta. Cosi' i due numeri contano gli
+     stessi prodotti, e la differenza vuol dire qualcosa.
+
+     I prezzi si rileggono dalle offerte che stiamo restituendo: chi riceve la
+     risposta puo' rifare il conto da se' e ritrovare la stessa cifra. */
   const confrontabili = insegne.filter((i) => i.confrontabile && i.totale > 0);
+
+  /** Per ogni insegna confrontabile: voce → quanto costa li'. */
+  const carrelli = new Map<string, Map<string, number>>(
+    confrontabili.map((i) => [i.insegna, new Map<string, number>()]),
+  );
+  for (const v of voci) {
+    for (const o of v.offerte ?? []) {
+      const suo = carrelli.get(o.insegna);
+      if (!suo || typeof o.prezzo !== "number" || !(o.prezzo > 0)) continue;
+      const gia = suo.get(v.voce);
+      if (gia == null || o.prezzo < gia) suo.set(v.voce, o.prezzo);
+    }
+  }
+
+  const comuni = voci
+    .map((v) => v.voce)
+    .filter((nome) => [...carrelli.values()].every((c) => c.has(nome)));
+
+  /* Se le voci in comune sono poche il confronto torna a essere una
+     coincidenza, e allora e' meglio non dire niente che dire un numero. */
+  const abbastanza = comuni.length >= minimo;
+  const somme = abbastanza
+    ? [...carrelli.values()].map((c) =>
+        comuni.reduce((s, nome) => s + (c.get(nome) ?? 0), 0),
+      )
+    : [];
+
   const risparmio =
-    confrontabili.length >= 2
-      ? Math.round(
-          (Math.max(...confrontabili.map((i) => i.totale)) -
-            Math.min(...confrontabili.map((i) => i.totale))) * 100,
-        ) / 100
+    somme.length >= 2
+      ? Math.round((Math.max(...somme) - Math.min(...somme)) * 100) / 100
       : null;
+  const risparmioSuVoci = risparmio == null ? null : comuni.length;
 
   return {
     voci,
     insegne,
     risparmio,
+    risparmioSuVoci,
     copertura: {
       paese: paese.toUpperCase(),
       coperto: paeseCoperto,
@@ -347,7 +406,19 @@ export function rispostaPrezziV1(
     riepilogo: {
       chieste: chieste.length,
       trovate: voci.filter((v) => v.esito === "trovato").length,
-      totaleAlMiglioPrezzo: dentro.totali?.spesaAlMiglioPrezzo ?? 0,
+      totaleMostrato: dentro.totali?.spesaAlMiglioPrezzo ?? 0,
+      /* Si ricalcola qui dalle offerte che stiamo restituendo, non da un
+         totale preso altrove: cosi' il numero e' la somma di cifre che il
+         chiamante ha in mano e puo' rifare da se'. */
+      totaleAlMiglioPrezzo:
+        Math.round(
+          voci.reduce((somma, v) => {
+            const prezzi = (v.offerte ?? [])
+              .map((o) => o.prezzo)
+              .filter((x): x is number => typeof x === "number" && x > 0);
+            return prezzi.length ? somma + Math.min(...prezzi) : somma;
+          }, 0) * 100,
+        ) / 100,
       valuta: dentro.totali?.valuta || valuta,
     },
     secondi: dentro.meta?.secondiPrezzi ?? 0,

@@ -212,7 +212,13 @@ interface RispostaV1 {
   insegne: Array<{ insegna: string; totale: number; vociCoperte: number; confrontabile: boolean }>;
   risparmio: number | null;
   copertura: { paese: string; coperto: boolean; insegne: number };
-  riepilogo: { chieste: number; trovate: number; totaleAlMiglioPrezzo: number; valuta: string };
+  riepilogo: {
+    chieste: number;
+    trovate: number;
+    totaleMostrato: number;
+    totaleAlMiglioPrezzo: number;
+    valuta: string;
+  };
   secondi: number;
 }
 
@@ -266,7 +272,12 @@ function daV1(r: RispostaV1, valuta: string): PricesResponse {
     vincitore: confrontabili.length ? confrontabili[0] : null,
     risparmioVsPiuCara: r.risparmio,
     totali: {
-      spesaAlMiglioPrezzo: r.riepilogo.totaleAlMiglioPrezzo,
+      /* Il totale che si legge a schermo e' la somma di quello che a schermo
+         c'e': la prima offerta di ogni voce. `totaleAlMiglioPrezzo` e' un
+         altro numero — quanto verrebbe girando fra i negozi — e metterlo
+         qui darebbe un totale piu' basso di qualunque somma il cliente
+         rifaccia a mano sulle righe che vede. */
+      spesaAlMiglioPrezzo: r.riepilogo.totaleMostrato,
       valuta: r.riepilogo.valuta,
       prodottiSenzaPrezzo: r.riepilogo.chieste - r.riepilogo.trovate,
       vociInLista: r.riepilogo.chieste,
@@ -763,7 +774,7 @@ async function menuPrima(
   try {
     prices = await withTimeout(
       post<RispostaV1>(
-        "/v1/prezzi",
+        "/v1/offerte",
         {
           items,
           city,
@@ -950,7 +961,7 @@ async function spesaPrima(
   try {
     prices = await withTimeout(
       post<RispostaV1>(
-        "/v1/prezzi",
+        "/v1/offerte",
         { items, city, country, currency, ...(PRICE_SOURCE ? { priceSource: PRICE_SOURCE } : {}) },
         PRICES_TIMEOUT_MS,
       ).then((r) => daV1(r, currency)),

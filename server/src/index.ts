@@ -1651,7 +1651,20 @@ async function apriLaPorta(
   if (!esito.ok) throw new HttpError(esito.stato ?? 401, esito.motivo ?? "Chiave richiesta");
 }
 
-app.post("/v1/prezzi", async (body, req) => {
+/* SI CHIAMA «OFFERTE», NON «PREZZI».
+   Il nome vecchio prometteva una cosa sola e ne consegnava undici: per ogni
+   voce della lista tornano il negozio, il nome vero del prodotto sullo
+   scaffale, il prezzo, il prezzo pieno, lo sconto, il link alla pagina, quando
+   quel prezzo e' stato letto, quanta fiducia merita, il peso e il prezzo al
+   chilo — piu' il confronto fra le insegne. Il prezzo e' un campo su undici.
+
+   «Offerta» e' la parola che il corpo della risposta usa gia' — ogni voce ha
+   un elenco di `offerte` — e allineare la rotta al vocabolario che l'API
+   parla gia' costa niente e toglie un equivoco.
+
+   Il nome vecchio resta appeso qui sotto: un'API non spegne un indirizzo che
+   ha gia' pubblicato, perche' non sa chi lo sta chiamando. */
+async function offerteDiLista(body: unknown, req: unknown) {
   await apriLaPorta(req, true);
   const data = parse(PricesInput, body);
   const iso = paeseIso(data.country).toUpperCase();
@@ -1668,7 +1681,11 @@ app.post("/v1/prezzi", async (body, req) => {
     data.currency,
     paesiConCatalogo().includes(iso),
   );
-});
+}
+
+app.post("/v1/offerte", offerteDiLista);
+/** Il nome di prima. Funziona identico, e non si tocca. */
+app.post("/v1/prezzi", offerteDiLista);
 
 app.post("/v1/prodotti", async (body, req) => {
   await apriLaPorta(req, false);
