@@ -8,8 +8,10 @@
  * dentro le impostazioni. Chi apre l'app e non capisce cosa legge deve
  * poterla cambiare subito, senza cercare.
  *
- * Occupa lo spazio di un'icona: il codice della lingua corrente (IT, EN, FR…)
- * dentro un tondo. Toccandolo si apre l'elenco, dove ogni lingua è scritta
+ * Occupa lo spazio di un'icona: la bandiera della lingua corrente dentro un
+ * tondo — DISEGNATA, non scritta con un'emoji, perché su Windows le
+ * emoji-bandiera non esistono e si vedrebbero due lettere (vedi
+ * `bandiera.tsx`). Toccandola si apre l'elenco, dove ogni lingua è scritta
  * nella lingua stessa — "Deutsch", non "Tedesco" — perché è l'unico modo
  * perché la trovi chi non capisce quella corrente.
  */
@@ -17,17 +19,10 @@
 import { useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { LANGUAGES, LANGUAGE_LABEL, useI18n, type Language } from "../lib/i18n";
+import { Bandiera } from "./bandiera";
+import { LANGUAGES, LANGUAGE_LABEL, useI18n } from "../lib/i18n";
 import { colors, font, radius, spacing } from "../theme";
 
-/** Bandiera della lingua: si riconosce prima del testo. */
-const FLAG: Record<Language, string> = {
-  it: "🇮🇹",
-  en: "🇬🇧",
-  fr: "🇫🇷",
-  es: "🇪🇸",
-  de: "🇩🇪",
-};
 
 export function LanguagePicker() {
   const { language, setLanguage } = useI18n();
@@ -42,7 +37,7 @@ export function LanguagePicker() {
         hitSlop={8}
         style={({ pressed }) => [styles.trigger, pressed && styles.pressed]}
       >
-        <Text style={styles.triggerFlag}>{FLAG[language]}</Text>
+        <Bandiera lingua={language} dimensione={17} />
       </Pressable>
 
       <Modal
@@ -76,7 +71,7 @@ export function LanguagePicker() {
                     pressed && styles.pressed,
                   ]}
                 >
-                  <Text style={styles.flag}>{FLAG[lang]}</Text>
+                  <Bandiera lingua={lang} dimensione={20} />
                   <Text style={[styles.label, active && styles.labelOn]}>
                     {LANGUAGE_LABEL[lang]}
                   </Text>
@@ -104,7 +99,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
-  triggerFlag: { fontSize: 19 },
   pressed: { opacity: 0.7 },
 
   backdrop: {

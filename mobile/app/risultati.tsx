@@ -29,6 +29,7 @@ import {
   Title,
   TopBar,
 } from "../src/components/ui";
+import { EroeRisparmio, RigaBudget } from "../src/components/eroe-risparmio";
 import { useSession } from "../src/lib/state/session";
 import { QuotaBanner } from "../src/components/quota-banner";
 import { computeResults } from "../src/lib/results/compute-results";
@@ -36,7 +37,7 @@ import { pricePlan } from "../src/lib/price-data/price-engine";
 import { pricingFromOffers } from "../src/lib/plan-full";
 import type { PricingResult } from "../src/lib/price-data";
 import { buildWhatsAppMessage } from "../src/lib/export/whatsapp-share";
-import { money, deviceDefaults } from "../src/lib/format";
+import { money, simboloValuta, deviceDefaults } from "../src/lib/format";
 import { useI18n } from "../src/lib/i18n";
 import { colors, font, radius, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
@@ -189,28 +190,57 @@ export default function RisultatiScreen() {
         </Subtitle>
       </View>
 
-      {/* Il dato principale, in evidenza: spesa contro budget */}
-      <GradientCard>
-        <Body style={styles.heroLabel}>
-          {results.estimatedSpend > 0 && !results.savingsAvailable
-            ? "Spesa prevista (parziale)"
-            : "Spesa prevista"}
-        </Body>
-        <Body style={styles.heroValue}>{money(results.estimatedSpend, cur, language)}</Body>
-        <Body style={styles.heroSub}>
-          su {money(results.budget, cur, language)} di budget
-          {results.savings > 0 ? ` · ti restano ${money(results.savings, cur, language)}` : ""}
-          {results.overBudgetAmount > 0 ? ` · sfori di ${money(results.overBudgetAmount, cur, language)}` : ""}
-        </Body>
-        <View style={styles.bar}>
-          <View
-            style={[
-              styles.barFill,
-              { width: `${Math.min(100, Math.max(2, results.ratio * 100))}%` },
-            ]}
-          />
-        </View>
-      </GradientCard>
+      {/* IL RISPARMIO, NON LA SPESA.
+          Prima qui c'era «Spesa prevista» in grande e il risparmio come nota:
+          i numeri erano gli stessi, ma la schermata raccontava quanto si
+          spende invece di quanto si guadagna a usarla. E' il disegno del
+          prototipo del cliente, ed e' quello giusto. */}
+      <EroeRisparmio
+        ui={ui}
+        risparmio={results.status === "over" ? results.overBudgetAmount : results.savings}
+        annuale={results.annualSavings}
+        valuta={simboloValuta(cur, language)}
+        sfora={results.status === "over"}
+        periodo={ui(profile.frequency === "monthly" ? "al mese" : "a settimana")}
+        statoBudget={ui(st.label)}
+        tono={st.tone}
+        punteggio={results.score.total}
+        senzaRisparmio={
+          results.savingsAvailable
+            ? undefined
+            : ui("Non abbastanza prezzi per calcolarlo: le voci senza prezzo non entrano nel totale.")
+        }
+      />
+
+      {/* Le cifre del budget, una riga per voce come nel prototipo. */}
+      <Card>
+        <RigaBudget
+          etichetta={ui(profile.frequency === "monthly" ? "Budget mensile" : "Budget settimanale")}
+          valore={money(results.budget, cur, language)}
+        />
+        <RigaBudget
+          etichetta={ui("Spesa stimata")}
+          valore={results.savingsAvailable ? money(results.estimatedSpend, cur, language) : "—"}
+        />
+        <View style={styles.filo} />
+        <RigaBudget
+          etichetta={ui(results.status === "over" ? "Sopra il budget di" : "Stai risparmiando")}
+          valore={
+            results.savingsAvailable
+              ? money(
+                  results.status === "over" ? results.overBudgetAmount : results.savings,
+                  cur,
+                  language,
+                )
+              : ui("non calcolabile")
+          }
+          tipo={results.status === "over" ? "sfora" : "risparmio"}
+        />
+        <RigaBudget
+          etichetta={ui("Risparmio annuo")}
+          valore={results.savingsAvailable ? money(results.annualSavings, cur, language) : "—"}
+        />
+      </Card>
 
       <View style={styles.grid}>
         <Stat icon="person-outline" label={ui("A persona / giorno")} value={money(results.costPerPersonPerDay, cur, language)} />
@@ -296,6 +326,11 @@ const styles = StyleSheet.create({
   empty: { gap: spacing.lg, paddingTop: spacing.xxxl, alignItems: "flex-start" },
   actions: { gap: spacing.sm },
   iconBtn: { minHeight: 38, width: 38, paddingHorizontal: 0 },
+  filo: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.sm,
+  },
   topActions: { flexDirection: "row", gap: 2 },
 
   heroLabel: { color: "rgba(255,255,255,0.85)", fontSize: font.size.sm },

@@ -45,6 +45,7 @@ import { cercaNelCatalogo } from "./catalogo.js";
 import { paesiConCatalogo } from "./catalogo-fonti.js";
 import { verifyProductPage } from "./price-page.js";
 import { chiamaMenu, MENU_MODEL, parseJson } from "./plan-grounded.js";
+import { prezziGiaVisti, salvaPrezzi, type PrezzoSalvato } from "./prezzi-magazzino.js";
 
 /** La stessa forma che producono le altre due strade. */
 export interface PrezzoGrezzo {
@@ -365,7 +366,35 @@ export async function generatePricesCatalogo(
     return ordinati.map((k, posto) => ({ voce: c.voce, posto, ...k }));
   });
 
+  /* PRIMA SI GUARDA IN MAGAZZINO.
+     Le schede lette nelle ultime ventiquattro ore non si riaprono: il prezzo
+     del latte di Alcampo non cambia fra le dieci e le dieci e un minuto, e
+     richiederlo a ogni utente voleva dire, con cento persone su Madrid,
+     seimila richieste ai negozi spagnoli invece di sessanta.
+
+     Se il database non c'e' o non risponde, la mappa torna vuota e si apre
+     tutto come prima: piu' lento, non rotto. */
+  const inMagazzino = await prezziGiaVisti(daAprire.map((c) => c.url));
+  const daSalvare: PrezzoSalvato[] = [];
+
   const letti = await aBrani(daAprire, INSIEME, async (c) => {
+    const salvato = inMagazzino.get(c.url);
+    if (salvato) {
+      if (salvato.verifica === "non-raggiungibile") return null;
+      return {
+        riga: {
+          prodotto: c.voce,
+          nome: salvato.nome,
+          prezzo: salvato.prezzo,
+          valuta: salvato.valuta || valuta,
+          negozio: c.insegna,
+          link: c.url,
+          giaVerificato: true,
+        } satisfies PrezzoGrezzo,
+        posto: c.posto,
+      };
+    }
+
     const v = await verifyProductPage(c.url);
 
     /* LA PAGINA CHE NON DICHIARA IL PREZZO NON SI BUTTA.
@@ -384,6 +413,20 @@ export async function generatePricesCatalogo(
        vogliamo fare. */
     const prezzo = v.page?.current ?? null;
 
+    /* Si mette da parte anche quel che non si mostra.
+       Sapere che una pagina non si apre, o che si apre e il prezzo non lo
+       dichiara, vale quanto sapere il prezzo: evita di tornare a chiederlo
+       domani per riscoprire la stessa cosa. */
+    daSalvare.push({
+      url: c.url,
+      prezzo,
+      valuta: v.page?.currency ?? valuta,
+      nome: c.nome.charAt(0).toUpperCase() + c.nome.slice(1),
+      insegna: c.insegna,
+      verifica: v.status,
+      visto: new Date(),
+    });
+
     // Se la pagina non si apre proprio, quella si butta: un link rotto non
     // serve a nessuno.
     if (v.status === "non-raggiungibile") return null;
@@ -401,6 +444,18 @@ export async function generatePricesCatalogo(
     } satisfies PrezzoGrezzo;
     return { riga, posto: c.posto };
   });
+
+  /* Il magazzino si riempie senza far aspettare nessuno.
+     L'utente ha gia' i suoi prezzi in mano: una scrittura che non cambia cio'
+     che vedra' non deve stare sulla sua strada. Se fallisce, domani si
+     rileggono le pagine — come si faceva prima, e nessuno se ne accorge. */
+  void salvaPrezzi(daSalvare);
+  if (daSalvare.length < daAprire.length) {
+    console.info(
+      `[magazzino] ${daAprire.length - daSalvare.length}/${daAprire.length} schede ` +
+        `prese da database invece che dai negozi`,
+    );
+  }
 
   /* UNO PER VOCE, IL PRIMO CHE HA UN PREZZO.
      `letti` puo' contenere piu' candidati della stessa voce: si tiene quello

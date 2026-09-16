@@ -7,16 +7,33 @@
  * arriva senza spostare la mano.
  */
 
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Body, Button, Screen, Subtitle, Title, TopBar } from "./ui";
+import { Body, Button, Ionicons, Screen, Subtitle, Title, TopBar } from "./ui";
 import { colors, font, radius, spacing } from "../theme";
 import { tornaIndietro } from "../lib/navigazione";
 
 /** I sei passi, nell'ordine. Serve a numerare e a tornare indietro. */
 export const STEPS = ["citta", "persone", "budget", "stile", "allergie", "extra"] as const;
 export type StepName = (typeof STEPS)[number];
+
+/**
+ * Un simbolo per domanda, come nel prototipo del cliente.
+ *
+ * Non e' decorazione: una schermata di onboarding e' fatta di testo, e senza
+ * un appiglio visivo i sei passi si somigliano tutti. L'icona dice di cosa si
+ * sta parlando prima che l'occhio arrivi al titolo, e dà alla domanda un
+ * centro da cui partire.
+ */
+const ICONA: Record<StepName, ComponentProps<typeof Ionicons>["name"]> = {
+  citta: "location-outline",
+  persone: "people-outline",
+  budget: "wallet-outline",
+  stile: "restaurant-outline",
+  allergie: "alert-circle-outline",
+  extra: "sparkles-outline",
+};
 
 /**
  * Struttura di un passo. `canNext` disabilita l'avanti finché la risposta
@@ -48,11 +65,24 @@ export function Step({
       }
     >
       {/* La lingua si puo' cambiare anche a meta' onboarding: chi si
-          accorge di non capire le domande non deve ricominciare. */}
-      <TopBar onBack={index > 0 ? () => tornaIndietro() : undefined} />
+          accorge di non capire le domande non deve ricominciare.
+
+          E LA FRECCIA C'E' ANCHE AL PRIMO PASSO.
+          Prima al passo uno spariva, perche' «indietro» non aveva dove
+          andare: ma chi entra nell'onboarding dalla home e cambia idea non
+          deve restare incastrato. Al primo passo riporta alla schermata
+          iniziale, dagli altri al passo precedente. */}
+      <TopBar
+        onBack={index > 0 ? () => tornaIndietro() : () => router.replace("/")}
+      />
 
       <View style={styles.head}>
         <Progress current={index} />
+
+        <View style={styles.iconBox}>
+          <Ionicons name={ICONA[step]} size={24} color={colors.primary} />
+        </View>
+
         <Text style={styles.stepLabel}>
           Passo {index + 1} di {STEPS.length}
         </Text>
@@ -182,6 +212,17 @@ export function useBack(step: StepName) {
 
 const styles = StyleSheet.create({
   head: { gap: spacing.sm, paddingTop: spacing.sm },
+  /* Quarantotto per quarantotto, raggio largo, fondo verde al dieci per cento:
+     le stesse misure del prototipo. */
+  iconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.lg,
+    backgroundColor: colors.successBg,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.sm,
+  },
   body: { gap: spacing.sm, marginTop: spacing.md },
 
   progress: { flexDirection: "row", gap: 4, marginBottom: spacing.sm },

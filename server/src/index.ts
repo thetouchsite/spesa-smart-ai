@@ -65,6 +65,8 @@ import { catalogoDisponibilePer, generatePricesCatalogo } from "./prices-catalog
 import { cercaProdottoAmazon, isAmazonSearchConfigured } from "./amazon-search.js";
 import { linkDiRipiego } from "./fallback-link.js";
 import { isoDaPaese } from "./insegne-online.js";
+import { FRESCHEZZA_MS, statoMagazzino } from "./prezzi-magazzino.js";
+import { statoCataloghi } from "./catalogo-magazzino.js";
 import { prezziDaiCataloghiIT } from "./catalogo-it.js";
 import { annota } from "./diario.js";
 import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./catalogo.js";
@@ -128,14 +130,17 @@ function memoryGet(key: string): unknown | undefined {
   return hit.value;
 }
 
-function memorySet(key: string, value: unknown): void {
+function memorySet(key: string, value: unknown, durataMs?: number): void {
   // Sfratto la voce piu' vecchia: senza limite un processo lungo cresce
   // senza fine.
   if (memoryCache.size >= MEMORY_CACHE_MAX) {
     const oldest = memoryCache.keys().next().value;
     if (oldest) memoryCache.delete(oldest);
   }
-  memoryCache.set(key, { value, expires: Date.now() + CACHE_TTL_DAYS * 86_400_000 });
+  memoryCache.set(key, {
+    value,
+    expires: Date.now() + (durataMs ?? CACHE_TTL_DAYS * 86_400_000),
+  });
 }
 
 function cacheKey(endpoint: string, payload: unknown): string {
@@ -1047,6 +1052,13 @@ app.post("/ai/prices", async (body) => {
   const data = parse(PricesInput, body);
   const fonte = data.priceSource ?? PRICE_SOURCE_DEFAULT;
 
+  /* LA RISPOSTA NON PUO' VIVERE PIU' A LUNGO DEL PREZZO CHE CONTIENE.
+     La cache delle risposte si guarda PRIMA del magazzino, quindi una lista
+     gia' chiesta tornava identica per giorni — con i prezzi di allora e
+     scavalcando del tutto la regola di freschezza del magazzino. Su un'app che
+     promette prezzi veri e' la bugia peggiore, perche' e' invisibile: la
+     risposta e' ben formata, i link funzionano, solo le cifre sono di un'altra
+     settimana. Ora scade insieme ai prezzi. */
   const key = cacheKey("prices", { ...data, priceSource: fonte });
   const local = memoryGet(key);
   if (local !== undefined) {
@@ -1076,15 +1088,18 @@ app.post("/ai/prices", async (body) => {
 
   const esito = await prezzaLista(data.items, data.city, data.country, data.currency, fonte);
 
-  memorySet(key, esito);
+  /* Scade insieme ai prezzi che contiene — ventiquattro ore, la stessa soglia
+     del magazzino. Erano sette giorni, ed erano sette giorni di troppo: la
+     risposta salvata si serve PRIMA del magazzino, quindi quella durata piu'
+     lunga non aggiungeva velocita', copriva soltanto la regola di freschezza. */
+  memorySet(key, esito, FRESCHEZZA_MS);
   if (isDbConfigured()) {
     try {
       await (await cache()).insertOne({
         _id: key,
         value: esito,
         createdAt: new Date(),
-        // Sette giorni: i prezzi invecchiano, le ricette no.
-        expiresAt: new Date(Date.now() + 7 * 86_400_000),
+        expiresAt: new Date(Date.now() + FRESCHEZZA_MS),
       });
     } catch {
       /* gia' presente */
@@ -1364,6 +1379,12 @@ app.post("/product/shopping", async (body) => {
 app.get("/catalogo/stato", async () => ({
   ...statoCatalogo(),
   quantiPaesi: paesiConCatalogo().length,
+  /* Quante schede abbiamo gia' letto e quante valgono ancora.
+     Serve a vedere il magazzino riempirsi: finche' `fresche` e' zero ogni
+     richiesta riapre le pagine, e la lentezza ha una spiegazione invece di
+     essere un mistero. */
+  magazzinoPrezzi: await statoMagazzino(),
+  magazzinoCataloghi: await statoCataloghi(),
 }));
 
 /* ─────────────────────────── I punti vendita ─────────────────────────── */
