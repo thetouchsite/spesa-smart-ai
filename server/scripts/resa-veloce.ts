@@ -175,6 +175,15 @@ ${f.paese} - ${f.insegna}  (resa scritta ${f.resa}, ${f.stimati} prodotti)`);
 
   console.log(`${elenco.length} insegne in ${paesi.join(" ")} · ${quante} schede ciascuna\n`);
 
+  /*
+   * Gli SCARTI si tengono, non solo si contano.
+   *
+   * Un numero dice che una scheda su dieci ha dato il prezzo; non dice quale
+   * delle altre nove sia rotta, ne' perche'. Ogni difetto trovato oggi e'
+   * venuto da qualcuno che ha aperto uno di questi indirizzi e ha guardato:
+   * la vetrina del volantino di Alcampo, i negozi di Aldi, i teatri di El
+   * Corte Ingles. Nessuno di quei tre si vedeva dai conteggi.
+   */
   const esiti: Array<{
     paese: string;
     insegna: string;
@@ -182,6 +191,7 @@ ${f.paese} - ${f.insegna}  (resa scritta ${f.resa}, ${f.stimati} prodotti)`);
     misurata: number;
     aperte: number;
     provate: number;
+    scarti: Array<{ url: string; motivo: string }>;
   }> = [];
 
   for (const f of elenco) {
@@ -196,8 +206,18 @@ ${f.paese} - ${f.insegna}  (resa scritta ${f.resa}, ${f.stimati} prodotti)`);
 
     let aperte = 0;
     let conPrezzo = 0;
+    const scarti: Array<{ url: string; motivo: string }> = [];
     for (const u of url) {
       const v = await verifyProductPage(u);
+      if (v.page?.current == null) {
+        scarti.push({
+          url: u,
+          motivo:
+            v.status === "non-raggiungibile"
+              ? `non si apre (${v.reason ?? "motivo non detto"})`
+              : "si apre ma il prezzo non si legge",
+        });
+      }
       if (v.status !== "non-raggiungibile") aperte++;
       if (v.page?.current != null) conPrezzo++;
       await attendi(PAUSA_MS);
@@ -211,6 +231,7 @@ ${f.paese} - ${f.insegna}  (resa scritta ${f.resa}, ${f.stimati} prodotti)`);
       misurata,
       aperte,
       provate: url.length,
+      scarti,
     });
 
     const differenza = Math.abs(misurata - f.resa);
@@ -230,6 +251,25 @@ ${f.paese} - ${f.insegna}  (resa scritta ${f.resa}, ${f.stimati} prodotti)`);
     for (const e of daCorreggere) {
       console.log(`     ${e.paese} ${e.insegna}: resa ${e.scritta} → ${e.misurata}`);
     }
+  }
+
+  /* Gli indirizzi che non hanno dato un prezzo, in chiaro e in ordine: sono
+     quelli da aprire nel browser. Un file a parte dal JSON perche' questo si
+     legge, si incolla e si manda a qualcuno. */
+  const conScarti = esiti.filter((e) => e.scarti.length > 0);
+  if (conScarti.length) {
+    const righe: string[] = [];
+    for (const e of conScarti) {
+      righe.push(`${e.paese} - ${e.insegna}  (${e.scarti.length} scartate su ${e.provate})`);
+      for (const x of e.scarti) {
+        righe.push(`   ${x.url}`);
+        righe.push(`      ${x.motivo}`);
+      }
+      righe.push("");
+    }
+    const dovScarti = `diario/scarti-${paesi.join("-").toLowerCase()}.txt`;
+    writeFileSync(dovScarti, righe.join("\n"), "utf8");
+    console.log(`  indirizzi da guardare: ${dovScarti}`);
   }
 
   /* Il nome porta i paesi dentro: due misure lanciate insieme non si
