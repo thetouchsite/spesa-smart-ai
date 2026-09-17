@@ -48,6 +48,7 @@ import {
 } from "../src/api/catalogo-fonti.js";
 import { giroContinuo } from "../src/api/prezzi-continuo.js";
 import { chiTieneIPaesi } from "../src/api/turni.js";
+import { chiStaLavorando } from "../src/api/giri.js";
 import { statoMagazzino } from "../src/api/prezzi-magazzino.js";
 
 const n = (x: number) => String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -156,8 +157,24 @@ async function main() {
     const liberi = disponibili.filter((p) => !tenuti.has(p));
     const daCui = liberi.length > 0 ? liberi : disponibili;
 
+    /* QUANTI NE PUO' PRENDERE UNO SOLO.
+       Senza un tetto, il primo lettore acceso si prende quattordici paesi e
+       se li tiene per tutti i quarantacinque minuti del giro: chi si accende
+       dopo trova solo gli avanzi, e sono gli avanzi a rendere meno. Misurato
+       stanotte: il raspberry lavorava su ES e LV al 43%, mentre touchPrice
+       teneva Italia e Regno Unito all'82%. Non era il Pi a essere lento, era
+       la spartizione a essere ingiusta.
+
+       La quota si ricava da quanti lettori sono vivi, che il registro dei
+       giri sa gia'. Si aggiusta da sola: acceso un quarto lettore, ognuno
+       prende meno al giro successivo; spento uno, gli altri si allargano. */
+    const vivi = await chiStaLavorando();
+    const quantiLettori = Math.max(1, new Set(vivi.map((v) => v.macchina + "#" + v.pid)).size);
+    const quota = Math.max(1, Math.ceil(disponibili.length / quantiLettori));
+    const quanti = Math.min(QUANTI_PAESI, quota, daCui.length);
+
     const scelti: string[] = [];
-    for (let i = 0; i < Math.min(QUANTI_PAESI, daCui.length); i++) {
+    for (let i = 0; i < quanti; i++) {
       scelti.push(daCui[(da + i) % daCui.length]);
     }
     da = (da + scelti.length) % Math.max(1, daCui.length);
@@ -172,7 +189,10 @@ async function main() {
     /* «chiedo» e non l'elenco secco: i paesi si prenotano, e se un altro
        lettore ne ha gia' in mano qualcuno questo giro ne lavorera' meno di
        quelli scritti qui. Il giro stesso lo dice nella riga dopo. */
-    console.log(`  [${ora()}] giro ${giro}: chiedo ${scelti.join(" ")}`);
+    console.log(
+      `  [${ora()}] giro ${giro}: chiedo ${scelti.join(" ")}` +
+        ` (${quantiLettori} lettori, quota ${quota})`,
+    );
     try {
       const e = await giroContinuo(scelti, MINUTI, (fatte, con) => {
         const resa = Math.round((con / Math.max(1, fatte)) * 100);
