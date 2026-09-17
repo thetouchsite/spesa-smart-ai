@@ -48,6 +48,7 @@ import {
   utenteDaRichiesta,
   utentePubblico,
 } from "./app/utente.js";
+import { fotoDelPiatto, fotoDiPiuPiatti } from "./app/foto-piatti.js";
 import { isShoppingConfigured, searchShopping } from "./app/shopping.js";
 import {
   type Blocco,
@@ -374,6 +375,33 @@ app.post("/auth/login", async (body) => {
 app.get("/me", async (_body, req) => {
   const { doc } = await utenteDaRichiesta(req);
   return utentePubblico(doc);
+});
+
+/* ──────────────────────── Le foto dei piatti ──────────────────────── */
+
+/**
+ * La foto di un piatto, cercata su Wikimedia Commons e ricordata.
+ *
+ * Non chiede la chiave dell'API: non costa niente al modello, non e' quello che
+ * vendiamo, e serve all'app a ogni ricetta. La cache la protegge dagli abusi
+ * meglio di una chiave — la seconda richiesta per lo stesso piatto non esce
+ * nemmeno da qui.
+ *
+ * Risponde `{ foto: null }` quando non trova niente, e l'app disegna il suo
+ * segnaposto. Mai un indirizzo indovinato: e' l'errore che ci ha portati ai
+ * riquadri rotti in cima a ogni ricetta.
+ */
+app.post("/piatto/foto", async (body) => {
+  const { nome } = parse(z.object({ nome: z.string().min(1).max(160) }), body);
+  return { foto: await fotoDelPiatto(nome) };
+});
+
+app.post("/piatto/foto-molte", async (body) => {
+  const { nomi } = parse(
+    z.object({ nomi: z.array(z.string().min(1).max(160)).min(1).max(30) }),
+    body,
+  );
+  return { foto: await fotoDiPiuPiatti(nomi) };
 });
 
 /* ─────────────────────── Password: cambio e recupero ─────────────────────── */

@@ -37,6 +37,7 @@ import { fetchRecipe, type ContentSource } from "../src/lib/content";
 import type { Recipe } from "../src/lib/recipes/types";
 import type { Recipe as GeneratedRecipe } from "../src/lib/plan-full";
 import { DishPhoto } from "../src/components/dish-photo";
+import { useFotoPiatto } from "../src/lib/recipes/foto";
 import { useSession } from "../src/lib/state/session";
 import { localDay } from "../src/lib/days";
 import { useI18n } from "../src/lib/i18n";
@@ -135,6 +136,7 @@ export default function RicettaScreen() {
   const servings = Math.max(1, parseInt((profile.household || "4").replace("+", ""), 10) || 4);
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const fotoTrovata = useFotoPiatto(recipe?.title);
   const [source, setSource] = useState<ContentSource>("locale");
   const [loading, setLoading] = useState(true);
 
@@ -203,7 +205,15 @@ export default function RicettaScreen() {
 
   return (
     <Screen footer={<Button label={ui("Torna al menù")} onPress={() => tornaIndietro("/menu")} />}>
-      <DishPhoto uri={recipe.image} nome={recipe.title} style={styles.photo} />
+      {/* La foto arriva dal backend, che la cerca su Wikimedia Commons. Se la
+          ricetta ne porta gia' una — quelle di TheMealDB ce l'hanno — vince
+          quella: e' la foto DI QUEL piatto, non una trovata cercando il nome. */}
+      <DishPhoto
+        uri={recipe.image || fotoTrovata?.url}
+        credito={recipe.image ? undefined : fotoTrovata?.credito}
+        nome={recipe.title}
+        style={styles.photo}
+      />
 
       <View style={styles.head}>
         {params.giorno ? (
