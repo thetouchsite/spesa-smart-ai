@@ -16,17 +16,16 @@
  * confine ha fatto esattamente il suo mestiere: costringere a rispondere
  * «questo di chi e'?» il giorno in cui il file nasce.
  *
- * IL RECUPERO PASSWORD SENZA POSTA
- * --------------------------------
- * Un recupero password ha bisogno di un canale che l'utente possiede e noi no:
- * la sua casella di posta. Oggi un servizio di invio non c'e', e va detto
- * invece di fingere.
+ * IL RECUPERO PASSWORD VUOLE UN CANALE CHE L'UTENTE POSSIEDE
+ * ----------------------------------------------------------
+ * Ed e' la sua casella di posta: e' li' che sta la prova che l'account e' suo.
+ * L'invio lo fa `posta.ts`, che sceglie da solo fra SMTP e Resend a seconda di
+ * come e' configurato il server.
  *
- * Quindi: il codice si genera sempre e si salva sempre, ma dove finisce
- * dipende da come e' configurato il server. Con un servizio di posta, gli
- * arriva per email. Senza, finisce nel registro del server — utile per
- * provare, inutilizzabile in produzione, e il codice lo dice chiaramente
- * all'avvio invece di lasciarlo scoprire a un utente bloccato fuori.
+ * Se non e' configurato niente, il codice si genera e si salva lo stesso ma
+ * all'utente non arriva, e il registro lo dice a voce alta. E' cosi' che
+ * questo recupero e' stato costruito e provato prima ancora che una casella
+ * esistesse — ma resta uno stato da sviluppo, non da produzione.
  *
  * NON SI DICE MAI SE UN'EMAIL ESISTE
  * ----------------------------------
@@ -40,6 +39,7 @@ import { ObjectId } from "mongodb";
 import { HttpError } from "../base/http.js";
 import { hashPassword, issueToken, requireUser, verifyPassword } from "./auth.js";
 import { plans, users, type UserDoc } from "../base/db.js";
+import { emailCodiceRecupero, spedisci } from "./posta.js";
 
 /** Quanto vive un codice di recupero. Lungo abbastanza per cercarlo, corto abbastanza da non restare in giro. */
 const RECUPERO_VALIDO_MS = 20 * 60 * 1000;
@@ -118,14 +118,17 @@ export async function avviaRecupero(email: string): Promise<{ codiceSoloPerProve
     },
   );
 
-  /* Finche' non c'e' un servizio di posta, il codice esce di qui. Nel registro
-     del server e' visibile a chi amministra la macchina — accettabile per
-     provare, non per gli utenti veri. */
-  console.info(
-    `[utente] codice di recupero per ${doc.email}: ${codice} ` +
-      `(valido ${RECUPERO_VALIDO_MS / 60000} minuti). ` +
-      `Nessun servizio di posta configurato: all'utente non arrivera' niente.`,
-  );
+  const { spedita } = await spedisci({
+    a: doc.email,
+    ...emailCodiceRecupero(codice, RECUPERO_VALIDO_MS / 60000),
+  });
+
+  /* Se la posta non e' configurata, `spedisci` ha gia' scritto tutto nel
+     registro con un avviso ben visibile. Qui non si ripete: si registra solo
+     che l'utente e' rimasto senza, che e' l'informazione operativa. */
+  if (!spedita) {
+    console.warn(`[utente] ${doc.email} ha chiesto il recupero ma l'email non e' partita.`);
+  }
 
   return CODICE_IN_CHIARO ? { codiceSoloPerProve: codice } : {};
 }
