@@ -33,6 +33,7 @@ import { chiStaLavorando, giriPassati } from "./giri.js";
 import { comandi, isDbConfigured } from "../base/db.js";
 import { giroContinuo } from "./prezzi-continuo.js";
 import { assicuraFonti } from "./catalogo-fonti.js";
+import { contiPesanti } from "./statistiche.js";
 import { statoMagazzino } from "./prezzi-magazzino.js";
 import { statoCataloghi } from "./catalogo-magazzino.js";
 import { statoCatalogo } from "./catalogo.js";
@@ -53,7 +54,11 @@ export async function datiPannello() {
     cataloghi,
     memoria: statoCatalogo(),
     fonti: statoFonti(),
-    paesi: paesiConCatalogo().length,
+    /* `quantiPaesi` e non `paesi`: i conti pesanti portano gia' un `paesi` che
+       e' l'elenco riga per riga, e due campi con lo stesso nome fanno sparire
+       quello che arriva prima senza dire niente. */
+    quantiPaesi: paesiConCatalogo().length,
+    ...contiPesanti(),
   };
 }
 
@@ -66,6 +71,25 @@ export async function datiPannello() {
  * che parte da solo.
  */
 const MINUTI_A_MANO = Number(process.env.PANNELLO_MINUTI ?? 60);
+
+/**
+ * Quanti paesi tocca un giro lanciato a mano.
+ *
+ * Non tutti e trentotto. Montare la coda vuol dire leggere e decomprimere il
+ * catalogo di ogni paese, e su un piano da mezzo giga farlo per trentotto paesi
+ * insieme e' il modo piu' rapido di farsi uccidere dal sistema prima di aver
+ * aperto una sola pagina. E' successo: «Partito», poi silenzio.
+ *
+ * Dodici alla volta bastano a tenere i lavoratori occupati — sono comunque
+ * dodici negozi diversi a ogni istante — e il giro successivo riparte dai paesi
+ * dopo, perche' l'ordine ruota a ogni avvio.
+ */
+const PAESI_A_MANO = Number(process.env.PANNELLO_PAESI ?? 12);
+
+/* Da dove ricominciare il prossimo giro. Senza, un pulsante premuto dieci volte
+   rifarebbe dieci volte i primi dodici paesi e gli altri ventisei non li
+   vedrebbe mai nessuno. */
+let daQualePaese = 0;
 
 /* Un giro alla volta per processo. Due giri sullo stesso server non vanno due
    volte piu' veloci: si dividono la stessa rete e la stessa memoria, e su un
@@ -95,6 +119,14 @@ export async function avviaQui(chiave: string): Promise<string> {
   const quante = await assicuraFonti();
   if (quante === 0) return "Nessuna insegna sul database: non c'e' niente da leggere.";
 
+  /* Si ruota: ogni avvio riparte da dove aveva smesso il precedente. */
+  const tutti = paesiConCatalogo();
+  const scelti: string[] = [];
+  for (let i = 0; i < Math.min(PAESI_A_MANO, tutti.length); i++) {
+    scelti.push(tutti[(daQualePaese + i) % tutti.length]);
+  }
+  daQualePaese = (daQualePaese + scelti.length) % Math.max(1, tutti.length);
+
   giroInCorsoQui = true;
 
   /* NON si aspetta la fine: un giro dura un'ora e la richiesta scadrebbe molto
@@ -110,7 +142,7 @@ export async function avviaQui(chiave: string): Promise<string> {
      il lavoro pesante comincia quando il browser ha gia' ricevuto. */
   setTimeout(() => void (async () => {
     try {
-      const e = await giroContinuo(paesiConCatalogo(), MINUTI_A_MANO);
+      const e = await giroContinuo(scelti, MINUTI_A_MANO);
       console.info(
         `[pannello] giro finito: ${e.aperte} aperte, ${e.conPrezzo} con prezzo, ` +
           `${e.secondi.toFixed(0)}s`,
@@ -122,7 +154,7 @@ export async function avviaQui(chiave: string): Promise<string> {
     }
   })(), 0);
 
-  return `Partito: ${MINUTI_A_MANO} minuti su ${paesiConCatalogo().length} paesi. Comparira' fra i vivi entro cinque secondi.`;
+  return `Partito: ${MINUTI_A_MANO} minuti su ${scelti.length} paesi (${scelti.join(" ")}). Comparira' fra i vivi entro cinque secondi.`;
 }
 
 /**
@@ -235,6 +267,31 @@ export function paginaPannello(): string {
   .comandi button:disabled{opacity:.45;cursor:default}
   .comandi button:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
   .comandi span{font-size:13px;color:var(--tenue)}
+  .spazio{background:var(--piano);border:1px solid var(--filo);border-radius:9px;padding:15px 17px}
+  .spazio .su{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 14px}
+  .spazio .su b{font-size:20px;font-variant-numeric:tabular-nums}
+  .spazio .su span{font-family:var(--mono);font-size:12px;color:var(--lieve)}
+  .spazio .barra{height:10px;margin-top:10px}
+  .spazio .barra i{background:var(--verde)}
+  .spazio.stretto .barra i{background:var(--ambra)}
+  .spazio.pieno .barra i{background:var(--rosso)}
+
+  .paesi{background:var(--piano);border:1px solid var(--filo);border-radius:9px;overflow:hidden}
+  .pr{display:grid;grid-template-columns:42px 1fr 96px 88px 64px;gap:12px;align-items:center;
+    padding:7px 16px;border-bottom:1px solid var(--filo)}
+  .pr:last-child{border-bottom:none}
+  .pr.cap{background:var(--incavo);font-size:10px;font-weight:700;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--lieve)}
+  .pr .sig{font-family:var(--mono);font-weight:600;font-size:13px}
+  .pr .num{font-family:var(--mono);font-size:12.5px;text-align:right;font-variant-numeric:tabular-nums;
+    color:var(--tenue)}
+  .pr .qta{font-family:var(--mono);font-size:12.5px;text-align:right;font-weight:600;
+    font-variant-numeric:tabular-nums;color:var(--verde)}
+  .pr .qta.bassa{color:var(--ambra)} .pr .qta.zero{color:var(--rosso)}
+  @media (max-width:620px){
+    .pr{grid-template-columns:34px 1fr 72px 62px 46px;gap:8px;padding:7px 11px}
+    .pr .num,.pr .qta{font-size:11px}
+  }
   .pie{margin-top:40px;padding-top:14px;border-top:1px solid var(--filo);
     font-family:var(--mono);font-size:11px;color:var(--lieve)}
 </style></head>
@@ -253,6 +310,12 @@ export function paginaPannello(): string {
 
   <h2>I magazzini</h2>
   <div class="cifre" id="magazzini"></div>
+
+  <h2>Spazio su Mongo</h2>
+  <div id="spazio"></div>
+
+  <h2>Paese per paese</h2>
+  <div class="paesi" id="perpaese"></div>
 
   <h2>Gli ultimi giri</h2>
   <div id="passati"></div>
@@ -350,10 +413,51 @@ async function aggiorna() {
   document.getElementById("magazzini").innerHTML = \`
     <div class="v"><b>\${n(c.prodotti)}</b><span>link in catalogo</span></div>
     <div><b>\${n(c.insegne)}</b><span>insegne</span></div>
-    <div><b>\${n(d.paesi)}</b><span>paesi</span></div>
+    <div><b>\${n(d.quantiPaesi)}</b><span>paesi</span></div>
     <div class="\${p.fresche > 0 ? "v" : "r"}"><b>\${n(p.fresche)}</b><span>prezzi freschi</span></div>
     <div><b>\${n(p.righe)}</b><span>righe in magazzino</span></div>
     <div><b>\${quota}%</b><span>ancora validi</span></div>\`;
+
+  /* Lo spazio. La barra e' l'unica cosa che dice quando il progetto si ferma:
+     riempito il piano, il magazzino smette di crescere e non c'e' codice che
+     rimedi. */
+  const sp = d.spazio;
+  if (sp) {
+    const q = Math.round(sp.pieno * 100);
+    const classe = q >= 90 ? "pieno" : q >= 70 ? "stretto" : "";
+    document.getElementById("spazio").innerHTML = \`
+      <div class="spazio \${classe}">
+        <div class="su">
+          <b>\${sp.totaleMb.toLocaleString("it-IT")} MB <span>di \${n(sp.tettoMb)} MB &middot; \${q}%</span></b>
+          <span>dati \${sp.datiMb} MB &middot; indici \${sp.indiciMb} MB</span>
+        </div>
+        <div class="barra"><i style="width:\${q}%"></i></div>
+        <div class="righe" style="margin-top:12px">
+          <div><span>un prezzo pesa</span><b>\${n(sp.bytePerPrezzo)} byte</b></div>
+          <div><span>ce ne stanno ancora</span><b>\${n(sp.prezziCheCiStanno)}</b></div>
+          <div><span>indici sul totale</span><b>\${sp.totaleMb > 0 ? Math.round((sp.indiciMb / sp.totaleMb) * 100) : 0}%</b></div>
+        </div>
+      </div>\`;
+  }
+
+  /* Paese per paese. La quota e' prezzi freschi su link conosciuti: dice quanto
+     di quel paese l'app puo' servire senza aprire una pagina mentre uno
+     aspetta, che e' il punto di tutto il magazzino. */
+  const pp = d.paesi || [];
+  document.getElementById("perpaese").innerHTML = pp.length
+    ? '<div class="pr cap"><span>paese</span><span>copertura</span><span>link</span><span>prezzi</span><span>quota</span></div>' +
+      pp.map((r) => {
+        const q = Math.round(r.copertura * 100);
+        const classe = q === 0 ? "zero" : q < 25 ? "bassa" : "";
+        return \`<div class="pr">
+          <span class="sig">\${r.paese}</span>
+          <span class="barra"><i style="width:\${q}%"></i></span>
+          <span class="num">\${n(r.link)}</span>
+          <span class="num">\${n(r.prezzi)}</span>
+          <span class="qta \${classe}">\${q}%</span>
+        </div>\`;
+      }).join("")
+    : '<div class="pr"><span class="sig">&mdash;</span><span>i conti per paese si fanno una volta al minuto: il primo arriva a momenti</span><span></span><span></span><span></span></div>';
 
   document.getElementById("passati").innerHTML = d.passati.length
     ? d.passati.map(schedaPassata).join("")
@@ -362,7 +466,8 @@ async function aggiorna() {
   document.getElementById("pie").textContent =
     d.fonti.quante + " insegne in memoria · " +
     d.memoria.caricati.length + " paesi caldi · " +
-    "magazzino prezzi " + p.interruttore + " · cataloghi " + c.interruttore;
+    "magazzino prezzi " + p.interruttore + " · cataloghi " + c.interruttore +
+    (d.presiIl ? " · conti per paese e spazio presi alle " + ora(d.presiIl) : "");
 }
 
 /* La parola d'ordine si chiede una volta e resta nel browser. Non viaggia mai

@@ -299,6 +299,11 @@ export async function getDb(): Promise<Db> {
     // Nessun indice sul contenuto: qui dentro non si cerca, si legge il
     // pacchetto della propria insegna e lo si scompatta.
     db.collection<CatalogoDoc>("cataloghi").createIndex({ paese: 1 }),
+    /* Non serve a cercare: serve a NON LEGGERE. Il conto dei link per paese
+       somma il campo `prodotti`, e senza questo indice Mongo aprirebbe ogni
+       documento — che porta dentro un blocco compresso da quasi un megabyte.
+       Centocinquanta megabyte letti per sommare centosessanta numeri. */
+    db.collection<CatalogoDoc>("cataloghi").createIndex({ paese: 1, prodotti: 1 }),
     // Le fonti si chiedono sempre per paese, e quasi sempre ordinate per resa.
     db.collection<FonteDoc>("fonti").createIndex({ paese: 1, resa: -1 }),
     /* Il diario si legge sempre in ordine di tempo, e le righe dei giri finiti

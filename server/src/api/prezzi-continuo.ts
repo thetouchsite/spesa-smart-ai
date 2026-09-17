@@ -206,6 +206,15 @@ export async function giroContinuo(
      l'unico modo di sapere se il lettore sta lavorando e' avere sotto gli occhi
      il terminale in cui e' stato lanciato. Vedi `giri.ts`. */
   const giro = new GiroInCorso("giro continuo", paesi);
+  /* Un battito SUBITO, prima di qualunque lavoro.
+     Fra il «parti» e la prima pagina aperta c'e' il montaggio della coda, che
+     legge e decomprime i cataloghi: e' la parte che consuma piu' memoria, ed e'
+     quella in cui un piano da mezzo giga viene ucciso. Se il primo battito
+     arrivasse dopo, un giro morto li' non lascerebbe nessuna traccia — ha detto
+     «partito» e non e' successo niente, che e' esattamente cio' che si e' visto
+     su Render. Col battito qui, la riga compare, poi diventa ambra, poi
+     sparisce: si legge che e' morto montando la coda. */
+  giro.segna(0, 0, 0);
 
   /* UNA CODA SOLA, MESCOLATA FRA I NEGOZI.
      La versione di prima faceva un'insegna alla volta e apriva otto pagine
