@@ -312,21 +312,20 @@ export default function ListaScreen() {
     }
   }
 
+  /* NEL FOOTER RESTA SOLO CIO' CHE LA BARRA NON SA FARE.
+     «Torna ai risultati» era un terzo modo di fare la stessa cosa: c'e' la
+     freccia in alto, c'e' il gesto dal bordo, e adesso c'e' la barra. Tre
+     strade per lo stesso posto occupano lo schermo e non aggiungono niente.
+     La condivisione invece la barra non ce l'ha, e resta. */
   return (
     <Screen
+      barra
       footer={
-        <View style={styles.actions}>
-          <Button
-            label={ui("Condividi la lista")}
-            icon="share-social-outline"
-            onPress={() => void shareList()}
-          />
-          <Button
-            label={ui("Torna ai risultati")}
-            variant="ghost"
-            onPress={() => tornaIndietro("/risultati")}
-          />
-        </View>
+        <Button
+          label={ui("Condividi la lista")}
+          icon="share-social-outline"
+          onPress={() => void shareList()}
+        />
       }
     >
       <TopBar title={ui("Lista della spesa")} onBack={() => tornaIndietro("/risultati")} />
@@ -537,7 +536,6 @@ const styles = StyleSheet.create({
   price: { fontSize: font.size.sm, fontWeight: font.weight.semibold, color: colors.foreground },
   noPrice: { fontSize: font.size.sm, color: colors.mutedForeground },
 
-  actions: { gap: spacing.sm },
   bold: { fontWeight: font.weight.semibold, color: colors.foreground },
   rowRight: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   buyBtn: {

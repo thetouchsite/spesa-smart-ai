@@ -103,6 +103,24 @@ export default function RootLayout() {
               del flusso: si apre come foglio dal basso e si chiude con uno
               scorrimento, senza portare l'utente via da dove si trova. */}
           <Stack.Screen name="dove-conviene" options={{ presentation: "modal" }} />
+
+          {/* LE QUATTRO DELLA BARRA NON SCIVOLANO.
+              Lo scorrimento da destra racconta un passo avanti: sei qui, ora
+              vai li', e per tornare rifai la strada al contrario. Fra queste
+              quattro non c'e' nessun passo avanti — sono lo stesso piano
+              visto da quattro lati, ed e' esattamente quello che significa
+              una barra in basso. Con l'animazione, ogni tocco della pillola
+              costava un terzo di secondo e si vedevano due barre scorrere una
+              sull'altra: sembrava che la barra sparisse e ne arrivasse
+              un'altra. Senza, resta ferma dov'e' e cambia solo il contenuto —
+              che e' il modo in cui tutti si aspettano che funzioni.
+
+              Vale anche quando a menu' e lista ci si arriva dai risultati,
+              e va bene cosi': dopo il primo piano quelle schermate non sono
+              piu' una tappa, sono due dei quattro posti dove si vive. */}
+          {["index", "menu", "lista", "piani"].map((nome) => (
+            <Stack.Screen key={nome} name={nome} options={{ animation: "none" }} />
+          ))}
         </Stack>
       </I18nProvider>
     </SafeAreaProvider>

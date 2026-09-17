@@ -19,6 +19,7 @@
 import { useCallback, useState } from "react";
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Body,
   Button,
@@ -34,13 +35,14 @@ import {
 import { getPlanStore, type SavedPlan } from "../src/lib/storage";
 import { useUtente } from "../src/lib/state/utente";
 import { SessioneScaduta } from "../src/lib/api/cliente";
-import { colors, font, radius, spacing } from "../src/theme";
+import { colors, font, radius, spacing, spazioPerLaBarra } from "../src/theme";
 import { tornaIndietro } from "../src/lib/navigazione";
 
 type Stato = "carico" | "pronto" | "errore";
 
 export default function PianiScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { stato: accesso, scaduta } = useUtente();
 
   const [stato, setStato] = useState<Stato>("carico");
@@ -108,7 +110,7 @@ export default function PianiScreen() {
 
   if (stato === "errore") {
     return (
-      <Screen>
+      <Screen barra>
         <TopBar title="I tuoi piani" onBack={() => tornaIndietro()} />
         <ErrorState
           text="Non riesco a caricare i tuoi piani. I piani non sono persi: è la connessione che manca."
@@ -119,11 +121,14 @@ export default function PianiScreen() {
   }
 
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} barra>
       <TopBar title="I tuoi piani" onBack={() => tornaIndietro()} />
 
       <ScrollView
-        contentContainerStyle={styles.lista}
+        /* Questa schermata scorre per conto suo — `Screen` ha
+           `scroll={false}` — quindi il posto per la pillola in fondo non lo
+           fa nessun altro: senza, l'ultimo piano salvato ci finisce sotto. */
+        contentContainerStyle={[styles.lista, { paddingBottom: spazioPerLaBarra(insets.bottom) }]}
         refreshControl={
           <RefreshControl
             refreshing={aggiorno}

@@ -55,6 +55,25 @@ export const spacing = {
 } as const;
 
 /**
+ * Le misure della barra che galleggia in basso.
+ *
+ * Stanno qui e non nel componente per due motivi. Il primo e' pratico: un
+ * file che esporta anche cose che non sono componenti perde il ricaricamento
+ * a caldo, e la barra si ritocca spesso. Il secondo conta di piu': la barra
+ * galleggia sopra tutto e non spinge via niente, quindi il posto se lo deve
+ * far lasciare — dal contenuto che scorre, dal footer dei pulsanti — e chi
+ * glielo lascia sta in altri tre file. Con l'altezza scritta a mano in
+ * ognuno, il giorno che la pillola cresce di otto punti resta nascosta
+ * l'ultima riga di un elenco che nessuno ricontrolla.
+ */
+export const ALTEZZA_PILLOLA = 44 /* minHeight di una voce */ + spacing.sm * 2;
+
+/** Quanto tenere libero in fondo a una schermata che mostra la barra. */
+export function spazioPerLaBarra(insetBasso: number): number {
+  return Math.max(insetBasso, spacing.md) + ALTEZZA_PILLOLA + spacing.md;
+}
+
+/**
  * Angoli.
  *
  * Sono cresciuti tutti di un gradino nel restyling del 17 settembre. La forma

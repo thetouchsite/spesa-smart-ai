@@ -82,16 +82,13 @@ export default function MenuScreen() {
     );
   }
 
+  /* IL PULSANTE «LISTA DELLA SPESA» NON C'E' PIU'.
+     Era il footer di questa schermata, e diceva esattamente quello che dice
+     la seconda voce della barra in basso, a tre centimetri di distanza. Due
+     comandi identici uno sopra l'altro non sono una comodita': fanno dubitare
+     che facciano la stessa cosa. */
   return (
-    <Screen
-      footer={
-        <Button
-          label={ui("Lista della spesa")}
-          icon="cart-outline"
-          onPress={() => router.push("/lista")}
-        />
-      }
-    >
+    <Screen barra>
       <TopBar title={ui("Il menù")} onBack={() => tornaIndietro("/risultati")} />
 
       <View style={styles.head}>

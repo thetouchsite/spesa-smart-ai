@@ -36,7 +36,7 @@ const MARCHIO = require("../../assets/mealmint-logo.png");
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LanguagePicker } from "./language-picker";
-import { colors, font, radius, shadow, spacing } from "../theme";
+import { colors, font, radius, shadow, spacing, spazioPerLaBarra } from "../theme";
 import { BarraBasso } from "./barra-basso";
 
 /** Il serif di sistema per i titoli: il prototipo usa un display serif, e
@@ -93,8 +93,13 @@ export function Screen({
       {scroll ? (
         <ScrollView
           /* Lo spazio in fondo tiene conto della barra: senza, l'ultima riga
-             dell'elenco finisce sotto la pillola e non si riesce a premerla. */
-          contentContainerStyle={{ paddingBottom: barra ? 116 : spacing.xxxl }}
+             dell'elenco finisce sotto la pillola e non si riesce a premerla.
+             Se pero' c'e' anche un footer, il posto alla pillola lo fa gia'
+             lui — e' un fratello nel flusso, non galleggia — e aggiungerlo
+             qui lascerebbe un buco di sessanta punti in fondo all'elenco. */
+          contentContainerStyle={{
+            paddingBottom: barra && !footer ? spazioPerLaBarra(insets.bottom) : spacing.xxxl,
+          }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -104,7 +109,19 @@ export function Screen({
         body
       )}
       {footer ? (
-        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>{footer}</View>
+        <View
+          style={[
+            styles.footer,
+            {
+              /* Con la barra, il footer si alza di tutta la pillola: quella
+                 galleggia sopra qualsiasi cosa, footer compreso, e senza
+                 questo margine coprirebbe a meta' il pulsante. */
+              paddingBottom: barra ? spazioPerLaBarra(insets.bottom) : insets.bottom + spacing.lg,
+            },
+          ]}
+        >
+          {footer}
+        </View>
       ) : null}
       {barra ? <BarraBasso /> : null}
     </View>

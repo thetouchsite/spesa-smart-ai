@@ -32,7 +32,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, font, radius, shadow, spacing } from "../theme";
+import { ALTEZZA_PILLOLA, colors, font, radius, shadow, spacing } from "../theme";
 import { useUtente } from "../lib/state/utente";
 
 interface Voce {
@@ -138,7 +138,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    minHeight: 44,
+    /* L'altezza viene dal tema, che e' anche la fonte del calcolo con cui
+       le altre schermate le lasciano il posto: due numeri che devono
+       restare uguali non si scrivono due volte. */
+    minHeight: ALTEZZA_PILLOLA - spacing.sm * 2,
     paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
   },
