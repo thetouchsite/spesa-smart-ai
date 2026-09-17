@@ -193,6 +193,9 @@ export function paginaPannello(): string {
   .scheda{background:var(--piano);border:1px solid var(--filo);border-radius:9px;
     padding:15px 17px;margin-bottom:10px}
   .scheda.viva{border-left:3px solid var(--verde);background:var(--verde-velo)}
+  .scheda.viva.zitta{border-left-color:var(--ambra);background:var(--ambra-velo)}
+  .scheda.viva.zitta .pallino{background:var(--ambra);animation:none}
+  .scheda.viva.zitta .barra i{background:var(--ambra)}
   .testa{display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 12px;margin-bottom:9px}
   .testa b{font-size:16px}
   .pallino{display:inline-block;width:8px;height:8px;border-radius:50%;
@@ -260,15 +263,26 @@ function durata(ms) {
   return Math.floor(m / 60) + "h " + String(m % 60).padStart(2, "0") + "m";
 }
 
+/* Oltre questo silenzio la scheda cambia faccia. Quindici secondi sono tre
+   battiti persi: uno solo capita per un rallentamento della rete, tre no. */
+const SOSPETTO_MS = 15000;
+
 function schedaViva(g, adesso) {
   const corso = new Date(adesso) - new Date(g.inizio);
+  const fermo = new Date(adesso) - new Date(g.tocco);
   const ritmo = corso > 0 ? (g.aperte / (corso / 1000)) : 0;
   const resa = g.aperte > 0 ? Math.round((g.conPrezzo / g.aperte) * 100) : 0;
-  return \`<div class="scheda viva">
+  /* Un lettore ucciso non fa in tempo a dire che sta morendo: la sua riga resta
+     li' fino a che il silenzio non e' abbastanza lungo da essere una risposta.
+     Nel frattempo va detto che non risponde, altrimenti per due minuti un morto
+     ha lo stesso aspetto di uno che lavora. */
+  const zitto = fermo > SOSPETTO_MS;
+  return \`<div class="scheda viva\${zitto ? " zitta" : ""}">
     <div class="testa">
       <b><span class="pallino"></span>\${g.macchina}</b>
-      <span class="etichetta ok">\${g.lavoro}</span>
+      <span class="etichetta \${zitto ? "att" : "ok"}">\${g.lavoro}</span>
       <span class="etichetta">da \${durata(corso)}</span>
+      \${zitto ? '<span class="etichetta att">non risponde da ' + durata(fermo) + '</span>' : ""}
     </div>
     <div class="righe">
       <div><span>aperte</span><b>\${n(g.aperte)}</b></div>
