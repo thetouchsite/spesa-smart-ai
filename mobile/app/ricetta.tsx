@@ -208,6 +208,12 @@ export default function RicettaScreen() {
 
   return (
     <Screen footer={<Button label={ui("Torna al menù")} onPress={() => tornaIndietro("/menu")} />}>
+      {/* La barra in alto c'era solo nei rami «sto caricando» e «non trovata»:
+          nella schermata vera, quella che si guarda davvero, il tasto indietro
+          non c'era. Dal menu' si entrava in una ricetta e si restava li', e sui
+          telefoni senza tasto fisico non c'era via d'uscita. */}
+      <TopBar onBack={() => tornaIndietro("/menu")} />
+
       {/* La foto arriva dal backend, che la cerca su Wikimedia Commons. Se la
           ricetta ne porta gia' una — quelle di TheMealDB ce l'hanno — vince
           quella: e' la foto DI QUEL piatto, non una trovata cercando il nome. */}

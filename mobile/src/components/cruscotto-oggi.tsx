@@ -27,7 +27,7 @@
 import { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Body, Button, Card, Ionicons, Label, Title } from "./ui";
+import { Body, Button, Card, GradientCard, Ionicons, Label, Title } from "./ui";
 import { DishPhoto } from "./dish-photo";
 import { useSession } from "../lib/state/session";
 import { useUtente } from "../lib/state/utente";
@@ -46,6 +46,35 @@ const PASTI = [
 /** La stessa chiave che usa la lista della spesa. */
 const CHIAVE_SPUNTE = "spesa.spuntati.v1";
 
+/**
+ * Come chiamare chi sta guardando.
+ *
+ * Il nome e' facoltativo alla registrazione, e chi lo salta si ritrovava il
+ * proprio indirizzo email come titolo della schermata — in grassetto, a
+ * ventotto punti. Un'email non e' un nome: e' una stringa tecnica, spesso
+ * lunga, e vederla scritta grande fa sembrare l'app un pannello di
+ * amministrazione.
+ *
+ * Se il nome non c'e', si prova la parte prima della chiocciola quando somiglia
+ * a un nome; altrimenti non si finge di conoscerlo e si dice cosa fa la
+ * schermata.
+ */
+function comeChiamarlo(nome?: string | null): string {
+  const n = (nome ?? "").trim();
+  if (n && !n.includes("@")) return n;
+
+  const prima = n
+    .split("@")[0]
+    ?.replace(/[._\-]+/g, " ")
+    .trim();
+  /* Solo se sembra un nome: «thetouchsite» o «info» non lo sono. Due parole,
+     o una parola corta e senza cifre, passano. */
+  if (prima && prima.length <= 14 && !/\d/.test(prima)) {
+    return prima.charAt(0).toUpperCase() + prima.slice(1);
+  }
+  return "";
+}
+
 function salutoDelMomento(): string {
   const h = new Date().getHours();
   if (h < 11) return "Buongiorno";
@@ -56,7 +85,7 @@ function salutoDelMomento(): string {
 export function CruscottoOggi() {
   const router = useRouter();
   const { language } = useI18n();
-  const { currentPlan } = useSession();
+  const { currentPlan, planExtra } = useSession();
   const { utente } = useUtente();
 
   /* Il giorno di oggi dentro il piano. `getDay()` conta da domenica, i giorni
@@ -95,13 +124,13 @@ export function CruscottoOggi() {
       <View style={styles.tutto}>
         <View style={styles.testa}>
           <Body style={styles.saluto}>{salutoDelMomento()}</Body>
-          <Title>{utente?.displayName || "Bentornato"}</Title>
+          <Title>{comeChiamarlo(utente?.displayName) || "Bentornato"}</Title>
         </View>
         <Card>
           <Label icon="restaurant-outline">Nessun piano in corso</Label>
           <Body style={styles.vuoto}>
-            Rispondi a sei domande e ti preparo il menù della settimana con la lista della spesa
-            e i prezzi veri.
+            Rispondi a sei domande e ti preparo il menù della settimana con la lista della spesa e i
+            prezzi veri.
           </Body>
           <Button label="Crea il mio piano" onPress={() => router.push("/onboarding/citta")} />
         </Card>
@@ -116,8 +145,37 @@ export function CruscottoOggi() {
           {salutoDelMomento()}
           {oggi ? ` · ${localDay(oggi.day, language)}` : ""}
         </Body>
-        <Title>{utente?.displayName || "Oggi si mangia"}</Title>
+        <Title>{comeChiamarlo(utente?.displayName) || "Oggi si mangia"}</Title>
       </View>
+
+      {/* IL PIANO, con lo stesso vestito che ha nella schermata dei risultati.
+          Non e' un vezzo: chi tocca questa carta finisce li', e ritrovare lo
+          stesso oggetto in fondo al tocco dice che si e' arrivati dove si
+          voleva. Due stili diversi per la stessa cosa farebbero sembrare la
+          seconda un'altra pagina. */}
+      {planExtra ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Il tuo piano. Spesa ${Math.round(planExtra.totali.spesaAlMiglioPrezzo)} ${planExtra.totali.valuta}. Apri i risultati`}
+          onPress={() => router.push("/risultati")}
+          style={({ pressed }) => [pressed && styles.premuto]}
+        >
+          <GradientCard>
+            <View style={styles.pianoTesta}>
+              <Body style={styles.pianoOcchiello}>Il tuo piano</Body>
+              <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.85)" />
+            </View>
+            <Body style={styles.pianoSpesa}>
+              {Math.round(planExtra.totali.spesaAlMiglioPrezzo)} {planExtra.totali.valuta}
+            </Body>
+            <Body style={styles.pianoSotto}>
+              {planExtra.risparmioVsPiuCara && planExtra.risparmioVsPiuCara > 0
+                ? `Risparmi ${Math.round(planExtra.risparmioVsPiuCara)} ${planExtra.totali.valuta} rispetto all'insegna più cara`
+                : `${planExtra.totali.vociInLista} prodotti · ${currentPlan.mealPlan.length} giorni`}
+            </Body>
+          </GradientCard>
+        </Pressable>
+      ) : null}
 
       {/* I tre pasti di oggi. È la ragione per cui si apre l'app la sera. */}
       {oggi ? (
@@ -215,7 +273,12 @@ const styles = StyleSheet.create({
   saluto: { fontSize: font.size.sm, color: colors.mutedForeground },
   vuoto: { fontSize: font.size.sm, color: colors.mutedForeground, marginBottom: spacing.sm },
 
-  pasto: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },
+  pasto: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
   premuto: { opacity: 0.7 },
   miniatura: { width: 52, height: 52, borderRadius: radius.md },
   pastoTesto: { flex: 1, gap: 2 },
@@ -234,4 +297,19 @@ const styles = StyleSheet.create({
   fatto: { fontSize: font.size.md, fontWeight: font.weight.semibold, color: colors.primary },
 
   scorciatoie: { gap: spacing.xs },
+
+  pianoTesta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  pianoOcchiello: {
+    fontSize: font.size.sm,
+    fontWeight: font.weight.semibold,
+    color: "rgba(255,255,255,0.9)",
+  },
+  pianoSpesa: {
+    fontSize: font.size.display,
+    fontWeight: font.weight.bold,
+    color: "#FFFFFF",
+    letterSpacing: -1,
+    marginTop: spacing.xs,
+  },
+  pianoSotto: { fontSize: font.size.sm, color: "rgba(255,255,255,0.9)", marginTop: 2 },
 });
