@@ -45,6 +45,21 @@ const OGNI_MS = 5_000;
 const QUESTA_MACCHINA = process.env.NOME_MACCHINA ?? hostname();
 
 /**
+ * La chiave del battito: macchina E processo.
+ *
+ * Il nome della macchina da solo non basta, e si e' visto alla prima prova. Su
+ * uno stesso computer possono girare due lettori insieme — lo script lanciato
+ * a mano e il lavoro notturno del server — e con una chiave sola si
+ * sovrascrivevano a vicenda ogni cinque secondi. Il pannello mostrava un
+ * numero che saltava da ventimila a cinquemila e tornava indietro: sembrava un
+ * guasto del contatore, invece erano due contatori diversi nella stessa riga.
+ *
+ * Col numero del processo dentro, i due lettori compaiono come due righe, che
+ * e' la verita'.
+ */
+const CHIAVE_BATTITO = `battito-${QUESTA_MACCHINA}-${process.pid}`;
+
+/**
  * Come sta la macchina che legge, in tre numeri.
  *
  * Su Windows `loadavg()` torna sempre zero: e' una misura che il sistema non
@@ -155,7 +170,7 @@ export class GiroInCorso {
     try {
       const c = await giri();
       const riga: GiroDoc = {
-        _id: `giro-${this.inizio.toISOString()}-${QUESTA_MACCHINA}`,
+        _id: `giro-${this.inizio.toISOString()}-${QUESTA_MACCHINA}-${process.pid}`,
         tipo: "giro",
         macchina: QUESTA_MACCHINA,
         lavoro: this.lavoro,
@@ -172,7 +187,7 @@ export class GiroInCorso {
       await c.replaceOne({ _id }, corpo, { upsert: true });
       /* La riga viva di QUESTA macchina se ne va. Quella di un'altra macchina
          che sta ancora lavorando resta dov'e'. */
-      await c.deleteOne({ _id: `battito-${QUESTA_MACCHINA}` });
+      await c.deleteOne({ _id: CHIAVE_BATTITO });
     } catch {
       /* Il registro non deve mai far fallire il lavoro che racconta. */
     }
@@ -184,7 +199,7 @@ export class GiroInCorso {
       try {
         const c = await giri();
         await c.replaceOne(
-          { _id: `battito-${QUESTA_MACCHINA}` },
+          { _id: CHIAVE_BATTITO },
           {
             tipo,
             macchina: QUESTA_MACCHINA,
