@@ -77,7 +77,23 @@ export default function Home() {
 
   return (
     <Screen>
-      <TopBar logo />
+      {/* L'account sta nella barra in alto e non solo piu' in basso nell'elenco:
+          li' bisognava scorrere per trovarlo, e una porta che si trova solo
+          scorrendo e' una porta che non si trova. L'icona cambia a seconda che
+          si sia entrati o no, cosi' dice anche in che stato sei. */}
+      <TopBar
+        logo
+        right={
+          <Button
+            label=""
+            nomeAccessibile={utente ? "Il tuo account" : "Accedi o registrati"}
+            icon={utente ? "person-circle" : "person-circle-outline"}
+            variant="ghost"
+            style={styles.iconaAccount}
+            onPress={() => router.push(utente ? "/piani" : "/accedi")}
+          />
+        }
+      />
 
       <QuotaBanner />
 
@@ -220,6 +236,7 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
+  iconaAccount: { minHeight: 38, width: 38, paddingHorizontal: 0 },
   hero: { gap: spacing.md, paddingTop: spacing.md },
   actions: { gap: spacing.sm },
 
