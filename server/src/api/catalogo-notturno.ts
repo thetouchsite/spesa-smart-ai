@@ -52,6 +52,7 @@ import { catalogoDi, dimenticaPaese, statoCatalogo } from "./catalogo.js";
 import { caricaFontiDalDb, paesiConCatalogo, statoFonti } from "./catalogo-fonti.js";
 import { riempiPrezzi } from "./prezzi-notturni.js";
 import { giroContinuo } from "./prezzi-continuo.js";
+import { cataloghi } from "../base/db.js";
 
 /**
  * Quante voci della spesa di base prezzare per paese, ogni notte.
@@ -81,6 +82,9 @@ const VOCI_PER_PAESE = Number(process.env.PREZZI_VOCI_PER_PAESE ?? 60);
  * A `0` il giro continuo non parte: resta solo il lavoro mirato.
  */
 const MINUTI_GIRO_CONTINUO = Number(process.env.PREZZI_MINUTI_GIRO ?? 45);
+
+/** Sotto questa eta' i cataloghi si considerano buoni e l'avvio non li rifa'. */
+const ORE_PRIMA_DI_RIFARE = Number(process.env.CATALOGO_ORE_VALIDE ?? 20);
 
 /**
  * I paesi da tenere sempre pronti.
@@ -137,6 +141,27 @@ export async function aggiornaCatalogo(motivo: string): Promise<void> {
         "si caricheranno su richiesta",
     );
     return;
+  }
+
+  /* ALL'AVVIO NON SI RIFA' QUEL CHE E' GIA' FRESCO.
+     Sessanta secondi dopo ogni avvio partiva l'aggiornamento completo. Su una
+     macchina che resta in piedi e' giusto: si scalda il catalogo e via. Su una
+     che viene uccisa per memoria e riavviata diventa una ruota da criceto —
+     misurato su Render nella notte del 17 settembre: dieci cicli in cinque ore,
+     uno ogni quarantadue minuti, ognuno con la sua ripassata alle sitemap di
+     centosessanta negozi. Il lavoro non finiva mai e il carico lo prendevano
+     loro.
+     Se il magazzino dei cataloghi e' stato rinfrescato da poco non c'e' niente
+     da rifare: quel che serve e' gia' su Mongo, e si legge da li'. */
+  if (motivo === "avvio") {
+    const eta = await etaCataloghi();
+    if (eta !== null && eta < ORE_PRIMA_DI_RIFARE * 3_600_000) {
+      console.info(
+        `[catalogo] all'avvio non c'e' niente da rifare: i cataloghi hanno ` +
+          `${(eta / 3_600_000).toFixed(1)}h. Si riparte a mezzanotte.`,
+      );
+      return;
+    }
   }
 
   inCorso = true;
@@ -196,7 +221,10 @@ export async function aggiornaCatalogo(motivo: string): Promise<void> {
        Prima si prezza quel che la gente chiede — la spesa di base, paese per
        paese — perche' se la notte viene interrotta e' quello che deve esserci.
        Il resto del catalogo e' un di piu' che si accumula col tempo. */
-    if (MINUTI_GIRO_CONTINUO > 0) {
+    /* Il giro continuo SOLO nell'appuntamento di mezzanotte. All'avvio e' la
+       parte che consuma di piu', e su un riavvio dopo un'uccisione per memoria
+       e' quella che rifa' uccidere: il ciclo si chiude e non si apre piu'. */
+    if (MINUTI_GIRO_CONTINUO > 0 && motivo !== "avvio") {
       try {
         const e = await giroContinuo(paesi, MINUTI_GIRO_CONTINUO, (fatte, con) => {
           if (fatte % 500 === 0) console.info(`[prezzi] giro continuo: ${fatte} aperte, ${con} con prezzo`);
@@ -257,6 +285,24 @@ export function avviaCatalogoNotturno(): void {
 }
 
 /** Gli appuntamenti veri, chiamati solo dopo che le fonti ci sono. */
+/**
+ * Quanto tempo fa e' stato rinfrescato il catalogo piu' recente, in millisecondi.
+ *
+ * Torna `null` se non ce n'e' nessuno: in quel caso c'e' davvero da lavorare.
+ */
+async function etaCataloghi(): Promise<number | null> {
+  try {
+    const c = await cataloghi();
+    const ultimo = await c.find({}).sort({ aggiornato: -1 }).limit(1).next();
+    if (!ultimo?.aggiornato) return null;
+    return Date.now() - new Date(ultimo.aggiornato).getTime();
+  } catch {
+    /* Se il database non risponde, meglio non rifare niente: chi non sa non
+       tocca. A mezzanotte si riprova comunque. */
+    return 0;
+  }
+}
+
 function programma(): void {
   const paesi = paesiDaScaldare();
   if (paesi.length === 0) return;
