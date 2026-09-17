@@ -28,6 +28,7 @@ import {
 } from "../src/components/ui";
 import { ping } from "../src/api/client";
 import { useSession } from "../src/lib/state/session";
+import { useUtente } from "../src/lib/state/utente";
 import { QuotaBanner } from "../src/components/quota-banner";
 import { deviceDefaults } from "../src/lib/format";
 import { BottoneCaldo, GrigliaPromesse, HeroHome } from "../src/components/hero-home";
@@ -54,6 +55,7 @@ const STEPS = [
 ];
 
 export default function Home() {
+  const { utente } = useUtente();
   const { language } = useI18n();
   /** Testo nella lingua scelta dall'utente. */
   const ui = (t: string) => uiText(t, language);
@@ -145,6 +147,22 @@ export default function Home() {
       </Card>
 
       <Card>
+        {/* L'account sta in cima e non dentro le impostazioni: le schermate
+            d'accesso esistevano gia' ma l'unico modo di raggiungerle era due
+            tocchi dentro un menu', dietro un'icona a ingranaggio. Una porta
+            che non si vede e' una porta che non c'e'.
+
+            La riga cambia faccia: a chi e' entrato mostra i suoi piani, a chi
+            non lo e' spiega a cosa serve un account invece di dire «accedi»,
+            che non e' un motivo. */}
+        <ListRow
+          icon={utente ? "person-circle-outline" : "person-add-outline"}
+          title={utente ? (utente.displayName || ui("Il tuo account")) : ui("Accedi o registrati")}
+          subtitle={
+            utente ? (utente.email ?? undefined) : ui("Per ritrovare i tuoi piani su ogni telefono")
+          }
+          onPress={() => router.push(utente ? "/piani" : "/accedi")}
+        />
         <ListRow
           icon="settings-outline"
           title={ui("Impostazioni")}

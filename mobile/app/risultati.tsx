@@ -32,6 +32,7 @@ import {
 import { EroeRisparmio, RigaBudget } from "../src/components/eroe-risparmio";
 import { useSession } from "../src/lib/state/session";
 import { QuotaBanner } from "../src/components/quota-banner";
+import { SalvaPiano } from "../src/components/salva-piano";
 import { computeResults } from "../src/lib/results/compute-results";
 import { pricePlan } from "../src/lib/price-data/price-engine";
 import { pricingFromOffers } from "../src/lib/plan-full";
@@ -325,6 +326,18 @@ export default function RisultatiScreen() {
                 : ui("Non siamo riusciti a trovare abbastanza prezzi per questa lista. Il menù e la lista della spesa restano completi, e da ogni voce puoi cercare il prodotto nei negozi.")}
         </Body>
       </Card>
+
+      {/* Il salvataggio sta in FONDO e non in cima: prima l'utente guarda i
+          numeri, poi decide se tenerli. Un pulsante «salva» prima ancora che
+          abbia letto cosa sta salvando e' un pulsante che non si preme. */}
+      <SalvaPiano
+        citta={city}
+        form={profile}
+        piano={currentPlan}
+        spesaStimata={results.estimatedSpend}
+        risparmio={results.savings}
+        punteggio={results.score.total}
+      />
     </Screen>
   );
 }
