@@ -184,6 +184,66 @@ export interface FonteDoc {
   aggiornato: Date;
 }
 
+/** Una riga del diario dei giri. Vedi `giri()` per il perche'. */
+/**
+ * Un ordine per il lettore, lasciato sul database.
+ *
+ * PERCHE' NON UNA CHIAMATA DIRETTA
+ * --------------------------------
+ * Il pannello sta su una macchina, il lettore su un'altra — spesso dietro il
+ * router di casa, senza indirizzo pubblico e senza nessuna porta aperta. Una
+ * chiamata dal pannello al lettore non arriverebbe da nessuna parte, e aprire
+ * una porta su un PC di casa per comandarlo da internet e' una pessima idea.
+ *
+ * Quindi non si chiama nessuno: si lascia un biglietto dove entrambi passano.
+ * Il pannello lo scrive, il lettore lo legge insieme al battito che manda gia'
+ * ogni cinque secondi. Costa zero richieste in piu' e funziona ovunque sia il
+ * lettore, anche dietro sette firewall.
+ *
+ * IL PREZZO DA PAGARE, DETTO SUBITO
+ * ---------------------------------
+ * Fermare si puo' sempre, perche' c'e' qualcuno in ascolto. AVVIARE no: se sul
+ * PC non gira nessun processo, non c'e' nessuno che possa leggere il biglietto.
+ * Un pulsante «avvia» funziona solo dove il lettore vive come servizio sempre
+ * acceso — cioe' sul VPS, che e' poi uno dei motivi per cui il VPS serve.
+ */
+export interface ComandoDoc {
+  _id: "comando";
+  azione: "ferma";
+  /** Il nome di una macchina, oppure `tutti`. */
+  per: string;
+  quando: Date;
+  /** Chi l'ha dato: resta scritto, perche' un giro fermato senza spiegazione fa perdere un'ora. */
+  da: string;
+}
+
+export interface GiroDoc {
+  /** `battito` per la riga viva, `giro-<quando>` per quelle finite. */
+  _id: string;
+  tipo: "battito" | "giro";
+  /** Chi sta lavorando: il nome della macchina. Due lettori insieme si vedono. */
+  macchina: string;
+  /** Che lavoro e': il giro continuo, la notte, una prova a mano. */
+  lavoro: string;
+  inizio: Date;
+  /** L'ultima volta che ha dato segno di vita. Su una riga finita e' la fine. */
+  tocco: Date;
+  aperte: number;
+  conPrezzo: number;
+  saltate: number;
+  /** Solo sulle righe finite: perche' ha smesso. */
+  esito?: "tempo scaduto" | "catalogo finito" | "interrotto";
+  paesi?: string[];
+  /* Lo stato della macchina che sta leggendo, preso al volo insieme al battito.
+     Serve perche' quando il lettore rallenta la prima domanda e' sempre «e' la
+     macchina che non ce la fa, o sono i negozi che non rispondono?» — e senza
+     questi tre numeri si risponde tirando a indovinare. */
+  ramUsataMb?: number;
+  ramTotaleMb?: number;
+  carico?: number;
+  accesaDaSec?: number;
+}
+
 export interface CacheDoc {
   _id: string; // chiave deterministica: endpoint + hash degli argomenti
   value: unknown;
@@ -241,6 +301,13 @@ export async function getDb(): Promise<Db> {
     db.collection<CatalogoDoc>("cataloghi").createIndex({ paese: 1 }),
     // Le fonti si chiedono sempre per paese, e quasi sempre ordinate per resa.
     db.collection<FonteDoc>("fonti").createIndex({ paese: 1, resa: -1 }),
+    /* Il diario si legge sempre in ordine di tempo, e le righe dei giri finiti
+       dopo un mese non servono piu' a nessuno: le butta Mongo da sola. */
+    db.collection<GiroDoc>("giri").createIndex({ tocco: -1 }),
+    db.collection<GiroDoc>("giri").createIndex(
+      { inizio: 1 },
+      { expireAfterSeconds: 30 * 86_400, partialFilterExpression: { tipo: "giro" } },
+    ),
   ]);
 
   console.info("[db] connesso a MongoDB");
@@ -303,6 +370,39 @@ export async function cacheVecchia(): Promise<Collection<CacheDoc>> {
 
 export async function prezzi(): Promise<Collection<PrezzoDoc>> {
   return (await getDb()).collection<PrezzoDoc>("prezzi");
+}
+
+/**
+ * Il registro dei giri: cosa sta facendo il lettore, e cosa ha fatto ieri.
+ *
+ * PERCHE' PASSA DAL DATABASE E NON DALLA MEMORIA
+ * ----------------------------------------------
+ * Il lettore e il pannello non girano sulla stessa macchina, e non e' un caso:
+ * il lettore sta dove costa poco restare accesi tutta la notte, il pannello
+ * sta dove sta l'API. Una variabile in memoria la vedrebbe solo il processo
+ * che l'ha scritta, quindi il pannello mostrerebbe sempre «fermo» mentre il
+ * lettore macina da un'altra parte.
+ *
+ * Il database e' l'unica cosa che i due hanno in comune. Quindi l'avanzamento
+ * si scrive li': il lettore batte un colpo ogni tanto, il pannello lo legge.
+ *
+ * DUE TIPI DI RIGA
+ * ----------------
+ *   battito   una sola, sempre la stessa, sovrascritta: cosa sta succedendo
+ *             ADESSO. Se la sua ora e' vecchia di qualche minuto, il lettore
+ *             e' morto senza dire niente — ed e' proprio quello che si vuole
+ *             vedere.
+ *   giro      una per ogni giro finito: quanto e' durato, cosa ha prodotto.
+ *             Serve a rispondere a «ieri notte e' andata?» senza leggere i log
+ *             di un servizio che i log li tiene un'ora.
+ */
+export async function giri(): Promise<Collection<GiroDoc>> {
+  return (await getDb()).collection<GiroDoc>("giri");
+}
+
+/** Gli ordini per il lettore. Una riga sola, sovrascritta. Vedi `ComandoDoc`. */
+export async function comandi(): Promise<Collection<ComandoDoc>> {
+  return (await getDb()).collection<ComandoDoc>("comandi");
 }
 
 export async function cataloghi(): Promise<Collection<CatalogoDoc>> {

@@ -43,7 +43,8 @@
           "locationWhenInUsePermission": "Serve per trovare i supermercati vicini a te e stimare i prezzi della tua zona."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "./plugins/percorsi-lunghi-windows"
     ],
     "extra": {
       "apiUrl": "http://localhost:3000",

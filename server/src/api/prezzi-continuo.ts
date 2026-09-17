@@ -44,6 +44,7 @@
 import { cataloghi } from "../base/db.js";
 import { prezzi as collezionePrezzi } from "../base/db.js";
 import { verifyProductPage } from "./price-page.js";
+import { GiroInCorso } from "./giri.js";
 import {
   FRESCHEZZA_MS,
   improntaUrl,
@@ -201,6 +202,11 @@ export async function giroContinuo(
   let conPrezzo = 0;
   let saltate = 0;
 
+  /* Il registro dei giri. Serve a chi guarda il pannello da un'altra macchina: senza,
+     l'unico modo di sapere se il lettore sta lavorando e' avere sotto gli occhi
+     il terminale in cui e' stato lanciato. Vedi `giri.ts`. */
+  const giro = new GiroInCorso("giro continuo", paesi);
+
   /* UNA CODA SOLA, MESCOLATA FRA I NEGOZI.
      La versione di prima faceva un'insegna alla volta e apriva otto pagine
      insieme dello STESSO negozio: se quel negozio era lento, otto lavoratori
@@ -299,10 +305,11 @@ export async function giroContinuo(
       finito = true;
       break;
     }
+    if (giro.devoFermarmi) break;
 
     let prossima = 0;
     const lavoratore = async () => {
-      while (prossima < coda.length && Date.now() < scadenza) {
+      while (prossima < coda.length && Date.now() < scadenza && !giro.devoFermarmi) {
         const c = coda[prossima++];
         const v = await verifyProductPage(c.url);
         aperte++;
@@ -317,7 +324,10 @@ export async function giroContinuo(
         });
         if (v.page?.current != null) conPrezzo++;
         if (raccolte.length >= BLOCCO) await salvaPrezzi(raccolte.splice(0, raccolte.length));
-        if (aperte % 50 === 0) onAvanzamento?.(aperte, conPrezzo);
+        if (aperte % 50 === 0) {
+          onAvanzamento?.(aperte, conPrezzo);
+          giro.segna(aperte, conPrezzo, saltate);
+        }
         await attendi(PAUSA_MS);
       }
     };
@@ -327,6 +337,8 @@ export async function giroContinuo(
   }
 
   if (raccolte.length > 0) await salvaPrezzi(raccolte);
+
+  await giro.chiudi(giro.devoFermarmi ? "interrotto" : finito ? "catalogo finito" : "tempo scaduto");
 
   return {
     aperte,

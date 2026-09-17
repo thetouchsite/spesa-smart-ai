@@ -52,7 +52,35 @@ function readJson(req: IncomingMessage): Promise<unknown> {
   });
 }
 
+/**
+ * Una pagina da guardare, invece di dati da consumare.
+ *
+ * Il server risponde in JSON a tutto, ed e' giusto cosi': e' un'API. Ma un
+ * paio di rotte servono a un essere umano con un browser — il pannello, e
+ * l'elenco delle rotte — e a quelle il JSON non serve.
+ *
+ * Invece di dare a ogni gestore una risposta da manipolare, che poi qualcuno
+ * dimentica di chiudere, basta che torni questo: chi lo riceve sa che e'
+ * testo e con che tipo mandarlo.
+ */
+export class Pagina {
+  constructor(
+    readonly testo: string,
+    readonly tipo = "text/html; charset=utf-8",
+  ) {}
+}
+
 function send(res: ServerResponse, status: number, payload: unknown) {
+  if (payload instanceof Pagina) {
+    res.writeHead(status, {
+      "Content-Type": payload.tipo,
+      "Content-Length": Buffer.byteLength(payload.testo),
+      /* Mai in cache: queste pagine si rinfrescano da sole, e una copia
+         vecchia racconterebbe di uno stato che non c'e' piu'. */
+      "Cache-Control": "no-store",
+    });
+    return res.end(payload.testo);
+  }
   const body = JSON.stringify(payload);
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",

@@ -35,7 +35,7 @@ import { createHash } from "node:crypto";
 import { generateText, Output } from "ai";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import { createApp, HttpError } from "./base/http.js";
+import { createApp, HttpError, Pagina } from "./base/http.js";
 import { isConfigured, model, MODEL_ID } from "./app/gemini.js";
 import { fetchPageContext, rankHits, searchProvider } from "./app/search.js";
 import { cache, cacheVecchia, isDbConfigured, plans, users } from "./base/db.js";
@@ -85,6 +85,7 @@ import { rispostaPrezziV1 } from "./api/contratto-v1.js";
 import { collegaTraduttore } from "./api/aiuti-esterni.js";
 import { consumoDiOggi, controllaChiave } from "./api/chiavi.js";
 import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./api/catalogo.js";
+import { avviaQui, datiPannello, ordinaDiFermare, paginaPannello } from "./api/pannello.js";
 import { paesiConCatalogo } from "./api/catalogo-fonti.js";
 import { negoziInCitta, statoNegozi, tuttiINegozi } from "./api/negozi.js";
 import { aggiornaCatalogo, avviaCatalogoNotturno } from "./api/catalogo-notturno.js";
@@ -1571,6 +1572,43 @@ app.post("/product/shopping", async (body) => {
  *
  * QUESTE ROTTE NON COSTANO NIENTE: nessuna chiamata al modello, nessuna quota.
  */
+
+/**
+ * Il pannello: le stesse cose di `/catalogo/stato`, ma da guardare.
+ *
+ * Sta qui e non in un artefatto rigenerato a mano perche' i numeri cambiano da
+ * soli e nessuno lancia tre comandi ogni tre minuti per accorgersene. La pagina
+ * e il perche' stanno in `pannello.ts`.
+ */
+app.get("/pannello", async () => new Pagina(paginaPannello()));
+
+app.get("/pannello/dati", async () => datiPannello());
+
+/**
+ * Ferma la lettura, ovunque stia girando.
+ *
+ * E' una POST e non una GET di proposito: una GET la apre un browser per
+ * sbaglio, la segue un crawler, la mette in cache un proxy. Un ordine che
+ * ferma il lavoro di una notte non deve poter partire da un clic distratto.
+ */
+/**
+ * Avvia la lettura sul server che riceve questa richiesta.
+ *
+ * Su Render vuol dire: accendi Render. Il processo del servizio web e' sempre
+ * in piedi, quindi c'e' chi puo' partire — ed e' proprio il caso in cui un
+ * pulsante «avvia» ha senso.
+ */
+app.post("/pannello/avvia", async (body) => {
+  const { chiave } = (body ?? {}) as { chiave?: string };
+  const messaggio = await avviaQui(String(chiave ?? ""));
+  return { ok: messaggio.startsWith("Partito"), messaggio };
+});
+
+app.post("/pannello/ferma", async (body) => {
+  const { chiave, per } = (body ?? {}) as { chiave?: string; per?: string };
+  const messaggio = await ordinaDiFermare(String(chiave ?? ""), per || "tutti");
+  return { ok: messaggio.startsWith("Ordine"), messaggio };
+});
 
 /** Cosa copriamo, e cosa e' pronto adesso. */
 app.get("/catalogo/stato", async () => ({
