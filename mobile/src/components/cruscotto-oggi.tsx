@@ -27,7 +27,8 @@
 import { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Body, Button, Card, GradientCard, Ionicons, Label, Title } from "./ui";
+import { Body, Button, Card, Ionicons, Label, Title } from "./ui";
+import { CartaPiano } from "./carta-piano";
 import { DishPhoto } from "./dish-photo";
 import { useSession } from "../lib/state/session";
 import { useUtente } from "../lib/state/utente";
@@ -65,7 +66,7 @@ function comeChiamarlo(nome?: string | null): string {
 
   const prima = n
     .split("@")[0]
-    ?.replace(/[._\-]+/g, " ")
+    ?.replace(/[._-]+/g, " ")
     .trim();
   /* Solo se sembra un nome: «thetouchsite» o «info» non lo sono. Due parole,
      o una parola corta e senza cifre, passano. */
@@ -154,27 +155,14 @@ export function CruscottoOggi() {
           voleva. Due stili diversi per la stessa cosa farebbero sembrare la
           seconda un'altra pagina. */}
       {planExtra ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Il tuo piano. Spesa ${Math.round(planExtra.totali.spesaAlMiglioPrezzo)} ${planExtra.totali.valuta}. Apri i risultati`}
+        <CartaPiano
+          spesa={planExtra.totali.spesaAlMiglioPrezzo}
+          valuta={planExtra.totali.valuta}
+          risparmio={planExtra.risparmioVsPiuCara}
+          prodotti={planExtra.totali.vociInLista}
+          giorni={currentPlan.mealPlan.length}
           onPress={() => router.push("/risultati")}
-          style={({ pressed }) => [pressed && styles.premuto]}
-        >
-          <GradientCard>
-            <View style={styles.pianoTesta}>
-              <Body style={styles.pianoOcchiello}>Il tuo piano</Body>
-              <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.85)" />
-            </View>
-            <Body style={styles.pianoSpesa}>
-              {Math.round(planExtra.totali.spesaAlMiglioPrezzo)} {planExtra.totali.valuta}
-            </Body>
-            <Body style={styles.pianoSotto}>
-              {planExtra.risparmioVsPiuCara && planExtra.risparmioVsPiuCara > 0
-                ? `Risparmi ${Math.round(planExtra.risparmioVsPiuCara)} ${planExtra.totali.valuta} rispetto all'insegna più cara`
-                : `${planExtra.totali.vociInLista} prodotti · ${currentPlan.mealPlan.length} giorni`}
-            </Body>
-          </GradientCard>
-        </Pressable>
+        />
       ) : null}
 
       {/* I tre pasti di oggi. È la ragione per cui si apre l'app la sera. */}
@@ -297,19 +285,4 @@ const styles = StyleSheet.create({
   fatto: { fontSize: font.size.md, fontWeight: font.weight.semibold, color: colors.primary },
 
   scorciatoie: { gap: spacing.xs },
-
-  pianoTesta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  pianoOcchiello: {
-    fontSize: font.size.sm,
-    fontWeight: font.weight.semibold,
-    color: "rgba(255,255,255,0.9)",
-  },
-  pianoSpesa: {
-    fontSize: font.size.display,
-    fontWeight: font.weight.bold,
-    color: "#FFFFFF",
-    letterSpacing: -1,
-    marginTop: spacing.xs,
-  },
-  pianoSotto: { fontSize: font.size.sm, color: "rgba(255,255,255,0.9)", marginTop: 2 },
 });
