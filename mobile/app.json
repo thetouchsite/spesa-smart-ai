@@ -29,8 +29,7 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "edgeToEdgeEnabled": true,
       "versionCode": 1
@@ -50,6 +49,13 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "Per farti entrare senza ridigitare la password a ogni apertura."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#00723B",
+          "defaultChannel": "promemoria"
         }
       ]
     ],

@@ -48,6 +48,7 @@ import {
   utenteDaRichiesta,
   utentePubblico,
 } from "./app/utente.js";
+import { registraPush, dimenticaPush } from "./app/notifiche.js";
 import { fotoDelPiatto, fotoDiPiuPiatti } from "./app/foto-piatti.js";
 import { isShoppingConfigured, searchShopping } from "./app/shopping.js";
 import {
@@ -512,6 +513,34 @@ app.post("/plans/delete", async (body, req) => {
   const res = await (await plans()).deleteOne({ _id: new ObjectId(id), userId });
   if (res.deletedCount === 0) throw new HttpError(404, "Piano non trovato");
   return { ok: true };
+});
+
+/* ───────────────────────── Notifiche push ───────────────────────── */
+
+/**
+ * Il telefono consegna il suo indirizzo, legato a chi e' entrato.
+ *
+ * Serve un account: un token senza utente e' un indirizzo senza destinatario
+ * — non sapremmo di chi e' la lista della spesa da confrontare coi prezzi.
+ */
+app.post("/notifiche/registra", async (body, req) => {
+  const { id: userId } = await utenteDaRichiesta(req);
+  const dati = parse(
+    z.object({
+      push: z.string().min(10).max(200),
+      piattaforma: z.string().max(20).optional(),
+      fuso: z.string().max(60).optional(),
+    }),
+    body,
+  );
+  return registraPush(userId, dati);
+});
+
+/** Si chiama uscendo dall'account: questo telefono non e' piu' suo. */
+app.post("/notifiche/dimentica", async (body, req) => {
+  const { id: userId } = await utenteDaRichiesta(req);
+  const { push } = parse(z.object({ push: z.string().min(10).max(200) }), body);
+  return dimenticaPush(userId, push);
 });
 
 /* ─────────────────────────────── AI ─────────────────────────────── */

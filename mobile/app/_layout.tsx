@@ -31,6 +31,7 @@ import { svegliaIlBackend } from "../src/lib/sveglia";
 import { useSession } from "../src/lib/state/session";
 import { useUtente } from "../src/lib/state/utente";
 import { Dialogo } from "../src/components/dialogo";
+import { Promemoria } from "../src/components/promemoria";
 import { colors, font, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 
@@ -128,6 +129,11 @@ export default function RootLayout() {
             chiunque con `confermaAzione`. Sta DOPO lo Stack perche' deve
             disegnarsi sopra qualunque schermata. */}
         <Dialogo />
+
+        {/* Non disegna niente: tiene in riga la coda dei promemoria e porta
+            dove la notifica prometteva quando la si tocca. Sta qui perche'
+            deve essere montato sempre. */}
+        <Promemoria />
       </I18nProvider>
     </SafeAreaProvider>
   );

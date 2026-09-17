@@ -34,6 +34,7 @@ import { kv } from "../src/lib/kv";
 import { confermaAzione } from "../src/lib/conferma";
 import { QuotaDetail } from "../src/components/quota-banner";
 import { SchedaAccount } from "../src/components/scheda-account";
+import { SchedaPromemoria } from "../src/components/scheda-promemoria";
 import { colors, font, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 import { tornaIndietro } from "../src/lib/navigazione";
@@ -90,6 +91,10 @@ export default function ImpostazioniScreen() {
       </View>
 
       <SchedaAccount />
+
+      {/* Subito sotto l'account: sono le due cose che l'utente viene a
+          cercare qui, e la lingua puo' aspettare due centimetri. */}
+      <SchedaPromemoria />
 
       <Card>
         <Label icon="language-outline">{ui("Lingua")}</Label>

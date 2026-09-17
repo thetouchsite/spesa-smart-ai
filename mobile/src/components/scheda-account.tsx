@@ -29,6 +29,7 @@ import {
 } from "../lib/biometria";
 import { colors, font, spacing } from "../theme";
 import { confermaAzione } from "../lib/conferma";
+import { dimenticaToken } from "../lib/notifiche-push";
 
 export function SchedaAccount() {
   const router = useRouter();
@@ -68,7 +69,13 @@ export function SchedaAccount() {
         conferma: "Esci",
         distruttiva: true,
       });
-      if (si) await esci();
+      if (!si) return;
+      /* Prima di uscire si toglie questo telefono dalla lista delle push:
+         dopo, il token dell'utente non c'e' piu' e il server non avrebbe modo
+         di sapere chi sta chiedendo di essere dimenticato. Chi entrasse dopo
+         con un altro account riceverebbe le notifiche del precedente. */
+      await dimenticaToken(token);
+      await esci();
     })();
   }
 

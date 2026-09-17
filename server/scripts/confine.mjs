@@ -114,6 +114,10 @@ const PADRONI = {
      costa il latte a Milano e' un dato e un dato non si inventa. Se un giorno
      un file dell'API importa `gemini`, e' quella distinzione che si sta
      perdendo, e lo script deve dirlo. */
+  /* Le push: chi notificare e cosa dirgli. Sta di qua perche' sa chi e'
+     l'utente e cosa c'e' nella sua lista — due cose che l'API non deve
+     sapere. L'API dice quanto costa il latte, non a chi importa. */
+  notifiche: "app",
   "plan-grounded": "app",
   prompts: "app",
   gemini: "app",
