@@ -47,7 +47,7 @@ import {
   eliminaAccount,
   utenteDaRichiesta,
   utentePubblico,
-} from "./api/utente.js";
+} from "./app/utente.js";
 import { isShoppingConfigured, searchShopping } from "./app/shopping.js";
 import {
   type Blocco,

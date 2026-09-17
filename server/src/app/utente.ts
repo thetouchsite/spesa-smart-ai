@@ -3,9 +3,18 @@
  *
  * COSA STA QUI E COSA NO
  * ----------------------
- * `app/auth.ts` sa di crittografia e di token e non ha idea di cosa sia un
- * utente. Qui c'e' il contrario: nessuna crittografia scritta a mano, solo le
- * regole di cosa si puo' fare a un account e quando.
+ * `auth.ts` sa di crittografia e di token e non ha idea di cosa sia un utente.
+ * Qui c'e' il contrario: nessuna crittografia scritta a mano, solo le regole di
+ * cosa si puo' fare a un account e quando.
+ *
+ * E STA IN `app/`, NON IN `api/`
+ * ------------------------------
+ * L'avevo messo di la' e il build l'ha fermato, giustamente: `api/` non puo'
+ * importare da `app/`, perche' l'API un giorno dev'essere staccabile con un
+ * `git mv`. Ma questo file non e' dell'API — l'API vende prezzi e non sa cosa
+ * sia un utente registrato. Account, password e piani sono dell'app, e il
+ * confine ha fatto esattamente il suo mestiere: costringere a rispondere
+ * «questo di chi e'?» il giorno in cui il file nasce.
  *
  * IL RECUPERO PASSWORD SENZA POSTA
  * --------------------------------
@@ -29,7 +38,7 @@
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { ObjectId } from "mongodb";
 import { HttpError } from "../base/http.js";
-import { hashPassword, issueToken, requireUser, verifyPassword } from "../app/auth.js";
+import { hashPassword, issueToken, requireUser, verifyPassword } from "./auth.js";
 import { plans, users, type UserDoc } from "../base/db.js";
 
 /** Quanto vive un codice di recupero. Lungo abbastanza per cercarlo, corto abbastanza da non restare in giro. */
