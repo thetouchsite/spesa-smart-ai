@@ -19,6 +19,23 @@ rem  «ferma» del pannello ferma il GIRO, non la finestra: dopo la pausa ne
 rem  comincia un altro.
 rem ---------------------------------------------------------------------------
 
+rem  MANOPOLE CONSIGLIATE, nel .env accanto a questo file.
+rem  Non stanno nel codice perche' i valori buoni per un PC ammazzano Render:
+rem  la' ci sono 512 MB, qui sedici giga. I predefiniti del codice sono quelli
+rem  prudenti, e chi ha una macchina vera se li alza qui.
+rem
+rem    NOME_MACCHINA=touchPrice     come ti chiami nel pannello
+rem    LETTORE_MINUTI=45            quanto dura un giro
+rem    LETTORE_PAESI=16             quanti paesi per giro
+rem    GIRO_INSIEME=48              pagine aperte insieme
+rem    GIRO_PER_INSEGNA=2000        quante schede per insegna, per giro
+rem    GIRO_MAX_VOCI=1200000        tetto alla coda montata in memoria
+rem
+rem  Si va piu' forte in LARGHEZZA, non in pressione: piu' paesi insieme vuol
+rem  dire piu' negozi diversi, e a ognuno arrivano MENO richieste al minuto.
+rem  Alzare solo GIRO_INSIEME tenendo pochi paesi fa l'opposto, ed e' il modo
+rem  di farsi bloccare.
+
 title Lettore prezzi - MealMint
 cd /d "%~dp0"
 
@@ -36,6 +53,11 @@ echo.
 echo ===========================================================================
 echo   avvio: %DATE% %TIME%
 echo ===========================================================================
+rem  Memoria: la coda montata puo' arrivare a un milione di voci, e il tetto
+rem  che Node si da' da solo su una macchina da 16 GB sta sotto. Meglio dirglielo
+rem  che scoprirlo con un crash alle quattro di notte.
+set NODE_OPTIONS=--max-old-space-size=8192
+
 call npx tsx --env-file-if-exists=.env scripts/lettore.ts %*
 
 rem  Uscita pulita (Ctrl+C, o «exit 0» del programma): non si riparte.
