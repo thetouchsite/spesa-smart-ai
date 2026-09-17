@@ -46,7 +46,10 @@ const VOCI: Voce[] = [
   { chiave: "casa", dove: "/", etichetta: "Home", icona: "home" },
   { chiave: "menu", dove: "/menu", etichetta: "Menù", icona: "restaurant" },
   { chiave: "lista", dove: "/lista", etichetta: "Lista", icona: "cart" },
-  { chiave: "piani", dove: "/piani", etichetta: "Piani", icona: "bookmark" },
+  /* Non piu' il segnalibro: un segnalibro vuol dire «messo da parte da te»,
+     ed era giusto quando i piani si salvavano a mano. Adesso ci finiscono
+     tutti da soli, e quello che si apre e' una pila di cose fatte. */
+  { chiave: "piani", dove: "/piani", etichetta: "Piani", icona: "albums" },
 ];
 
 export function BarraBasso() {

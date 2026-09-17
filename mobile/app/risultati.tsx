@@ -12,7 +12,7 @@
  * linea la stessa funzione userà le fonti reali senza toccare questa schermata.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Share, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -32,7 +32,8 @@ import {
 import { EroeRisparmio, RigaBudget } from "../src/components/eroe-risparmio";
 import { useSession } from "../src/lib/state/session";
 import { QuotaBanner } from "../src/components/quota-banner";
-import { SalvaPiano } from "../src/components/salva-piano";
+import { PianoArchiviato } from "../src/components/salva-piano";
+import { getPlanStore } from "../src/lib/storage";
 import { computeResults } from "../src/lib/results/compute-results";
 import { pricePlan } from "../src/lib/price-data/price-engine";
 import { pricingFromOffers } from "../src/lib/plan-full";
@@ -58,7 +59,7 @@ export default function RisultatiScreen() {
   /** Testo nella lingua scelta dall'utente. */
   const ui = (t: string) => uiText(t, language);
   const router = useRouter();
-  const { profile, currentPlan, planExtra } = useSession();
+  const { profile, currentPlan, planExtra, pianoAttivoId, setPianoAttivoId } = useSession();
   const { language } = useI18n();
   const [pricing, setPricing] = useState<PricingResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -103,6 +104,77 @@ export default function RisultatiScreen() {
     () => (currentPlan ? computeResults({ profile, plan: currentPlan, pricing }) : null),
     [profile, currentPlan, pricing],
   );
+
+  /**
+   * IL PIANO SI ARCHIVIA DA SOLO, QUI.
+   *
+   * PERCHE' QUI E NON NELL'ELABORAZIONE
+   * -----------------------------------
+   * Perche' e' qui che i numeri esistono. Archiviandolo un istante prima —
+   * appena generato — la riga nell'elenco nascerebbe con spesa zero e
+   * risparmio zero, e resterebbe cosi' per sempre: l'archivio si riempirebbe
+   * di piani che sembrano tutti da buttare. Aspettare questa schermata costa
+   * il tempo di una transizione e in cambio la riga nasce completa.
+   *
+   * PERCHE' NON C'E' PIU' UN PULSANTE «SALVA»
+   * -----------------------------------------
+   * Perche' l'archivio si riempiva solo se l'utente se lo ricordava, e chi non
+   * se lo ricordava — quasi tutti — vedeva il piano sparire alla generazione
+   * successiva senza un avviso. L'app scaricava addosso a chi la usa il
+   * compito di proteggersi da una cosa che faceva lei.
+   *
+   * SI ASPETTA CHE I PREZZI SIANO ANDATI, NON CHE SIANO RIUSCITI
+   * ------------------------------------------------------------
+   * `loading` diventa falso anche quando i prezzi non arrivano. Un piano senza
+   * prezzi si archivia lo stesso: le ricette e la lista ci sono, ed e' piu'
+   * di quanto avrebbe chi non lo ritrova affatto.
+   */
+  const archiviazione = useRef<string | null>(null);
+  const [archiviato, setArchiviato] = useState(false);
+
+  useEffect(() => {
+    if (!currentPlan || !results || loading) return;
+    /* Gia' archiviato: o e' un piano riaperto dall'elenco, o l'abbiamo appena
+       messo noi. In sviluppo React monta due volte, e senza questa guardia
+       nell'elenco comparirebbero due righe identiche. */
+    if (pianoAttivoId) {
+      setArchiviato(true);
+      return;
+    }
+    const impronta =
+      JSON.stringify(currentPlan.mealPlan?.[0] ?? "") + currentPlan.groceryList.length;
+    if (archiviazione.current === impronta) return;
+    archiviazione.current = impronta;
+
+    let vivo = true;
+    void (async () => {
+      try {
+        const etichetta = `${profile.city || "Il mio piano"} · ${new Date().toLocaleDateString(
+          "it-IT",
+          { day: "numeric", month: "long" },
+        )}`;
+        const salvato = await getPlanStore().save({
+          label: etichetta,
+          form: profile,
+          plan: currentPlan,
+          estimatedSpend: results.estimatedSpend,
+          savings: results.savings,
+          score: results.score.total,
+        });
+        if (!vivo) return;
+        setPianoAttivoId(salvato.id);
+        setArchiviato(true);
+      } catch (err) {
+        /* Non si dice niente e non si riprova in cerchio: il piano resta
+           comunque in sessione e utilizzabile. La scheda in fondo dice «lo sto
+           mettendo», che e' vero finche' non riesce. */
+        console.warn("[risultati] archiviazione non riuscita:", err);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [currentPlan, results, loading, pianoAttivoId, profile, setPianoAttivoId]);
 
   if (!currentPlan || !results) {
     return (
@@ -345,17 +417,10 @@ export default function RisultatiScreen() {
         </Body>
       </Card>
 
-      {/* Il salvataggio sta in FONDO e non in cima: prima l'utente guarda i
-          numeri, poi decide se tenerli. Un pulsante «salva» prima ancora che
-          abbia letto cosa sta salvando e' un pulsante che non si preme. */}
-      <SalvaPiano
-        citta={city}
-        form={profile}
-        piano={currentPlan}
-        spesaStimata={results.estimatedSpend}
-        risparmio={results.savings}
-        punteggio={results.score.total}
-      />
+      {/* In fondo, dove prima c'era «Salva questo piano»: adesso il piano e'
+          gia' nell'elenco e qui si dice soltanto dov'e' finito — e a chi non
+          ha un account, cosa si porterebbe via un telefono perso. */}
+      <PianoArchiviato archiviato={archiviato} />
     </Screen>
   );
 }

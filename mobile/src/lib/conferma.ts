@@ -1,82 +1,35 @@
 /**
- * «Sei sicuro?», dove funziona davvero.
+ * «Sei sicuro?», in una riga e con la faccia dell'app.
  *
- * PERCHE' ESISTE
- * --------------
- * `Alert.alert` di React Native, nella versione web, e' questo:
+ * COME SI USA
+ * -----------
+ *     if (await confermaAzione({ titolo: "…", conferma: "Cancella" })) { … }
  *
- *     class Alert { static alert() {} }
+ * Torna una promessa e non una richiamata, cosi' il codice si legge
+ * nell'ordine in cui accadono le cose. `Alert.alert` chiedeva una funzione da
+ * chiamare dopo, e chi la scriveva finiva per annidare: conferma dentro
+ * conferma, e il filo del discorso si perde.
  *
- * Una funzione vuota. Non un errore, non un avviso in console: non succede
- * niente. E siccome nell'app ogni cosa irreversibile passava di li' — cancella
- * questo piano, esci dall'account, cancella i miei dati — nel browser quei tre
- * pulsanti erano decorativi. Si premevano, non succedeva niente, e l'unica
- * conclusione ragionevole per chi guardava era che l'app fosse rotta.
+ * DUE FINESTRE DI SISTEMA SCARTATE, E PERCHE'
+ * -------------------------------------------
+ * `Alert.alert` di React Native, nella versione web, e' letteralmente
+ * `class Alert { static alert() {} }`: una funzione vuota. Nel browser si
+ * premeva «Cancella» e non succedeva niente — non un errore, non un avviso in
+ * console: niente. Il primo rimedio e' stato `window.confirm`, che funziona
+ * davvero ma e' la finestra grigia del browser, coi pulsanti in inglese e
+ * sopra scritto «localhost:8081 dice». In mezzo a un'app curata sembra un
+ * pezzo dimenticato, e per una cosa irreversibile e' il momento peggiore per
+ * sembrare improvvisati.
  *
- * Il bello e' che il guasto si nasconde nel posto peggiore: nessuno scrive una
- * prova per «cancella», perche' cancellare durante le prove e' scomodo. E un
- * pulsante che non fa niente non lascia tracce nei registri.
- *
- * PERCHE' `window.confirm` E NON UN AVVISO DISEGNATO
- * --------------------------------------------------
- * Perche' un avviso disegnato da noi vuol dire uno stato in piu' per ogni
- * schermata che ne ha uno, e quattro schermate lo hanno. `window.confirm`
- * blocca la pagina, e' del sistema, si chiude con Esc, e chi usa un lettore di
- * schermo lo sente annunciato — tutte cose che un finto avviso fatto con dei
- * `View` va riscritto a mano per avere. Il giorno che ne serve uno con dentro
- * un campo di testo, allora si fa la schermata: e infatti la cancellazione
- * dell'account, che la password la chiede, una schermata ce l'ha gia'.
- *
- * TORNA UNA PROMESSA, NON UNA RICHIAMATA
- * --------------------------------------
- * `Alert.alert` chiede una funzione da chiamare dopo, e chi la scrive finisce
- * per annidare: conferma dentro conferma, e il filo del discorso si perde.
- * Qui si scrive `if (await chiediConferma(...)) { ... }`, che si legge nello
- * stesso ordine in cui accadono le cose.
+ * Adesso la finestra e' nostra — `components/dialogo.tsx`, montata una volta
+ * sola nel layout radice — e questo file e' solo la porta d'ingresso: tiene
+ * il nome che i cinque posti che la usano conoscono gia'.
  */
 
-import { Alert, Platform } from "react-native";
+import { useDialogo, type Domanda } from "./state/dialogo";
 
-export interface Domanda {
-  titolo: string;
-  /** La riga sotto: cosa succede davvero, non «questa azione e' irreversibile». */
-  testo?: string;
-  /** Il testo del pulsante che conferma. Un verbo, non «OK». */
-  conferma: string;
-  /** Rosso su iPhone, per le cose che non si annullano. */
-  distruttiva?: boolean;
-  annulla?: string;
-}
+export type { Domanda };
 
-export function confermaAzione({
-  titolo,
-  testo,
-  conferma,
-  distruttiva = false,
-  annulla = "Annulla",
-}: Domanda): Promise<boolean> {
-  if (Platform.OS === "web") {
-    /* `window.confirm` non mostra le etichette dei pulsanti — sono quelle del
-       browser — quindi la domanda deve bastare da sola: il titolo, cosa
-       succede, e infine il verbo, cosi' chi legge sa a cosa dice «OK». */
-    const righe = [titolo, testo, conferma + "?"].filter(Boolean);
-    try {
-      return Promise.resolve(window.confirm(righe.join("\n\n")));
-    } catch {
-      /* Finestra senza `confirm` (un frame con permessi ridotti): meglio non
-         fare niente che fare la cosa irreversibile senza aver chiesto. */
-      return Promise.resolve(false);
-    }
-  }
-
-  return new Promise((risolvi) => {
-    Alert.alert(titolo, testo, [
-      { text: annulla, style: "cancel", onPress: () => risolvi(false) },
-      {
-        text: conferma,
-        style: distruttiva ? "destructive" : "default",
-        onPress: () => risolvi(true),
-      },
-    ]);
-  });
+export function confermaAzione(domanda: Domanda): Promise<boolean> {
+  return useDialogo.getState().chiedi(domanda);
 }

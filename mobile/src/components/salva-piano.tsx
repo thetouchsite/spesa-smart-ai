@@ -1,154 +1,73 @@
 /**
- * «Salva questo piano», in fondo ai risultati.
+ * Il piano si archivia da solo: qui si dice soltanto dov'e' finito.
  *
- * PERCHE' QUI E NON ALTROVE
- * -------------------------
- * L'archivio dei piani esisteva da prima, e i suoi due magazzini pure — quello
- * sul telefono e quello sul nostro backend. Ma NESSUNA schermata lo chiamava:
- * lo storico sarebbe rimasto vuoto per sempre, e la promessa dell'account
- * («ritrovi i tuoi piani») non avrebbe avuto niente da mantenere.
+ * COS'ERA PRIMA, E PERCHE' NON VA PIU' BENE
+ * -----------------------------------------
+ * Era «Salva questo piano», con il pulsante. L'archivio si riempiva solo se
+ * l'utente se lo ricordava, e chi non se lo ricordava — quasi tutti — vedeva
+ * il suo piano sparire alla generazione successiva, senza avvisi. Cioe'
+ * l'app scaricava addosso a chi la usa il compito di proteggersi da una cosa
+ * che faceva lei.
  *
- * E questo e' il punto giusto in cui chiedere l'account, che e' una cosa
- * diversa dal punto giusto in cui metterlo. Qui l'utente ha appena visto un
- * piano suo, con i suoi numeri: ha qualcosa da perdere. Chiedergli di
- * registrarsi all'apertura, prima ancora di sapere cosa fa l'app, sarebbe
- * chiederglielo quando non ha niente da guadagnarci.
+ * E ne nasceva una confusione peggiore: due oggetti chiamati «piano» che non
+ * si parlavano. Si cancellavano tutti i piani salvati e quello in corso
+ * restava in home, perche' non era mai stato nell'archivio.
  *
- * L'ETICHETTA SE LA SCRIVE DA SOLO
- * --------------------------------
- * Il nome del piano e' la citta' e la data, non un campo da compilare. Nessuno
- * ha voglia di dare un nome a una lista della spesa, e «Piano del 17 settembre
- * — Napoli» e' piu' utile di «asd» — che e' quello che si scrive davvero
- * quando un modulo insiste.
+ * Adesso il piano entra nell'archivio appena i numeri sono pronti, e questa
+ * scheda fa la sola cosa che restava da fare: dire dov'e' finito, e a chi non
+ * ha un account spiegare cosa si porta via un telefono perso.
+ *
+ * L'INVITO ALL'ACCOUNT RESTA QUI, E NON PER CASO
+ * ----------------------------------------------
+ * E' il momento giusto per chiederlo: l'utente ha appena visto numeri suoi,
+ * ha qualcosa da perdere. Chiederglielo all'apertura, prima ancora di sapere
+ * cosa fa l'app, sarebbe chiederglielo quando non ha niente da guadagnarci.
+ * Cambia solo la frase: prima prometteva di salvare qualcosa che l'utente
+ * doveva ancora salvare, adesso dice dov'e' gia'.
  */
 
-import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Body, Button, Card, Ionicons } from "./ui";
-import { getPlanStore } from "../lib/storage";
 import { useUtente } from "../lib/state/utente";
-import { SessioneScaduta } from "../lib/api/cliente";
 import { colors, font, spacing } from "../theme";
-import type { SavedPlanForm } from "../lib/saved-plans";
 
-type Esito = "da-fare" | "salvo" | "fatto" | "errore";
-
-export function SalvaPiano({
-  citta,
-  form,
-  piano,
-  spesaStimata,
-  risparmio,
-  punteggio,
+export function PianoArchiviato({
+  /** `false` finche' l'archiviazione non e' riuscita: non si promette niente. */
+  archiviato,
 }: {
-  citta: string;
-  form: SavedPlanForm;
-  piano: unknown;
-  spesaStimata: number;
-  risparmio: number;
-  punteggio: number;
+  archiviato: boolean;
 }) {
   const router = useRouter();
-  const { stato, scaduta } = useUtente();
-  const [esito, setEsito] = useState<Esito>("da-fare");
-
-  const etichetta = `${citta || "Il mio piano"} · ${new Date().toLocaleDateString("it-IT", {
-    day: "numeric",
-    month: "long",
-  })}`;
-
-  async function salva() {
-    if (esito === "salvo") return;
-    setEsito("salvo");
-    try {
-      await getPlanStore().save({
-        label: etichetta,
-        form,
-        plan: piano as never,
-        estimatedSpend: spesaStimata,
-        savings: risparmio,
-        score: punteggio,
-      });
-      setEsito("fatto");
-    } catch (e) {
-      /* Sessione scaduta: si esce e si riprova sul telefono, cosi' il piano
-         non si perde comunque. Salvare in locale e' meglio che non salvare. */
-      if (e instanceof SessioneScaduta) {
-        await scaduta();
-        try {
-          await getPlanStore().save({
-            label: etichetta,
-            form,
-            plan: piano as never,
-            estimatedSpend: spesaStimata,
-            savings: risparmio,
-            score: punteggio,
-          });
-          setEsito("fatto");
-          return;
-        } catch {
-          /* niente da fare */
-        }
-      }
-      setEsito("errore");
-    }
-  }
-
-  if (esito === "fatto") {
-    return (
-      <Card>
-        <View style={styles.riga}>
-          <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
-          <Body style={styles.fatto}>Piano salvato</Body>
-        </View>
-        <Body style={styles.nota}>
-          {stato === "dentro"
-            ? "Lo ritrovi da qualunque telefono, nei tuoi piani."
-            : "È salvato su questo telefono. Con un account lo ritroveresti ovunque."}
-        </Body>
-        <View style={styles.bottoni}>
-          <Button
-            label="Vedi i tuoi piani"
-            variant="secondary"
-            onPress={() => router.push("/piani")}
-          />
-          {stato !== "dentro" ? (
-            <Button label="Crea un account" onPress={() => router.push("/registrati")} />
-          ) : null}
-        </View>
-      </Card>
-    );
-  }
+  const { stato } = useUtente();
 
   return (
     <Card>
       <View style={styles.riga}>
-        <Ionicons name="bookmark-outline" size={20} color={colors.foreground} />
-        <Body style={styles.titolo}>Salva questo piano</Body>
+        <Ionicons
+          name={archiviato ? "checkmark-circle" : "bookmark-outline"}
+          size={20}
+          color={archiviato ? colors.primary : colors.mutedForeground}
+        />
+        <Body style={styles.titolo}>
+          {archiviato ? "Questo piano è nei tuoi piani" : "Lo sto mettendo nei tuoi piani"}
+        </Body>
       </View>
+
       <Body style={styles.nota}>
         {stato === "dentro"
-          ? "Lo ritroverai da qualunque telefono."
-          : "Resterà su questo telefono. Con un account lo ritrovi ovunque, anche se lo cambi."}
+          ? "Lo ritrovi da qualunque telefono, insieme a quelli di prima."
+          : "Sta su questo telefono, insieme a quelli di prima. Con un account li ritrovi ovunque, anche se lo cambi o lo perdi."}
       </Body>
-
-      {esito === "errore" ? (
-        <Body style={styles.errore}>Non sono riuscito a salvarlo. Riprova.</Body>
-      ) : null}
 
       <View style={styles.bottoni}>
         <Button
-          label={esito === "salvo" ? "Salvo…" : "Salva il piano"}
-          loading={esito === "salvo"}
-          onPress={salva}
+          label="Vedi i tuoi piani"
+          variant="secondary"
+          onPress={() => router.push("/piani")}
         />
         {stato !== "dentro" ? (
-          <Button
-            label="Accedi per ritrovarlo ovunque"
-            variant="ghost"
-            onPress={() => router.push("/accedi")}
-          />
+          <Button label="Crea un account" onPress={() => router.push("/registrati")} />
         ) : null}
       </View>
     </Card>
@@ -158,13 +77,11 @@ export function SalvaPiano({
 const styles = StyleSheet.create({
   riga: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   titolo: { fontSize: font.size.md, fontWeight: font.weight.semibold },
-  fatto: { fontSize: font.size.md, fontWeight: font.weight.semibold, color: colors.primary },
   nota: {
     fontSize: font.size.sm,
     color: colors.mutedForeground,
     marginTop: spacing.xs,
     marginBottom: spacing.md,
   },
-  errore: { fontSize: font.size.sm, color: colors.destructive, marginBottom: spacing.sm },
   bottoni: { gap: spacing.sm },
 });

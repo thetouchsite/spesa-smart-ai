@@ -30,6 +30,7 @@ import { hydrate } from "../src/lib/kv";
 import { svegliaIlBackend } from "../src/lib/sveglia";
 import { useSession } from "../src/lib/state/session";
 import { useUtente } from "../src/lib/state/utente";
+import { Dialogo } from "../src/components/dialogo";
 import { colors, font, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 
@@ -122,6 +123,11 @@ export default function RootLayout() {
             <Stack.Screen key={nome} name={nome} options={{ animation: "none" }} />
           ))}
         </Stack>
+
+        {/* La finestra delle conferme: montata una volta qui, usata da
+            chiunque con `confermaAzione`. Sta DOPO lo Stack perche' deve
+            disegnarsi sopra qualunque schermata. */}
+        <Dialogo />
       </I18nProvider>
     </SafeAreaProvider>
   );

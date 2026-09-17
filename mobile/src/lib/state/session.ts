@@ -38,12 +38,30 @@ interface SessionState {
    * prezzi: le schermate lo controllano e mostrano quel che c'è.
    */
   planExtra: PlanExtra | null;
+  /**
+   * Quale voce dell'archivio si sta guardando.
+   *
+   * PERCHE' UN PUNTATORE E NON UNA COPIA
+   * ------------------------------------
+   * Prima c'erano due magazzini: il piano in corso qui dentro, e i piani
+   * salvati in un archivio a parte che si riempiva solo premendo «Salva
+   * questo piano». Da fuori erano due cose che si chiamavano uguale e non si
+   * parlavano — si cancellavano tutti i piani salvati e quello in corso
+   * restava li', perche' non era mai stato nell'archivio.
+   *
+   * Adesso ogni piano generato entra nell'archivio da solo, e questo campo
+   * dice qual e' quello attivo. `null` vuol dire «generato ma non ancora
+   * archiviato», che dura i pochi secondi fra l'elaborazione e i risultati.
+   */
+  pianoAttivoId: string | null;
   variantSeed: number;
   status: SessionStatus;
   error: string | null;
   updateProfile: (patch: Partial<UserProfile>) => void;
   resetProfile: () => void;
   setPlan: (plan: Plan | null, extra?: PlanExtra | null) => void;
+  /** Collega il piano in corso alla sua voce d'archivio. */
+  setPianoAttivoId: (id: string | null) => void;
   setStatus: (status: SessionStatus, error?: string | null) => void;
   bumpSeed: () => number;
 }
@@ -54,6 +72,7 @@ export const useSession = create<SessionState>()(
       profile: DEFAULT_PROFILE,
       currentPlan: null,
       planExtra: null,
+      pianoAttivoId: null,
       variantSeed: 1,
       status: "idle",
       error: null,
@@ -74,9 +93,24 @@ export const useSession = create<SessionState>()(
             keys.forEach((k) => localStorage.removeItem(k));
           } catch { /* quota / private mode — ignore */ }
         }
-        set({ profile: DEFAULT_PROFILE, currentPlan: null, planExtra: null, variantSeed: 1, status: "idle", error: null });
+        set({
+          profile: DEFAULT_PROFILE,
+          currentPlan: null,
+          planExtra: null,
+          pianoAttivoId: null,
+          variantSeed: 1,
+          status: "idle",
+          error: null,
+        });
       },
-      setPlan: (plan, extra = null) => set({ currentPlan: plan, planExtra: extra }),
+      /* Un piano nuovo non e' ancora nessuna voce d'archivio: chi lo
+         archivia — `/risultati`, appena ha i numeri veri — chiama poi
+         `setPianoAttivoId`. Dimenticare di azzerarlo qui vorrebbe dire che il
+         piano nuovo si spaccia per quello vecchio, e riaprendo l'archivio si
+         vedrebbe «in corso» sulla riga sbagliata. */
+      setPlan: (plan, extra = null) =>
+        set({ currentPlan: plan, planExtra: extra, pianoAttivoId: null }),
+      setPianoAttivoId: (id) => set({ pianoAttivoId: id }),
       setStatus: (status, error = null) => set({ status, error }),
       bumpSeed: () => {
         const next = get().variantSeed + 1;
@@ -129,6 +163,7 @@ export const useSession = create<SessionState>()(
         currentPlan: s.currentPlan,
         planExtra: s.planExtra,
         variantSeed: s.variantSeed,
+        pianoAttivoId: s.pianoAttivoId,
       }),
     },
   ),

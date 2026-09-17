@@ -1,34 +1,25 @@
 /**
- * Lo storico: i piani già fatti.
+ * I piani: tutti quelli fatti, e quello che stai usando adesso.
  *
- * FUNZIONA ANCHE SENZA ACCOUNT
- * ----------------------------
- * Chi non è registrato vede i piani salvati sul telefono; chi lo è vede i suoi,
- * ovunque li abbia fatti. La schermata non se ne accorge: chiede l'elenco a
- * `getPlanStore()` e quello sa già da dove prenderlo. In fondo c'è l'invito a
- * registrarsi, che è il momento in cui l'utente capisce a cosa serve — dopo
- * aver visto i piani che rischia di perdere, non prima.
+ * NON E' PIU' UN ARCHIVIO A PARTE
+ * -------------------------------
+ * Fino a ieri c'erano due oggetti che si chiamavano «piano»: quello in corso,
+ * dentro la sessione, e i piani salvati, in un archivio che si riempiva solo
+ * premendo un pulsante. I due non si parlavano: si cancellavano tutti i piani
+ * salvati e quello in corso restava in home, perche' non era mai stato
+ * nell'archivio. Chi guardava non poteva capirlo, perche' non c'era niente da
+ * capire — erano due cose scollegate con lo stesso nome.
  *
- * UN PIANO SALVATO SI RIAPRE
- * ---------------------------
- * Per mesi non si poteva: ogni riga aveva la data, la spesa, il risparmio e un
- * cestino, e il cestino era l'unica cosa che si potesse fare a un piano
- * salvato. Un archivio da cui si puo' solo cancellare non e' un archivio, e
- * peggio ancora rendeva bugiarda la frase con cui si chiede l'account —
- * «ritrovi i tuoi piani ovunque»: li ritrovavi scritti in un elenco, non li
- * ritrovavi da usare.
+ * Adesso ogni piano generato finisce qui da solo, e «in corso» e' un bollino
+ * su una di queste righe: non un secondo magazzino, un segnalibro. Si tocca
+ * una riga e quel piano diventa quello attivo — in home, nel menu', nella
+ * lista. Si cancella la riga in corso e sparisce davvero, anche dalla home.
  *
- * Riaprire un piano rimette in corso due cose: il piano e le risposte con cui
- * era stato fatto — citta', persone, budget, stile — perche' senza quelle le
- * porzioni e la valuta sarebbero quelle dell'ultimo piano, non di questo.
- *
- * I PREZZI VERI NON TORNANO INDIETRO, E VA BENE
- * ---------------------------------------------
- * Di un piano si salvano le ricette e le risposte, non le offerte dei negozi:
- * quelle scadono. Un piano di tre settimane fa riaperto con i prezzi di tre
- * settimane fa direbbe bugie con la faccia seria. Riaprendolo la lista li
- * ricalcola, e finche' non ha finito mostra la stima — che e' dichiarata come
- * tale, come dappertutto nell'app.
+ * PERCHE' «CREA UN PIANO» STA IN CIMA E NON IN FONDO
+ * --------------------------------------------------
+ * Perche' con dieci piani in elenco un pulsante in fondo si trova solo
+ * scorrendo, e perche' in fondo c'e' la barra che galleggia. In cima e'
+ * sempre alla stessa distanza dal pollice, che ci siano zero piani o venti.
  *
  * L'ERRORE NON SI TRAVESTE DA ELENCO VUOTO
  * ----------------------------------------
@@ -57,9 +48,9 @@ import { getPlanStore, type SavedPlan } from "../src/lib/storage";
 import { useUtente } from "../src/lib/state/utente";
 import { useSession } from "../src/lib/state/session";
 import { SessioneScaduta } from "../src/lib/api/cliente";
+import { confermaAzione } from "../src/lib/conferma";
 import { colors, font, radius, spacing, spazioPerLaBarra } from "../src/theme";
 import { tornaIndietro } from "../src/lib/navigazione";
-import { confermaAzione } from "../src/lib/conferma";
 
 type Stato = "carico" | "pronto" | "errore";
 
@@ -67,7 +58,8 @@ export default function PianiScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { stato: accesso, scaduta } = useUtente();
-  const { currentPlan, setPlan, updateProfile, profile } = useSession();
+  const { profile, currentPlan, pianoAttivoId, setPlan, setPianoAttivoId, updateProfile } =
+    useSession();
 
   const [stato, setStato] = useState<Stato>("carico");
   const [piani, setPiani] = useState<SavedPlan[]>([]);
@@ -103,17 +95,18 @@ export default function PianiScreen() {
   );
 
   /**
-   * Rimette in corso un piano salvato e porta ai risultati.
+   * Rende attivo un piano e porta ai risultati.
    *
-   * Il profilo si ripristina insieme al piano: le porzioni, la valuta e la
-   * citta' con cui i conti tornano sono quelle con cui il piano era stato
-   * fatto, non quelle dell'ultima volta che si e' risposto alle domande.
+   * Con il piano tornano anche le risposte con cui era stato fatto — città,
+   * persone, budget, valuta, stile — o le porzioni e i conti sarebbero quelli
+   * dell'ultimo piano invece che di questo.
    *
-   * `planExtra` si azzera apposta — vedi la nota in cima al file: le offerte
-   * salvate non esistono, e riproporre quelle vecchie sarebbe peggio che
-   * ricalcolarle.
+   * `planExtra` si azzera apposta: di un piano si conservano le ricette e le
+   * risposte, non le offerte dei negozi, che scadono. Riproporre i prezzi di
+   * tre settimane fa sarebbe dire bugie con la faccia seria; la lista li
+   * ricalcola, e intanto mostra la stima.
    */
-  function metti(p: SavedPlan) {
+  function attiva(p: SavedPlan) {
     updateProfile({
       city: p.form.city,
       country: p.form.country ?? profile.country,
@@ -127,42 +120,35 @@ export default function PianiScreen() {
       zeroSpendDay: p.form.zeroSpendDay,
     });
     setPlan(p.plan, null);
+    setPianoAttivoId(p.id);
     /* `push` e non `replace`: la freccia indietro deve riportare all'elenco,
-       che e' da dove si e' partiti. */
+       che è da dove si è partiti. */
     router.push("/risultati");
-  }
-
-  function apri(p: SavedPlan) {
-    /* SI CHIEDE CONFERMA SOLO QUANDO C'E' DAVVERO QUALCOSA DA PERDERE.
-       Il piano in corso non si salva da solo — si salva premendo «Salva
-       questo piano» in fondo ai risultati — quindi aprirne un altro puo'
-       buttare via lavoro che nessuno ha messo al sicuro. Ma se un piano in
-       corso non c'e', o e' gia' questo, non c'e' niente da chiedere: una
-       domanda a cui la risposta e' sempre «si'» insegna solo a non leggere. */
-    if (!currentPlan || currentPlan === p.plan) return metti(p);
-    void (async () => {
-      const si = await confermaAzione({
-        titolo: "Aprire questo piano?",
-        testo: "Quello che hai in corso viene sostituito. Se non l'hai salvato, lo perdi.",
-        conferma: "Apri",
-      });
-      if (si) metti(p);
-    })();
   }
 
   function cancella(p: SavedPlan) {
     void (async () => {
+      const inCorso = p.id === pianoAttivoId;
       const si = await confermaAzione({
         titolo: "Cancellare questo piano?",
-        testo: p.label,
+        testo: inCorso
+          ? `«${p.label}» è il piano che stai usando: sparisce anche dalla home.`
+          : p.label,
         conferma: "Cancella",
         distruttiva: true,
       });
       if (!si) return;
+
       /* Si toglie subito dall'elenco e poi si chiede al server. Aspettare la
          risposta per far sparire una riga fa sembrare l'app lenta; se il
          server rifiuta, il ricaricamento la rimette al suo posto. */
       setPiani((attuali) => attuali.filter((x) => x.id !== p.id));
+      /* CANCELLARE IL PIANO IN CORSO LO CANCELLA DAVVERO.
+         È il punto che prima non tornava: si svuotava l'elenco e in home
+         restava un piano che l'utente credeva di aver buttato. */
+      if (inCorso) {
+        setPlan(null, null);
+      }
       try {
         await getPlanStore().delete(p.id);
       } catch {
@@ -171,10 +157,18 @@ export default function PianiScreen() {
     })();
   }
 
+  const nuovo = (
+    <Button
+      label="Crea un piano nuovo"
+      icon="sparkles-outline"
+      onPress={() => router.push("/onboarding/citta")}
+    />
+  );
+
   if (stato === "carico") {
     return (
       <Screen barra>
-        <TopBar title="I tuoi piani" onBack={() => tornaIndietro()} />
+        <TopBar title="Piani" onBack={() => tornaIndietro()} />
         <Loading text="Carico i tuoi piani…" />
       </Screen>
     );
@@ -183,7 +177,7 @@ export default function PianiScreen() {
   if (stato === "errore") {
     return (
       <Screen barra>
-        <TopBar title="I tuoi piani" onBack={() => tornaIndietro()} />
+        <TopBar title="Piani" onBack={() => tornaIndietro()} />
         <ErrorState
           text="Non riesco a caricare i tuoi piani. I piani non sono persi: è la connessione che manca."
           onRetry={() => void carica()}
@@ -194,12 +188,11 @@ export default function PianiScreen() {
 
   return (
     <Screen scroll={false} barra>
-      <TopBar title="I tuoi piani" onBack={() => tornaIndietro()} />
+      <TopBar title="Piani" onBack={() => tornaIndietro()} />
 
       <ScrollView
-        /* Questa schermata scorre per conto suo — `Screen` ha
-           `scroll={false}` — quindi il posto per la pillola in fondo non lo
-           fa nessun altro: senza, l'ultimo piano salvato ci finisce sotto. */
+        /* Questa schermata scorre per conto suo — `Screen` ha `scroll={false}`
+           — quindi il posto per la pillola in fondo lo faccio io. */
         contentContainerStyle={[styles.lista, { paddingBottom: spazioPerLaBarra(insets.bottom) }]}
         refreshControl={
           <RefreshControl
@@ -212,106 +205,249 @@ export default function PianiScreen() {
             tintColor={colors.primary}
           />
         }
+        showsVerticalScrollIndicator={false}
       >
         {piani.length === 0 ? (
           <View style={styles.vuoto}>
-            <Ionicons name="receipt-outline" size={44} color={colors.mutedForeground} />
+            <View style={styles.vuotoDisco}>
+              <Ionicons name="receipt-outline" size={30} color={colors.primary} />
+            </View>
             <Title>Ancora nessun piano</Title>
-            <Subtitle>Quando ne generi uno, lo ritrovi qui.</Subtitle>
-            <Button label="Generane uno" onPress={() => router.replace("/")} />
+            <Subtitle>Rispondi a sei domande e te ne prepariamo uno.</Subtitle>
+            <View style={styles.vuotoBottone}>{nuovo}</View>
           </View>
         ) : (
-          piani.map((p) => (
-            /* IL PREMIBILE STA DENTRO LA SCHEDA, NON ATTORNO.
-               Avvolgere tutta la scheda sembrava piu' comodo — si apre da
-               qualunque punto — ma dentro c'e' il cestino, che e' gia' un
-               pulsante: sul web diventava un <button> dentro un <button>, che
-               l'HTML vieta e React segnala con un errore in console. Adesso
-               sono fratelli — il testo con la freccia apre, il cestino
-               cancella — e nessuno dei due sta dentro l'altro. */
-            <Card key={p.id}>
-              <View style={styles.riga}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Apri il piano ${p.label}`}
-                  onPress={() => apri(p)}
-                  style={({ pressed }) => [styles.apri, pressed && styles.premuto]}
-                >
-                  <View style={styles.testo}>
-                    <Body style={styles.titolo}>{p.label}</Body>
-                    <Body style={styles.data}>
-                      {new Date(p.createdAt).toLocaleDateString("it-IT", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}
-                    </Body>
-                    <View style={styles.numeri}>
-                      <Body style={styles.numero}>
-                        Spesa {Math.round(p.estimatedSpend)} · Risparmio {Math.round(p.savings)}
-                      </Body>
-                    </View>
-                  </View>
-                  {/* La freccia dice che la riga si apre. Senza, una scheda con
-                      dentro un cestino sembra una scheda con dentro un cestino
-                      — e nient'altro. */}
-                  <Ionicons
-                    name="chevron-forward"
-                    size={18}
-                    color={colors.mutedForeground}
-                    style={styles.freccia}
-                  />
-                </Pressable>
-                <Button
-                  label=""
-                  nomeAccessibile={`Cancella il piano ${p.label}`}
-                  icon="trash-outline"
-                  variant="ghost"
-                  onPress={() => cancella(p)}
-                  style={styles.cestino}
-                />
-              </View>
-            </Card>
-          ))
-        )}
+          <>
+            <View style={styles.testa}>
+              <Body style={styles.conteggio}>
+                {piani.length === 1 ? "Un piano" : `${piani.length} piani`}
+                {currentPlan && pianoAttivoId ? " · uno in corso" : ""}
+              </Body>
+              {nuovo}
+            </View>
 
-        {accesso !== "dentro" && piani.length > 0 ? (
-          <Card>
-            <Body style={styles.invito}>
-              Questi piani stanno solo su questo telefono. Con un account li ritrovi ovunque, anche
-              se lo cambi.
-            </Body>
-            <Button
-              label="Crea un account"
-              variant="secondary"
-              onPress={() => router.push("/registrati")}
-            />
-          </Card>
-        ) : null}
+            {piani.map((p) => (
+              <RigaPiano
+                key={p.id}
+                piano={p}
+                inCorso={p.id === pianoAttivoId}
+                onApri={() => attiva(p)}
+                onCancella={() => cancella(p)}
+              />
+            ))}
+
+            {accesso !== "dentro" ? (
+              <Card style={styles.invito}>
+                <Body style={styles.invitoTesto}>
+                  Questi piani stanno solo su questo telefono. Con un account li ritrovi ovunque,
+                  anche se lo cambi.
+                </Body>
+                <Button
+                  label="Crea un account"
+                  variant="secondary"
+                  onPress={() => router.push("/registrati")}
+                />
+              </Card>
+            ) : null}
+          </>
+        )}
       </ScrollView>
     </Screen>
   );
 }
 
+/**
+ * Una riga dell'elenco.
+ *
+ * PERCHE' I NUMERI SONO TRE RIQUADRI E NON UNA FRASE
+ * --------------------------------------------------
+ * Erano «Spesa 72 · Risparmio 78» dentro una pillola grigia: una frase, e le
+ * frasi si leggono, mentre qui serve confrontare. Tre riquadri con
+ * l'etichetta sopra e la cifra sotto si scorrono in verticale fra un piano e
+ * l'altro — quale ho speso meno? — che è la sola domanda che si fa aprendo
+ * questo elenco.
+ *
+ * Le cifre sono in serif come tutte le cifre dell'app: separa i numeri, che
+ * sono il contenuto, dal resto dell'interfaccia che è senza grazie.
+ *
+ * QUELLO IN CORSO SI VEDE DA LONTANO
+ * ----------------------------------
+ * Bordo verde e bollino. Senza, in un elenco di righe identiche l'unica
+ * informazione che conta davvero — quale sto usando — bisognerebbe indovinarla.
+ */
+function RigaPiano({
+  piano,
+  inCorso,
+  onApri,
+  onCancella,
+}: {
+  piano: SavedPlan;
+  inCorso: boolean;
+  onApri: () => void;
+  onCancella: () => void;
+}) {
+  const data = new Date(piano.createdAt);
+  /* `textTransform: capitalize` metteva la maiuscola a OGNI parola —
+     «Giovedì 17 Settembre» — e in italiano i mesi sono minuscoli. Qui si
+     alza solo la prima lettera, che e' l'unica che va alzata. */
+  const grezza = data.toLocaleDateString("it-IT", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const giorno = grezza.charAt(0).toUpperCase() + grezza.slice(1);
+  const valuta = piano.form.currency === "GBP" ? "£" : piano.form.currency === "USD" ? "$" : "€";
+  const giorni = piano.plan?.mealPlan?.length ?? 0;
+
+  const numeri = [
+    {
+      testa: "SPESA",
+      valore: piano.estimatedSpend > 0 ? valuta + Math.round(piano.estimatedSpend) : "—",
+    },
+    {
+      testa: "RISPARMIO",
+      valore: piano.savings > 0 ? valuta + Math.round(piano.savings) : "—",
+      acceso: piano.savings > 0,
+    },
+    { testa: "GIORNI", valore: giorni > 0 ? String(giorni) : "—" },
+  ];
+
+  return (
+    <Card style={[styles.carta, inCorso && styles.cartaInCorso]}>
+      <View style={styles.riga}>
+        {/* Il premibile e il cestino sono FRATELLI: un pulsante dentro un
+            pulsante l'HTML lo vieta, e sul web React lo segnala. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            inCorso
+              ? `${piano.label}, piano in corso. Aprilo`
+              : `Rendi attivo il piano ${piano.label}`
+          }
+          onPress={onApri}
+          style={({ pressed }) => [styles.premibile, pressed && styles.premuto]}
+        >
+          <View style={[styles.disco, inCorso && styles.discoInCorso]}>
+            <Ionicons
+              name={inCorso ? "radio-button-on" : "receipt-outline"}
+              size={19}
+              color={inCorso ? colors.primary : colors.mutedForeground}
+            />
+          </View>
+          <View style={styles.testo}>
+            <Body style={styles.titolo} numberOfLines={1}>
+              {piano.label}
+            </Body>
+            <Body style={styles.data}>{giorno}</Body>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
+        </Pressable>
+
+        <Button
+          label=""
+          nomeAccessibile={`Cancella il piano ${piano.label}`}
+          icon="trash-outline"
+          variant="ghost"
+          onPress={onCancella}
+          style={styles.cestino}
+        />
+      </View>
+
+      <View style={styles.numeri}>
+        {numeri.map((n) => (
+          <View key={n.testa} style={styles.riquadro}>
+            <Body style={styles.riquadroTesta}>{n.testa}</Body>
+            <Body style={[styles.riquadroValore, n.acceso && styles.riquadroAcceso]}>
+              {n.valore}
+            </Body>
+          </View>
+        ))}
+      </View>
+
+      {inCorso ? (
+        <View style={styles.bollino}>
+          <Ionicons name="checkmark-circle" size={13} color={colors.primary} />
+          <Body style={styles.bollinoTesto}>IN CORSO</Body>
+        </View>
+      ) : null}
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
-  lista: { gap: spacing.md, paddingBottom: spacing.xxxl },
-  vuoto: { alignItems: "center", gap: spacing.md, paddingVertical: spacing.xxxl },
-  riga: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
-  testo: { flex: 1, gap: 2 },
+  lista: { gap: spacing.md },
+  testa: { gap: spacing.sm, marginBottom: spacing.xs },
+  conteggio: {
+    fontSize: font.size.sm,
+    color: colors.mutedForeground,
+  },
+
+  vuoto: { alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xxxl },
+  vuotoDisco: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: colors.tintaVerde,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.sm,
+  },
+  vuotoBottone: { alignSelf: "stretch", marginTop: spacing.lg },
+
+  carta: { gap: spacing.md },
+  cartaInCorso: { borderWidth: 1.5, borderColor: colors.primary },
+
+  riga: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  premibile: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md },
+  premuto: { opacity: 0.6 },
+  disco: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.muted,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  discoInCorso: { backgroundColor: colors.tintaVerde },
+  testo: { flex: 1, gap: 1 },
   titolo: { fontSize: font.size.md, fontWeight: font.weight.semibold },
   data: { fontSize: font.size.sm, color: colors.mutedForeground },
-  numeri: { flexDirection: "row", marginTop: spacing.xs },
-  numero: {
-    fontSize: font.size.xs,
-    color: colors.mutedForeground,
+  cestino: { paddingHorizontal: spacing.sm },
+
+  numeri: { flexDirection: "row", gap: spacing.sm },
+  riquadro: {
+    flex: 1,
     backgroundColor: colors.muted,
     borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
-  apri: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  cestino: { paddingHorizontal: spacing.sm },
-  freccia: { marginTop: spacing.sm },
-  premuto: { opacity: 0.7 },
-  invito: { fontSize: font.size.sm, color: colors.mutedForeground, marginBottom: spacing.sm },
+  riquadroTesta: {
+    fontSize: 10,
+    fontWeight: font.weight.semibold,
+    letterSpacing: 0.6,
+    color: colors.mutedForeground,
+  },
+  riquadroValore: {
+    fontSize: font.size.md,
+    fontWeight: font.weight.bold,
+    color: colors.foreground,
+    marginTop: 1,
+  },
+  riquadroAcceso: { color: colors.primary },
+
+  bollino: { flexDirection: "row", alignItems: "center", gap: 5 },
+  bollinoTesto: {
+    fontSize: 10,
+    fontWeight: font.weight.semibold,
+    letterSpacing: 0.8,
+    color: colors.primary,
+  },
+
+  invito: { marginTop: spacing.sm },
+  invitoTesto: {
+    fontSize: font.size.sm,
+    color: colors.mutedForeground,
+    marginBottom: spacing.sm,
+  },
 });
