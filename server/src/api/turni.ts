@@ -20,9 +20,20 @@
  * --------------------------------------
  * Un biglietto per paese sul database, con una scadenza. Chi vuole leggere la
  * Spagna prende il biglietto «ES»; chi arriva dopo lo trova occupato e prende
- * un altro paese. Il biglietto scade da solo dopo la durata del giro, quindi
- * un lettore che muore male non blocca la Spagna per sempre — che e' il guaio
- * classico dei blocchi scritti col cuore leggero.
+ * un altro paese.
+ *
+ * IL BIGLIETTO E' UN AFFITTO BREVE, NON UNA PROPRIETA'
+ * ----------------------------------------------------
+ * La prima versione lo faceva scadere alla fine del giro: cinquanta minuti.
+ * Sembra prudente e invece e' il guaio classico dei lucchetti — un lettore che
+ * muore male, o una finestra chiusa col mouse, lasciano il paese bloccato per
+ * quasi un'ora a nome di un processo che non esiste piu'. Si e' visto subito:
+ * un PC con sedici paesi per giro, riavviato una volta, ne teneva trentuno.
+ *
+ * Adesso l'affitto dura pochi minuti e chi lavora lo rinnova mentre lavora.
+ * Un lettore vivo lo tiene quanto gli serve; uno morto lo perde in tre minuti,
+ * perche' morto non rinnova niente. E' lo stesso principio del battito: la
+ * prova di essere vivi si da' continuando a darla, non dichiarandola una volta.
  *
  * PERCHE' IL PAESE E NON L'INSEGNA
  * --------------------------------
@@ -108,6 +119,27 @@ export async function prendiTurni(
 }
 
 /**
+ * Allunga i biglietti che sono nostri, di altri `minuti`.
+ *
+ * Si chiama mentre si lavora. Chi non chiama piu' — perche' e' morto — li
+ * perde alla scadenza, ed e' esattamente cio' che deve succedere.
+ */
+export async function rinnovaTurni(paesi: string[], minuti: number): Promise<void> {
+  if (!isDbConfigured() || paesi.length === 0) return;
+  try {
+    await (
+      await turni()
+    ).updateMany(
+      { _id: { $in: paesi.map((p) => `turno-${p}`) }, macchina: CHI, pid: process.pid },
+      { $set: { scade: new Date(Date.now() + minuti * 60_000) } },
+    );
+  } catch {
+    /* Se non riesce, il giro perdera' i paesi alla scadenza e li riprendera'
+       al giro dopo. Niente di rotto: solo un po' di lavoro rifatto. */
+  }
+}
+
+/**
  * Rende i biglietti finito il giro.
  *
  * Si rende solo cio' che e' proprio: senza il filtro su macchina e pid, un
@@ -127,6 +159,21 @@ export async function rendiTurni(paesi: string[]): Promise<void> {
   } catch {
     /* Se non riesce, scadono da soli. E' il motivo per cui hanno una scadenza. */
   }
+}
+
+/**
+ * Chi tiene ogni paese, adesso. Paese → nome della macchina.
+ *
+ * Serve a chi deve SCEGLIERE prima di partire, non a chi guarda: il pulsante
+ * del pannello sceglieva i paesi con la sua rotazione e li passava al giro,
+ * che li trovava occupati e non faceva niente. Da fuori il pulsante diceva
+ * «Partito» e non partiva nulla — il modo peggiore di fallire, perche' non
+ * lascia nemmeno il sospetto che qualcosa sia andato storto.
+ */
+export async function chiTieneIPaesi(): Promise<Map<string, string>> {
+  const mappa = new Map<string, string>();
+  for (const t of await turniInCorso()) mappa.set(t.paese, t.macchina);
+  return mappa;
 }
 
 /** Chi ha in mano cosa, adesso. Per il pannello. */

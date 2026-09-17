@@ -276,6 +276,54 @@ export class GiroInCorso {
 }
 
 /**
+ * Il battito di chi e' acceso ma non ha niente da fare.
+ *
+ * PERCHE' SERVE
+ * -------------
+ * Il battito lo scrive `GiroInCorso`, che nasce quando un giro parte davvero.
+ * Un lettore che chiede i paesi, li trova tutti occupati e si ritira non ne
+ * apre mai uno — quindi non scrive niente, e nel pannello non compare. Da
+ * fuori e' identico a un lettore spento, ed e' esattamente il momento in cui
+ * vorresti vederlo: e' acceso, sta facendo la cosa giusta, e non lavora. Senza
+ * questa riga uno guarda il pannello, non lo trova, e va a riavviare una cosa
+ * che stava gia' andando bene.
+ *
+ * NON APRE UN GIRO
+ * ----------------
+ * Scrive solo la riga viva, e non lascia niente nello storico: aspettare non
+ * e' un giro, e venti «in attesa» in fila nell'elenco dei giri passati
+ * coprirebbero i giri veri, che sono quelli che si vanno a leggere.
+ *
+ * La riga sparisce da sola dopo due minuti di silenzio, come tutte: un lettore
+ * spento mentre aspettava smette di essere in attesa.
+ */
+export async function battitoDiAttesa(motivo: string): Promise<void> {
+  if (!isDbConfigured()) return;
+  try {
+    const c = await giri();
+    await c.replaceOne(
+      { _id: CHIAVE_BATTITO },
+      {
+        tipo: "battito" as const,
+        macchina: QUESTA_MACCHINA,
+        pid: process.pid,
+        lavoro: motivo,
+        inizio: new Date(),
+        tocco: new Date(),
+        aperte: 0,
+        conPrezzo: 0,
+        saltate: 0,
+        ...comeSta(),
+      },
+      { upsert: true },
+    );
+  } catch {
+    /* Come per gli altri battiti: raccontare di essere vivi non deve poter
+       far morire chi lo racconta. */
+  }
+}
+
+/**
  * Chi sta lavorando in questo momento, e da quale macchina.
  *
  * Torna solo i battiti recenti: uno vecchio di piu' di due minuti e' un

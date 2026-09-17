@@ -42,10 +42,10 @@
  */
 
 import { cataloghi } from "../base/db.js";
-import { prendiTurni, rendiTurni } from "./turni.js";
+import { prendiTurni, rendiTurni, rinnovaTurni } from "./turni.js";
 import { prezzi as collezionePrezzi } from "../base/db.js";
 import { verifyProductPage } from "./price-page.js";
-import { GiroInCorso } from "./giri.js";
+import { GiroInCorso, battitoDiAttesa } from "./giri.js";
 import {
   FRESCHEZZA_MS,
   improntaUrl,
@@ -230,9 +230,18 @@ export async function giroContinuo(
      quelli liberi, e se sono tutti occupati non legge — che e' meglio di due
      lettori che si pestano i piedi: il lavoro totale e' lo stesso, le
      richieste ai negozi sono la meta'. Vedi `turni.ts`. */
-  const paesi = await prendiTurni(paesiChiesti, paesiChiesti.length, minuti + 5);
+  /* L'affitto dura poco e si rinnova lavorando: vedi `turni.ts`. Prenderlo
+     per tutta la durata del giro vorrebbe dire che una finestra chiusa col
+     mouse blocca quei paesi per quasi un'ora. */
+  const VALIDITA_MIN = 3;
+  const paesi = await prendiTurni(paesiChiesti, paesiChiesti.length, VALIDITA_MIN);
   if (paesi.length === 0) {
     console.info("[giro] tutti i paesi sono presi da un altro lettore: salto il giro");
+    /* E lo si scrive anche sul pannello: un lettore acceso che si ritira non
+       apre nessun giro, quindi senza questa riga sarebbe indistinguibile da
+       uno spento — proprio nel momento in cui uno si chiede perche' non
+       lavora. Vedi `battitoDiAttesa`. */
+    await battitoDiAttesa("in attesa: tutti i paesi occupati");
     return { aperte: 0, conPrezzo: 0, saltate: 0, secondi: 0, finito: false };
   }
   if (paesi.length < paesiChiesti.length) {
@@ -242,6 +251,7 @@ export async function giroContinuo(
 
   const scadenza = Date.now() + minuti * 60_000;
   const inizio = Date.now();
+  let ultimoRinnovo = Date.now();
   let aperte = 0;
   let conPrezzo = 0;
   let saltate = 0;
@@ -380,6 +390,13 @@ export async function giroContinuo(
         if (aperte % 50 === 0) {
           onAvanzamento?.(aperte, conPrezzo);
           giro.segna(aperte, conPrezzo, saltate);
+          /* Il rinnovo viaggia col battito, ma piu' di rado: allungare un
+             affitto ogni cinque secondi sarebbe una scrittura inutile ogni
+             cinque secondi, per trentuno paesi. */
+          if (Date.now() - ultimoRinnovo > 60_000) {
+            ultimoRinnovo = Date.now();
+            void rinnovaTurni(paesi, VALIDITA_MIN);
+          }
         }
         await attendi(PAUSA_MS);
       }

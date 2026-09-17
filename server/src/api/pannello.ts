@@ -32,6 +32,7 @@
 import { chiStaLavorando, giriPassati } from "./giri.js";
 import { comandi, isDbConfigured } from "../base/db.js";
 import { giroContinuo } from "./prezzi-continuo.js";
+import { chiTieneIPaesi } from "./turni.js";
 import { assicuraFonti, tutteLeFonti } from "./catalogo-fonti.js";
 import { contiPesanti } from "./statistiche.js";
 import { statoMagazzino } from "./prezzi-magazzino.js";
@@ -143,11 +144,29 @@ export async function avviaQui(chiave: string): Promise<string> {
   /* Si ruota: ogni avvio riparte da dove aveva smesso il precedente. */
   const tutti = paesiCheRendono();
   if (tutti.length === 0) return "Nessun paese con insegne che pubblicano prezzi.";
-  const scelti: string[] = [];
-  for (let i = 0; i < Math.min(PAESI_A_MANO, tutti.length); i++) {
-    scelti.push(tutti[(daQualePaese + i) % tutti.length]);
+
+  /* SI SCEGLIE FRA I PAESI LIBERI, non fra tutti.
+     Da quando i paesi si prenotano, un lettore acceso altrove — il PC di
+     casa — puo' averli gia' in mano. Prima questo pulsante li sceglieva con
+     la sua rotazione e li passava al giro, che li trovava occupati e tornava
+     indietro senza far niente: il pannello diceva «Partito» e non partiva
+     nulla. Un fallimento che non lascia nemmeno il sospetto di essere tale.
+
+     Adesso si guarda prima chi tiene cosa, si prende quel che e' libero, e se
+     non c'e' niente di libero lo si dice — con il nome di chi sta lavorando,
+     che e' la sola informazione utile in quel momento. */
+  const tenuti = await chiTieneIPaesi();
+  const liberi = tutti.filter((p) => !tenuti.has(p));
+  if (liberi.length === 0) {
+    const chi = [...new Set(tenuti.values())].join(", ");
+    return `Tutti i paesi sono gia' in mano a un altro lettore${chi ? ` (${chi})` : ""}. Non c'e' niente da leggere che non stia gia' leggendo qualcun altro.`;
   }
-  daQualePaese = (daQualePaese + scelti.length) % Math.max(1, tutti.length);
+
+  const scelti: string[] = [];
+  for (let i = 0; i < Math.min(PAESI_A_MANO, liberi.length); i++) {
+    scelti.push(liberi[(daQualePaese + i) % liberi.length]);
+  }
+  daQualePaese = (daQualePaese + scelti.length) % Math.max(1, liberi.length);
 
   giroInCorsoQui = true;
 
@@ -176,7 +195,8 @@ export async function avviaQui(chiave: string): Promise<string> {
     }
   })(), 0);
 
-  return `Partito: ${MINUTI_A_MANO} minuti su ${scelti.length} paesi (${scelti.join(" ")}). Comparira' fra i vivi entro cinque secondi.`;
+  const occupati = tenuti.size > 0 ? ` (${tenuti.size} paesi sono presi da un altro lettore)` : "";
+  return `Partito: ${MINUTI_A_MANO} minuti su ${scelti.length} paesi (${scelti.join(" ")})${occupati}. Comparira' fra i vivi entro cinque secondi.`;
 }
 
 /**
