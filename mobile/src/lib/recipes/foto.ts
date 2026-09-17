@@ -105,6 +105,47 @@ export async function fotoDiPiuPiatti(nomi: string[]): Promise<void> {
 }
 
 /**
+ * Le foto di piu' piatti, per una schermata che ne mostra tanti.
+ *
+ * PERCHE' UN GANCIO E NON UNA CHIAMATA
+ * ------------------------------------
+ * `fotoDiPiuPiatti` riempie la memoria ma non dice niente a nessuno: chi
+ * disegna con `fotoNota` non si accorge che nel frattempo le foto sono
+ * arrivate, e resta coi segnaposto finche' qualcos'altro non lo fa
+ * ridisegnare. Il menu' se l'era risolta per conto suo con un contatore, e la
+ * home no — per questo in home i piatti di oggi erano tre forchette grigie
+ * finche' non si passava dal menu' e si tornava indietro.
+ *
+ * Il rimedio non e' ricopiare il contatore nella seconda schermata: e' che
+ * chiedere le foto e farsi ridisegnare siano la stessa cosa, una volta sola.
+ *
+ * NON TORNA LE FOTO
+ * -----------------
+ * Le legge chi disegna, con `fotoNota`, una per volta. Tornare un dizionario
+ * vorrebbe dire ricostruirlo a ogni giro per poi leggerne tre valori.
+ */
+export function useFotoDiPiuPiatti(nomi: (string | undefined)[]): void {
+  const [, ridisegna] = useState(0);
+  /* La dipendenza vera sono i NOMI, non l'array: chi chiama lo ricostruisce a
+     ogni disegno — `giorno.pasti.map(...)` — e con quello come dipendenza
+     l'effetto ripartirebbe per sempre. La stringa cambia solo quando cambiano
+     davvero i piatti. */
+  const elenco = nomi.filter((n): n is string => !!n);
+  const impronta = elenco.map(chiave).sort().join("|");
+
+  useEffect(() => {
+    if (!impronta) return;
+    let vivo = true;
+    void fotoDiPiuPiatti(impronta.split("|")).then(() => {
+      if (vivo) ridisegna((n) => n + 1);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [impronta]);
+}
+
+/**
  * La foto di un piatto, per una schermata.
  *
  * Torna subito quella gia' nota — cosi' tornando su una ricetta vista la foto

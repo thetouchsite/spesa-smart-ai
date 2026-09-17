@@ -28,7 +28,7 @@ import {
 import { useSession } from "../src/lib/state/session";
 import { localDay } from "../src/lib/days";
 import { DishPhoto } from "../src/components/dish-photo";
-import { fotoDiPiuPiatti, fotoNota } from "../src/lib/recipes/foto";
+import { fotoNota, useFotoDiPiuPiatti } from "../src/lib/recipes/foto";
 import { colors, font, radius, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 import { useI18n } from "../src/lib/i18n";
@@ -49,25 +49,14 @@ export default function MenuScreen() {
 
   /* Le foto di tutta la settimana in una richiesta sola.
      Ventuno pasti sarebbero ventuno richieste, e con le miniature che si
-     ridisegnano a ogni scorrimento diventerebbero molte di piu'. Qui si
-     chiedono insieme una volta, e da li' in poi sono in memoria. */
-  const [fotoPronte, setFotoPronte] = useState(0);
-  useEffect(() => {
-    const piatti = (currentPlan?.mealPlan ?? []).flatMap((g) =>
-      MEALS.map((m) => (g as Record<string, unknown>)[m.key] as string).filter(Boolean),
-    );
-    if (piatti.length === 0) return;
-    let vivo = true;
-    void fotoDiPiuPiatti(piatti).then(() => {
-      /* Un contatore invece delle foto: servono solo a far ridisegnare la
-         schermata, e i valori veri li legge `fotoNota` dalla sua memoria. */
-      if (vivo) setFotoPronte((n: number) => n + 1);
-    });
-    return () => {
-      vivo = false;
-    };
-  }, [currentPlan]);
-  void fotoPronte;
+     ridisegnano a ogni scorrimento diventerebbero molte di piu'. Il gancio le
+     chiede insieme e fa ridisegnare quando sono arrivate; i valori veri li
+     legge `fotoNota` dalla sua memoria. */
+  useFotoDiPiuPiatti(
+    (currentPlan?.mealPlan ?? []).flatMap((g) =>
+      MEALS.map((m) => (g as Record<string, unknown>)[m.key] as string),
+    ),
+  );
 
   if (!currentPlan) {
     return (

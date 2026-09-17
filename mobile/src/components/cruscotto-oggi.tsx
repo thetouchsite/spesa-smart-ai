@@ -32,7 +32,7 @@ import { CartaPiano } from "./carta-piano";
 import { DishPhoto } from "./dish-photo";
 import { useSession } from "../lib/state/session";
 import { useUtente } from "../lib/state/utente";
-import { fotoNota } from "../lib/recipes/foto";
+import { fotoNota, useFotoDiPiuPiatti } from "../lib/recipes/foto";
 import { dayIndex, localDay } from "../lib/days";
 import { computeResults } from "../lib/results/compute-results";
 import { pricingFromOffers } from "../lib/plan-full";
@@ -178,6 +178,12 @@ export function CruscottoOggi() {
   /* Le voci non ancora prese. Si leggono dallo stesso posto in cui la lista
      le scrive: due verità sullo stesso fatto diventerebbero due verità
      diverse alla prima occasione. */
+  /* I TRE PIATTI DI OGGI CHIEDONO LE LORO FOTO.
+     `fotoNota` legge e basta: senza qualcuno che riempia la memoria, in home
+     restavano tre segnaposto grigi finche' non si passava dal menu'. Sono tre
+     nomi, e partono in una richiesta sola. */
+  useFotoDiPiuPiatti(PASTI.map((p) => oggi?.[p.chiave]));
+
   const mancanti = useMemo(() => {
     const voci = currentPlan?.groceryList ?? [];
     if (voci.length === 0) return [];
