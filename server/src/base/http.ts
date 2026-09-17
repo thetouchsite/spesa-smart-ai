@@ -112,11 +112,28 @@ function applyCors(req: IncomingMessage, res: ServerResponse) {
   res.setHeader("Access-Control-Max-Age", "86400");
 }
 
+/**
+ * Tutte le rotte montate, in ordine.
+ *
+ * Il registro esiste gia' — `createApp` ne ha bisogno per smistare le
+ * richieste — e questa funzione lo mette a disposizione del pannello. Il punto
+ * e' che l'elenco delle API sia GENERATO e non scritto: un elenco scritto a
+ * mano e' giusto il giorno che si scrive, e dopo due rotte nuove e una tolta
+ * racconta un server che non esiste piu'. Questo non puo' sbagliarsi, perche'
+ * e' la stessa mappa da cui passano le richieste vere.
+ */
+const montate = new Set<string>();
+
+export function rotteMontate(): string[] {
+  return [...montate].sort();
+}
+
 export function createApp() {
   const routes = new Map<string, Handler>();
 
   function route(method: string, path: string, handler: Handler) {
     routes.set(`${method} ${path}`, handler);
+    montate.add(`${method} ${path}`);
   }
 
   const app = {

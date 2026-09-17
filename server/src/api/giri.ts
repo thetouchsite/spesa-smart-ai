@@ -323,6 +323,73 @@ export async function battitoDiAttesa(motivo: string): Promise<void> {
   }
 }
 
+export interface GiornoDiLavoro {
+  /** `2026-09-17`. Gia' nel fuso di chi guarda: vedi la nota qui sotto. */
+  giorno: string;
+  aperte: number;
+  conPrezzo: number;
+  /** Quanto e' durata la lettura, in minuti, sommando tutti i giri. */
+  minuti: number;
+  giri: number;
+}
+
+/**
+ * Quanto si e' letto, giorno per giorno.
+ *
+ * PERCHE' NON BASTAVA L'ELENCO DEGLI ULTIMI GIRI
+ * ----------------------------------------------
+ * L'elenco dice cos'e' successo, una riga per volta, e va benissimo per
+ * capire perche' un giro e' morto. Ma la domanda che ci si fa guardando il
+ * pannello dopo una settimana e' un'altra — «stiamo andando avanti?» — e a
+ * quella un elenco non risponde: bisogna sommare a mente dieci righe e
+ * ricordarsi quelle di ieri. Dieci barre lo dicono in un colpo d'occhio, e
+ * soprattutto dicono quando NON si e' letto, che e' l'informazione che
+ * l'elenco nasconde meglio: un giorno senza righe semplicemente non compare.
+ *
+ * IL GIORNO E' QUELLO DI CHI GUARDA, NON QUELLO DI GREENWICH
+ * ----------------------------------------------------------
+ * Raggruppando in UTC, un giro delle 00:30 italiane finirebbe nel giorno
+ * prima, e chi legge il pannello alle nove di mattina si troverebbe il lavoro
+ * di stanotte spalmato su due barre. Il pannello lo guardiamo dall'Italia; se
+ * un giorno lo guardera' qualcun altro, `FUSO_PANNELLO` e' li' apposta.
+ */
+export async function lavoroPerGiorno(giorni = 14): Promise<GiornoDiLavoro[]> {
+  if (!isDbConfigured()) return [];
+  const fuso = process.env.FUSO_PANNELLO ?? "Europe/Rome";
+  const da = new Date(Date.now() - giorni * 24 * 60 * 60 * 1000);
+  try {
+    const c = await giri();
+    const righe = await c
+      .aggregate<{ _id: string; aperte: number; conPrezzo: number; ms: number; giri: number }>([
+        { $match: { tipo: "giro", inizio: { $gte: da } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$inizio", timezone: fuso } },
+            aperte: { $sum: "$aperte" },
+            conPrezzo: { $sum: "$conPrezzo" },
+            /* La durata si ricava, non si salva: `tocco` e' l'ultimo respiro,
+               `inizio` il primo. Su un giro morto ammazzato e' comunque il
+               tempo che ha lavorato davvero. */
+            ms: { $sum: { $subtract: ["$tocco", "$inizio"] } },
+            giri: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ])
+      .toArray();
+
+    return righe.map((r) => ({
+      giorno: r._id,
+      aperte: r.aperte ?? 0,
+      conPrezzo: r.conPrezzo ?? 0,
+      minuti: Math.max(0, Math.round((r.ms ?? 0) / 60000)),
+      giri: r.giri ?? 0,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Chi sta lavorando in questo momento, e da quale macchina.
  *

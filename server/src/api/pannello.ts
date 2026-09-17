@@ -29,8 +29,9 @@
  * gira su GitHub e non ha bisogno che nessuno guardi niente.
  */
 
-import { chiStaLavorando, giriPassati } from "./giri.js";
+import { chiStaLavorando, giriPassati, lavoroPerGiorno } from "./giri.js";
 import { comandi, isDbConfigured } from "../base/db.js";
+import { rotteMontate } from "../base/http.js";
 import { giroContinuo } from "./prezzi-continuo.js";
 import { chiTieneIPaesi } from "./turni.js";
 import { assicuraFonti, tutteLeFonti } from "./catalogo-fonti.js";
@@ -41,9 +42,10 @@ import { statoCatalogo } from "./catalogo.js";
 import { statoFonti, paesiConCatalogo } from "./catalogo-fonti.js";
 
 export async function datiPannello() {
-  const [vivi, passati, prezzi, cataloghi] = await Promise.all([
+  const [vivi, passati, perGiorno, prezzi, cataloghi] = await Promise.all([
     chiStaLavorando(),
     giriPassati(10),
+    lavoroPerGiorno(14),
     statoMagazzino(),
     statoCataloghi(),
   ]);
@@ -51,9 +53,11 @@ export async function datiPannello() {
     adesso: new Date().toISOString(),
     vivi,
     passati,
+    perGiorno,
     prezzi,
     cataloghi,
     memoria: statoCatalogo(),
+    rotte: rotteMontate(),
     fonti: statoFonti(),
     /* `quantiPaesi` e non `paesi`: i conti pesanti portano gia' un `paesi` che
        e' l'elenco riga per riga, e due campi con lo stesso nome fanno sparire
@@ -295,6 +299,23 @@ export function paginaPannello(): string {
   .righe div span{display:block;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;
     color:var(--lieve);margin-bottom:1px}
   .righe div b{font-family:var(--mono);font-size:14px;font-variant-numeric:tabular-nums;font-weight:600}
+  /* LE SCHEDE DEI LETTORI, STRETTE.
+     Erano due griglie sovrapposte, cinque numeri sopra e tre sotto, con un
+     titolo in mezzo: centosettanta punti d'altezza a testa, e con tre
+     macchine accese il resto del pannello finiva sotto la piega. I numeri
+     sono gli stessi — non si toglie informazione per fare spazio — ma stanno
+     su una riga sola, e quelli che si guardano di rado (RAM, carico, da
+     quanto e' accesa) scendono in una riga minuta in fondo. */
+  .scheda.viva{padding:11px 14px}
+  .scheda.viva .testa{margin-bottom:7px}
+  .scheda.viva .righe{grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:7px}
+  .scheda.viva .righe div span{font-size:9.5px;margin-bottom:0}
+  .scheda.viva .righe div b{font-size:13px}
+  .scheda.viva .barra{height:5px;margin-top:8px}
+  .coda{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-family:var(--mono);
+    font-size:10.5px;color:var(--lieve)}
+  .coda b{font-weight:600;color:var(--tenue)}
+
   .barra{height:7px;border-radius:5px;background:var(--incavo);overflow:hidden;margin-top:11px}
   .barra i{display:block;height:100%;background:var(--verde);border-radius:5px;
     transition:width .6s ease}
@@ -318,13 +339,66 @@ export function paginaPannello(): string {
   .spazio.stretto .barra i{background:var(--ambra)}
   .spazio.pieno .barra i{background:var(--rosso)}
 
-  .paesi{background:var(--piano);border:1px solid var(--filo);border-radius:9px;overflow:hidden}
-  .pr{display:grid;grid-template-columns:42px 1fr 96px 88px 64px;gap:12px;align-items:center;
+  /* Giorno per giorno. Stessa griglia dei paesi ma cinque colonne diverse:
+     la barra e' la DURATA, perche' la domanda e' «quanto abbiamo letto», e le
+     pagine stanno accanto in cifra. Due barre sovrapposte — tempo e pagine —
+     sarebbero piu' complete e illeggibili. */
+  /* Le rotte. Una riga per rotta, raggruppate per primo pezzo del percorso:
+     e' l'ordine in cui il server e' organizzato davvero, e mette vicine le
+     cose che si toccano insieme. */
+  .rt{display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:center;
+    padding:6px 16px;border-bottom:1px solid var(--filo)}
+  .rt:last-child{border-bottom:none}
+  .rt .met{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.06em;
+    text-align:center;padding:2px 0;border-radius:3px;background:var(--incavo);color:var(--lieve)}
+  .rt .met.post{background:var(--verde-velo);color:var(--verde)}
+  .rt .via{font-family:var(--mono);font-size:12.5px;color:var(--tenue)}
+  .rt .chiave{font-family:var(--mono);font-size:10px;color:var(--ambra);
+    background:var(--ambra-velo);padding:2px 7px;border-radius:3px}
+  .gruppo{background:var(--incavo);padding:5px 16px;font-size:10px;font-weight:700;
+    letter-spacing:.07em;text-transform:uppercase;color:var(--lieve);
+    border-bottom:1px solid var(--filo)}
+
+  .gg{display:grid;grid-template-columns:70px 1fr 74px 96px 56px;gap:12px;align-items:center;
     padding:7px 16px;border-bottom:1px solid var(--filo)}
+  .gg:last-child{border-bottom:none}
+  .gg.cap{background:var(--incavo);font-size:10px;font-weight:700;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--lieve)}
+  .gg .sig{font-family:var(--mono);font-weight:600;font-size:12.5px}
+  .gg .num{font-family:var(--mono);font-size:12.5px;text-align:right;font-variant-numeric:tabular-nums;
+    color:var(--tenue)}
+  .gg .qta{font-family:var(--mono);font-size:12.5px;text-align:right;font-weight:600;
+    font-variant-numeric:tabular-nums;color:var(--verde)}
+  .gg .qta.bassa{color:var(--ambra)} .gg .qta.zero{color:var(--rosso)}
+  /* Un giorno senza lettura ha la barra vuota e il nome spento: si deve vedere
+     che c'e' stato, e che non e' successo niente. */
+  .gg.vuoto .sig{color:var(--lieve)}
+  .gg.oggi .sig{color:var(--verde)}
+
+  .paesi{background:var(--piano);border:1px solid var(--filo);border-radius:9px;overflow:hidden}
+  .pr{display:grid;grid-template-columns:26px minmax(132px,1.1fr) 2fr 92px 84px 58px;gap:12px;
+    align-items:center;padding:7px 16px;border-bottom:1px solid var(--filo)}
+  /* LA BANDIERA E' UN'IMMAGINE, E NON PER SCELTA.
+     Prima era il carattere emoji, ricavato dal codice: elegante, zero file,
+     zero elenchi da aggiornare. Solo che Windows le bandiere non le disegna —
+     e' una decisione di Microsoft, non un difetto — e al loro posto mostra le
+     due lettere. Su una dashboard guardata da tre macchine Windows, una
+     colonna che mostra «IT» accanto a «Italia IT» e' peggio che non averla.
+     Venti per quindici punti da flagcdn: se il servizio non risponde resta un
+     buco, e accanto c'e' comunque la sigla. */
+  .pr .bnd{width:20px;height:15px;border-radius:2px;display:block;
+    box-shadow:0 0 0 1px rgba(0,0,0,.08)}
+  .pr .nome{display:flex;align-items:baseline;gap:7px;min-width:0}
+  .pr .nome b{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis}
+  /* La sigla resta, piccola: e' quella che si scrive in «--solo IT,ES» e
+     nelle variabili, quindi toglierla farebbe perdere il collegamento fra
+     quello che si legge qui e quello che si digita altrove. */
+  .pr .nome i{font-family:var(--mono);font-style:normal;font-size:10.5px;color:var(--lieve);
+    letter-spacing:.04em}
   .pr:last-child{border-bottom:none}
   .pr.cap{background:var(--incavo);font-size:10px;font-weight:700;letter-spacing:.07em;
     text-transform:uppercase;color:var(--lieve)}
-  .pr .sig{font-family:var(--mono);font-weight:600;font-size:13px}
   .pr .num{font-family:var(--mono);font-size:12.5px;text-align:right;font-variant-numeric:tabular-nums;
     color:var(--tenue)}
   .pr .qta{font-family:var(--mono);font-size:12.5px;text-align:right;font-weight:600;
@@ -359,6 +433,12 @@ export function paginaPannello(): string {
   <h2>Paese per paese</h2>
   <div class="paesi" id="perpaese"></div>
 
+  <h2>Le API esposte</h2>
+  <div class="paesi" id="rotte"></div>
+
+  <h2>Giorno per giorno</h2>
+  <div class="paesi" id="pergiorno"></div>
+
   <h2>Gli ultimi giri</h2>
   <div id="passati"></div>
 
@@ -366,6 +446,13 @@ export function paginaPannello(): string {
 </div>
 
 <script>
+const nomiPaese = (() => {
+  try { return new Intl.DisplayNames([navigator.language || "it"], { type: "region" }); }
+  catch { return null; }
+})();
+const nomePaese = (c) => {
+  try { return (nomiPaese && nomiPaese.of(c)) || c; } catch { return c; }
+};
 const n = (x) => (x ?? 0).toLocaleString("it-IT");
 const ora = (s) => new Date(s).toLocaleTimeString("it-IT");
 
@@ -406,10 +493,10 @@ function schedaViva(g, adesso) {
       <div><span>ultimo colpo</span><b>\${ora(g.tocco)}</b></div>
     </div>
     <div class="barra"><i style="width:\${resa}%"></i></div>
-    <div class="righe" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--filo)">
-      <div><span>RAM macchina</span><b>\${g.ramTotaleMb ? n(g.ramUsataMb) + " / " + n(g.ramTotaleMb) + " MB" : "&mdash;"}</b></div>
-      <div><span>carico</span><b>\${g.carico ? g.carico.toFixed(2) : "non misurato"}</b></div>
-      <div><span>accesa da</span><b>\${g.accesaDaSec ? durata(g.accesaDaSec * 1000) : "&mdash;"}</b></div>
+    <div class="coda">
+      <span>RAM <b>\${g.ramTotaleMb ? n(g.ramUsataMb) + "/" + n(g.ramTotaleMb) + " MB" : "&mdash;"}</b></span>
+      <span>carico <b>\${g.carico ? g.carico.toFixed(2) : "&mdash;"}</b></span>
+      <span>accesa da <b>\${g.accesaDaSec ? durata(g.accesaDaSec * 1000) : "&mdash;"}</b></span>
     </div>
   </div>\`;
 }
@@ -487,19 +574,110 @@ async function aggiorna() {
      aspetta, che e' il punto di tutto il magazzino. */
   const pp = d.paesi || [];
   document.getElementById("perpaese").innerHTML = pp.length
-    ? '<div class="pr cap"><span>paese</span><span>copertura</span><span>link</span><span>prezzi</span><span>quota</span></div>' +
+    ? '<div class="pr cap"><span></span><span>paese</span><span>copertura</span><span>link</span><span>prezzi</span><span>quota</span></div>' +
       pp.map((r) => {
         const q = Math.round(r.copertura * 100);
         const classe = q === 0 ? "zero" : q < 25 ? "bassa" : "";
         return \`<div class="pr">
-          <span class="sig">\${r.paese}</span>
+          <img class="bnd" alt="" loading="lazy" src="https://flagcdn.com/20x15/\${r.paese.toLowerCase()}.png">
+          <span class="nome"><b>\${nomePaese(r.paese)}</b><i>\${r.paese}</i></span>
           <span class="barra"><i style="width:\${q}%"></i></span>
           <span class="num">\${n(r.link)}</span>
           <span class="num">\${n(r.prezzi)}</span>
           <span class="qta \${classe}">\${q}%</span>
         </div>\`;
       }).join("")
-    : '<div class="pr"><span class="sig">&mdash;</span><span>i conti per paese si fanno una volta al minuto: il primo arriva a momenti</span><span></span><span></span><span></span></div>';
+    : '<div class="pr"><span></span><span class="nome"><b>&mdash;</b></span><span>i conti per paese si fanno una volta al minuto: il primo arriva a momenti</span><span></span><span></span><span></span></div>';
+
+  /* LE API ESPOSTE.
+     L'elenco lo genera il server dal registro da cui passano le richieste
+     vere, quindi non puo' raccontare rotte che non esistono ne' dimenticarne
+     una nuova. Qui si raggruppano per primo pezzo del percorso e si segna
+     quali vogliono una chiave: quello e' l'unico dato che un elenco di
+     percorsi da solo non direbbe, ed e' il primo che si va a cercare.
+
+     Le rotte si vedono comunque guardando le richieste dell'app: elencarle
+     non regala niente a nessuno. Quello che NON si mostra e' cosa accettano e
+     cosa rispondono. */
+  const rotte = d.rotte || [];
+  const CHIAVE = ["/v1/", "/pannello/avvia", "/pannello/ferma"];
+  const perGruppo = new Map();
+  for (const r of rotte) {
+    const via = r.split(" ")[1] || "/";
+    const g = via === "/" ? "/" : "/" + (via.split("/")[1] || "");
+    if (!perGruppo.has(g)) perGruppo.set(g, []);
+    perGruppo.get(g).push(r);
+  }
+  document.getElementById("rotte").innerHTML = rotte.length
+    ? [...perGruppo.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([g, righe]) =>
+          '<div class="gruppo">' + g + " &middot; " + righe.length + "</div>" +
+          righe.map((r) => {
+            const met = r.split(" ")[0];
+            const via = r.split(" ")[1];
+            const serve = CHIAVE.some((c) => via.startsWith(c));
+            return '<div class="rt"><span class="met ' + met.toLowerCase() + '">' + met +
+              '</span><span class="via">' + via + '</span>' +
+              (serve ? '<span class="chiave">chiave</span>' : '<span></span>') + '</div>';
+          }).join(""),
+        ).join("")
+    : '<div class="rt"><span></span><span class="via">nessuna rotta registrata</span><span></span></div>';
+
+  /* GIORNO PER GIORNO.
+     Si riempiono anche i giorni senza righe: un giorno in cui non si e' letto
+     e' un dato, e saltarlo lo nasconderebbe proprio a chi sta cercando di
+     capire quando ci si e' fermati. La barra e' proporzionale al giorno piu'
+     lungo, non a un massimo fisso: le giornate cambiano di un fattore dieci e
+     una scala fissa le appiattirebbe tutte. */
+  const gg = d.perGiorno || [];
+  const perData = new Map(gg.map((r) => [r.giorno, { ...r }]));
+
+  /* I GIRI IN CORSO CONTANO NELLA BARRA DI OGGI.
+     Nel registro un giro entra quando si chiude, non quando lavora: con giri
+     da tre quarti d'ora la barra di oggi resterebbe vuota mentre tre lettori
+     stanno macinando, e chi guarda concluderebbe che oggi non si e' fatto
+     niente. Qui si sommano i vivi a mano, col tempo trascorso finora. */
+  const adesso = new Date();
+  const chiaveOggi = adesso.getFullYear() + "-" + String(adesso.getMonth() + 1).padStart(2, "0") +
+    "-" + String(adesso.getDate()).padStart(2, "0");
+  if (d.vivi && d.vivi.length) {
+    const o = perData.get(chiaveOggi) || { giorno: chiaveOggi, aperte: 0, conPrezzo: 0, minuti: 0, giri: 0 };
+    for (const v of d.vivi) {
+      o.aperte += v.aperte || 0;
+      o.conPrezzo += v.conPrezzo || 0;
+      o.minuti += Math.max(0, Math.round((Date.now() - new Date(v.inizio).getTime()) / 60000));
+      o.giri += 1;
+    }
+    perData.set(chiaveOggi, o);
+  }
+  const maxMin = Math.max(1, ...[...perData.values()].map((r) => r.minuti));
+  const oggi = new Date();
+  const giorni = [];
+  for (let i = 13; i >= 0; i--) {
+    const x = new Date(oggi.getTime() - i * 86400000);
+    const chiave = x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" +
+      String(x.getDate()).padStart(2, "0");
+    giorni.push({ chiave, data: x, r: perData.get(chiave) });
+  }
+  const NOMI = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
+  document.getElementById("pergiorno").innerHTML =
+    '<div class="gg cap"><span>giorno</span><span>tempo di lettura</span><span>ore</span><span>aperte</span><span>resa</span></div>' +
+    giorni.map((g, i) => {
+      const r = g.r;
+      const min = r ? r.minuti : 0;
+      const resa = r && r.aperte > 0 ? Math.round((r.conPrezzo / r.aperte) * 100) : 0;
+      const classe = !r ? "vuoto" : i === giorni.length - 1 ? "oggi" : "";
+      const qc = !r ? "zero" : resa < 40 ? "bassa" : "";
+      const ore = min >= 60 ? (min / 60).toFixed(1) + "h" : min > 0 ? min + "m" : "&mdash;";
+      return \`<div class="gg \${classe}">
+        <span class="sig">\${NOMI[g.data.getDay()]} \${g.data.getDate()}</span>
+        <span class="barra"><i style="width:\${Math.round((min / maxMin) * 100)}%"></i></span>
+        <span class="num">\${ore}</span>
+        <span class="num">\${r ? n(r.aperte) : "&mdash;"}</span>
+        <span class="qta \${qc}">\${r ? resa + "%" : "&mdash;"}</span>
+      </div>\`;
+    }).join("");
 
   document.getElementById("passati").innerHTML = d.passati.length
     ? d.passati.map(schedaPassata).join("")
