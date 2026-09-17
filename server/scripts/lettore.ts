@@ -47,6 +47,7 @@ import {
   tutteLeFonti,
 } from "../src/api/catalogo-fonti.js";
 import { giroContinuo } from "../src/api/prezzi-continuo.js";
+import { chiTieneIPaesi } from "../src/api/turni.js";
 import { statoMagazzino } from "../src/api/prezzi-magazzino.js";
 
 const n = (x: number) => String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -138,12 +139,35 @@ async function main() {
   });
 
   for (;;) {
+    /* SI CHIEDONO I PAESI LIBERI, NON I PRIMI DELLA CLASSIFICA.
+       La rotazione parte dai piu' redditizi, ed e' giusto: se sei solo,
+       cominci da dove rende. Ma con quattro lettori accesi i primi quattordici
+       sono sempre in mano a qualcuno, e chi riparte li chiede, li trova presi
+       e salta il giro — mentre diciassette paesi liberi restano fermi. Visto
+       dal vero: il raspberry riacceso chiedeva ES PT IT GB... e non leggeva
+       niente.
+
+       Guardare prima chi tiene cosa costa una lettura e cambia il risultato
+       da «zero pagine» a «quattordici paesi da lavorare». Fra il momento in
+       cui si guarda e quello in cui si prenota un altro lettore puo' averne
+       preso uno: non e' un problema, il biglietto resta l'unica verita' e chi
+       arriva secondo si tiene il resto. */
+    const tenuti = await chiTieneIPaesi();
+    const liberi = disponibili.filter((p) => !tenuti.has(p));
+    const daCui = liberi.length > 0 ? liberi : disponibili;
+
     const scelti: string[] = [];
-    for (let i = 0; i < Math.min(QUANTI_PAESI, disponibili.length); i++) {
-      scelti.push(disponibili[(da + i) % disponibili.length]);
+    for (let i = 0; i < Math.min(QUANTI_PAESI, daCui.length); i++) {
+      scelti.push(daCui[(da + i) % daCui.length]);
     }
-    da = (da + scelti.length) % disponibili.length;
+    da = (da + scelti.length) % Math.max(1, daCui.length);
     giro++;
+
+    if (liberi.length === 0) {
+      console.log(`  [${ora()}] tutti i ${disponibili.length} paesi sono presi: aspetto`);
+      await new Promise((r) => setTimeout(r, PAUSA_MS));
+      continue;
+    }
 
     /* «chiedo» e non l'elenco secco: i paesi si prenotano, e se un altro
        lettore ne ha gia' in mano qualcuno questo giro ne lavorera' meno di
