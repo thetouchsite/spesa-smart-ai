@@ -28,6 +28,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { kv } from "../src/lib/kv";
 import { Pressable, Share, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
@@ -105,6 +106,9 @@ interface Row {
   offerUntil?: string;
 }
 
+/** Dove restano le voci gia' prese. La versione serve se un giorno cambia la forma. */
+const CHIAVE_SPUNTE = "spesa.spuntati.v1";
+
 export default function ListaScreen() {
   /** Testo nella lingua scelta dall'utente. */
   const ui = (t: string) => uiText(t, language);
@@ -113,7 +117,33 @@ export default function ListaScreen() {
   const { language } = useI18n();
   const [pricing, setPricing] = useState<PricingResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [done, setDone] = useState<Record<string, boolean>>({});
+  /**
+   * Le voci gia' prese.
+   *
+   * SI SALVANO, e non e' un di piu': questa lista si usa dentro al
+   * supermercato, con una mano sola e il carrello nell'altra. Basta una
+   * telefonata, un'app aperta sopra, il telefono che si blocca — e con lo
+   * stato in sola memoria si torna indietro e le spunte sono sparite tutte.
+   * A quel punto l'utente non si fida piu' della lista, e giustamente.
+   *
+   * La chiave e' una sola per tutta l'app: un piano nuovo ha voci con nomi
+   * diversi, quindi le spunte vecchie non corrispondono a niente e restano
+   * inerti. Quelle poche righe rimaste non danno fastidio a nessuno, e il
+   * costo di ripulirle sarebbe maggiore del disturbo che fanno.
+   */
+  const [done, setDone] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(kv.getItem(CHIAVE_SPUNTE) ?? "{}") as Record<string, boolean>;
+    } catch {
+      return {};
+    }
+  });
+
+  /* Si scrive a ogni cambiamento, non all'uscita: da una schermata si esce
+     anche chiudendo l'app, e li' non c'e' nessun momento in cui salvare. */
+  useEffect(() => {
+    kv.setItem(CHIAVE_SPUNTE, JSON.stringify(done));
+  }, [done]);
   // Prodotto per cui si sta verificando il prezzo reale: null = riquadro chiuso.
   const [checking, setChecking] = useState<string | null>(null);
 
@@ -232,7 +262,7 @@ export default function ListaScreen() {
 
   if (!currentPlan) {
     return (
-      <Screen>
+      <Screen barra>
         <View style={styles.empty}>
           <Title>{ui("Nessuna lista")}</Title>
           <Subtitle>{ui("Crea prima un piano.")}</Subtitle>
@@ -282,13 +312,20 @@ export default function ListaScreen() {
     }
   }
 
+  /* NEL FOOTER RESTA SOLO CIO' CHE LA BARRA NON SA FARE.
+     «Torna ai risultati» era un terzo modo di fare la stessa cosa: c'e' la
+     freccia in alto, c'e' il gesto dal bordo, e adesso c'e' la barra. Tre
+     strade per lo stesso posto occupano lo schermo e non aggiungono niente.
+     La condivisione invece la barra non ce l'ha, e resta. */
   return (
     <Screen
+      barra
       footer={
-        <View style={styles.actions}>
-          <Button label={ui("Condividi la lista")} icon="share-social-outline" onPress={() => void shareList()} />
-          <Button label={ui("Torna ai risultati")} variant="ghost" onPress={() => tornaIndietro("/risultati")} />
-        </View>
+        <Button
+          label={ui("Condividi la lista")}
+          icon="share-social-outline"
+          onPress={() => void shareList()}
+        />
       }
     >
       <TopBar title={ui("Lista della spesa")} onBack={() => tornaIndietro("/risultati")} />
@@ -314,7 +351,7 @@ export default function ListaScreen() {
         ) : null}
         {checked > 0 ? (
           <Body style={styles.progress}>
-            {checked} di {rows.length} nel carrello
+            {checked} di {rows.length} in dispensa
           </Body>
         ) : null}
       </View>
@@ -436,7 +473,9 @@ export default function ListaScreen() {
       <Card style={styles.note}>
         <Label icon="information-circle-outline">{ui("Sui prezzi e sui link")}</Label>
         <Body style={styles.small}>
-          {ui("Ogni prezzo è quello trovato sul sito del negozio, e il link porta alla pagina di quel prodotto. Tocca una voce per vedere tutte le offerte a confronto.")}
+          {ui(
+            "Ogni prezzo è quello trovato sul sito del negozio, e il link porta alla pagina di quel prodotto. Tocca una voce per vedere tutte le offerte a confronto.",
+          )}
         </Body>
       </Card>
     </Screen>
@@ -497,7 +536,6 @@ const styles = StyleSheet.create({
   price: { fontSize: font.size.sm, fontWeight: font.weight.semibold, color: colors.foreground },
   noPrice: { fontSize: font.size.sm, color: colors.mutedForeground },
 
-  actions: { gap: spacing.sm },
   bold: { fontWeight: font.weight.semibold, color: colors.foreground },
   rowRight: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   buyBtn: {

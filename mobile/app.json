@@ -29,8 +29,7 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "edgeToEdgeEnabled": true,
       "versionCode": 1
@@ -43,7 +42,22 @@
           "locationWhenInUsePermission": "Serve per trovare i supermercati vicini a te e stimare i prezzi della tua zona."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "./plugins/percorsi-lunghi-windows",
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Per farti entrare senza ridigitare la password a ogni apertura."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#00723B",
+          "defaultChannel": "promemoria"
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "http://localhost:3000",

@@ -29,6 +29,9 @@ import { I18nProvider, useI18n } from "../src/lib/i18n";
 import { hydrate } from "../src/lib/kv";
 import { svegliaIlBackend } from "../src/lib/sveglia";
 import { useSession } from "../src/lib/state/session";
+import { useUtente } from "../src/lib/state/utente";
+import { Dialogo } from "../src/components/dialogo";
+import { Promemoria } from "../src/components/promemoria";
 import { colors, font, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 
@@ -49,6 +52,14 @@ export default function RootLayout() {
         await hydrate();
         // Ora che lo specchio è pieno, zustand può rileggere davvero.
         await useSession.persist.rehydrate();
+
+        // La sessione dell'account vive in un altro posto — la cassaforte del
+        // sistema, non AsyncStorage — e si riprende qui, prima di montare la
+        // navigazione. Farlo dopo vorrebbe dire mostrare per un istante
+        // l'app da sconosciuti anche a chi è già entrato: un lampeggio che
+        // sembra un difetto. Se il server non risponde non butta fuori
+        // nessuno: vedi `riprendi` in `state/utente.ts`.
+        await useUtente.getState().riprendi();
       } catch (err) {
         // Nemmeno un archivio corrotto deve impedire l'avvio: si riparte
         // vuoti e lo si dice, invece di mostrare una schermata bianca.
@@ -94,7 +105,35 @@ export default function RootLayout() {
               del flusso: si apre come foglio dal basso e si chiude con uno
               scorrimento, senza portare l'utente via da dove si trova. */}
           <Stack.Screen name="dove-conviene" options={{ presentation: "modal" }} />
+
+          {/* LE QUATTRO DELLA BARRA NON SCIVOLANO.
+              Lo scorrimento da destra racconta un passo avanti: sei qui, ora
+              vai li', e per tornare rifai la strada al contrario. Fra queste
+              quattro non c'e' nessun passo avanti — sono lo stesso piano
+              visto da quattro lati, ed e' esattamente quello che significa
+              una barra in basso. Con l'animazione, ogni tocco della pillola
+              costava un terzo di secondo e si vedevano due barre scorrere una
+              sull'altra: sembrava che la barra sparisse e ne arrivasse
+              un'altra. Senza, resta ferma dov'e' e cambia solo il contenuto —
+              che e' il modo in cui tutti si aspettano che funzioni.
+
+              Vale anche quando a menu' e lista ci si arriva dai risultati,
+              e va bene cosi': dopo il primo piano quelle schermate non sono
+              piu' una tappa, sono due dei quattro posti dove si vive. */}
+          {["index", "menu", "lista", "piani"].map((nome) => (
+            <Stack.Screen key={nome} name={nome} options={{ animation: "none" }} />
+          ))}
         </Stack>
+
+        {/* La finestra delle conferme: montata una volta qui, usata da
+            chiunque con `confermaAzione`. Sta DOPO lo Stack perche' deve
+            disegnarsi sopra qualunque schermata. */}
+        <Dialogo />
+
+        {/* Non disegna niente: tiene in riga la coda dei promemoria e porta
+            dove la notifica prometteva quando la si tocca. Sta qui perche'
+            deve essere montato sempre. */}
+        <Promemoria />
       </I18nProvider>
     </SafeAreaProvider>
   );

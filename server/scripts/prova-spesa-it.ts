@@ -16,13 +16,13 @@
  */
 
 import { catalogoDi, cercaNelCatalogo } from "../src/api/catalogo.js";
-import { FONTI } from "../src/api/catalogo-fonti.js";
+import { caricaFontiDalDb, tutteLeFonti } from "../src/api/catalogo-fonti.js";
 import { verifyProductPage } from "../src/api/price-page.js";
 
 const PAESE = (process.argv[2] ?? "IT").toUpperCase();
 const CANDIDATI = 6;
 
-const MUTE = new Set(FONTI.filter((f) => f.paese === PAESE && f.resa === 0).map((f) => f.insegna));
+const MUTE = new Set(tutteLeFonti().filter((f) => f.paese === PAESE && f.resa === 0).map((f) => f.insegna));
 
 const LISTA = [
   "pasta di semola", "latte intero", "passata di pomodoro", "petto di pollo",
@@ -31,6 +31,7 @@ const LISTA = [
   "yogurt bianco", "mele", "caffe macinato", "burro",
 ];
 
+await caricaFontiDalDb();
 const cat = await catalogoDi(PAESE);
 if (!cat) { console.log(`catalogo ${PAESE} non disponibile`); process.exit(1); }
 console.log(`catalogo ${PAESE}: ${cat.voci.length} voci, ${cat.insegne.length} insegne`);

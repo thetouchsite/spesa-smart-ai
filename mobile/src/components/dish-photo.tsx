@@ -45,6 +45,7 @@ export function DishPhoto({
   nome,
   style,
   compatto = false,
+  credito,
 }: {
   /** Foto vera, quando il backend è riuscito a trovarla. Vuoto = segnaposto. */
   uri?: string;
@@ -53,6 +54,16 @@ export function DishPhoto({
   style?: StyleProp<ViewStyle>;
   /** Nelle miniature del menù serve solo l'icona, senza iniziale. */
   compatto?: boolean;
+  /**
+   * Autore e licenza della foto.
+   *
+   * NON È DECORAZIONE: le foto arrivano da Wikimedia Commons, e le licenze
+   * Creative Commons chiedono di citare l'autore. Senza questa riga staremmo
+   * usando il lavoro di qualcuno violando la sola condizione che ci ha posto.
+   * Nelle miniature si omette — non ci starebbe — e infatti lì la foto non si
+   * mostra affatto.
+   */
+  credito?: string;
 }) {
   // Una foto può anche esistere e non caricarsi: in quel caso si ricade sul
   // segnaposto invece di lasciare il riquadro vuoto.
@@ -60,7 +71,7 @@ export function DishPhoto({
   const mostraFoto = Boolean(uri) && !caduta;
 
   if (mostraFoto) {
-    return (
+    const foto = (
       <Image
         source={{ uri }}
         // Le due forme di stile non coincidono nei tipi, ma le proprieta' che
@@ -72,6 +83,16 @@ export function DishPhoto({
         accessibilityLabel={`Foto di ${nome}`}
       />
     );
+
+    if (!credito || compatto) return foto;
+    return (
+      <View>
+        {foto}
+        <Body style={styles.credito} numberOfLines={1}>
+          {credito}
+        </Body>
+      </View>
+    );
   }
 
   const i = impronta(nome) % FONDI.length;
@@ -82,11 +103,7 @@ export function DishPhoto({
       style={[style, styles.segnaposto, { backgroundColor: FONDI[i] }]}
       accessibilityLabel={nome}
     >
-      <Ionicons
-        name="restaurant-outline"
-        size={compatto ? 18 : 30}
-        color={INCHIOSTRI[i]}
-      />
+      <Ionicons name="restaurant-outline" size={compatto ? 18 : 30} color={INCHIOSTRI[i]} />
       {compatto ? null : (
         <Body style={[styles.iniziale, { color: INCHIOSTRI[i] }]}>{iniziale}</Body>
       )}
@@ -100,6 +117,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 4,
     borderRadius: radius.sm,
+  },
+  credito: {
+    fontSize: 10,
+    color: colors.mutedForeground,
+    marginTop: 4,
+    textAlign: "right",
   },
   iniziale: {
     fontSize: font.size.lg,

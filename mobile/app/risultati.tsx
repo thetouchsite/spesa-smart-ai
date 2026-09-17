@@ -12,7 +12,7 @@
  * linea la stessa funzione userà le fonti reali senza toccare questa schermata.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Share, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -32,6 +32,8 @@ import {
 import { EroeRisparmio, RigaBudget } from "../src/components/eroe-risparmio";
 import { useSession } from "../src/lib/state/session";
 import { QuotaBanner } from "../src/components/quota-banner";
+import { PianoArchiviato } from "../src/components/salva-piano";
+import { getPlanStore } from "../src/lib/storage";
 import { computeResults } from "../src/lib/results/compute-results";
 import { pricePlan } from "../src/lib/price-data/price-engine";
 import { pricingFromOffers } from "../src/lib/plan-full";
@@ -42,7 +44,10 @@ import { useI18n } from "../src/lib/i18n";
 import { colors, font, radius, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 
-const STATUS: Record<string, { label: string; tone: "success" | "warning" | "danger"; icon: string }> = {
+const STATUS: Record<
+  string,
+  { label: string; tone: "success" | "warning" | "danger"; icon: string }
+> = {
   comfortable: { label: "Sei dentro il budget", tone: "success", icon: "checkmark-circle-outline" },
   optimized: { label: "Budget usato quasi tutto", tone: "warning", icon: "speedometer-outline" },
   over: { label: "Sopra il budget", tone: "danger", icon: "alert-circle-outline" },
@@ -54,7 +59,7 @@ export default function RisultatiScreen() {
   /** Testo nella lingua scelta dall'utente. */
   const ui = (t: string) => uiText(t, language);
   const router = useRouter();
-  const { profile, currentPlan, planExtra } = useSession();
+  const { profile, currentPlan, planExtra, pianoAttivoId, setPianoAttivoId } = useSession();
   const { language } = useI18n();
   const [pricing, setPricing] = useState<PricingResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,6 +105,77 @@ export default function RisultatiScreen() {
     [profile, currentPlan, pricing],
   );
 
+  /**
+   * IL PIANO SI ARCHIVIA DA SOLO, QUI.
+   *
+   * PERCHE' QUI E NON NELL'ELABORAZIONE
+   * -----------------------------------
+   * Perche' e' qui che i numeri esistono. Archiviandolo un istante prima —
+   * appena generato — la riga nell'elenco nascerebbe con spesa zero e
+   * risparmio zero, e resterebbe cosi' per sempre: l'archivio si riempirebbe
+   * di piani che sembrano tutti da buttare. Aspettare questa schermata costa
+   * il tempo di una transizione e in cambio la riga nasce completa.
+   *
+   * PERCHE' NON C'E' PIU' UN PULSANTE «SALVA»
+   * -----------------------------------------
+   * Perche' l'archivio si riempiva solo se l'utente se lo ricordava, e chi non
+   * se lo ricordava — quasi tutti — vedeva il piano sparire alla generazione
+   * successiva senza un avviso. L'app scaricava addosso a chi la usa il
+   * compito di proteggersi da una cosa che faceva lei.
+   *
+   * SI ASPETTA CHE I PREZZI SIANO ANDATI, NON CHE SIANO RIUSCITI
+   * ------------------------------------------------------------
+   * `loading` diventa falso anche quando i prezzi non arrivano. Un piano senza
+   * prezzi si archivia lo stesso: le ricette e la lista ci sono, ed e' piu'
+   * di quanto avrebbe chi non lo ritrova affatto.
+   */
+  const archiviazione = useRef<string | null>(null);
+  const [archiviato, setArchiviato] = useState(false);
+
+  useEffect(() => {
+    if (!currentPlan || !results || loading) return;
+    /* Gia' archiviato: o e' un piano riaperto dall'elenco, o l'abbiamo appena
+       messo noi. In sviluppo React monta due volte, e senza questa guardia
+       nell'elenco comparirebbero due righe identiche. */
+    if (pianoAttivoId) {
+      setArchiviato(true);
+      return;
+    }
+    const impronta =
+      JSON.stringify(currentPlan.mealPlan?.[0] ?? "") + currentPlan.groceryList.length;
+    if (archiviazione.current === impronta) return;
+    archiviazione.current = impronta;
+
+    let vivo = true;
+    void (async () => {
+      try {
+        const etichetta = `${profile.city || "Il mio piano"} · ${new Date().toLocaleDateString(
+          "it-IT",
+          { day: "numeric", month: "long" },
+        )}`;
+        const salvato = await getPlanStore().save({
+          label: etichetta,
+          form: profile,
+          plan: currentPlan,
+          estimatedSpend: results.estimatedSpend,
+          savings: results.savings,
+          score: results.score.total,
+        });
+        if (!vivo) return;
+        setPianoAttivoId(salvato.id);
+        setArchiviato(true);
+      } catch (err) {
+        /* Non si dice niente e non si riprova in cerchio: il piano resta
+           comunque in sessione e utilizzabile. La scheda in fondo dice «lo sto
+           mettendo», che e' vero finche' non riesce. */
+        console.warn("[risultati] archiviazione non riuscita:", err);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [currentPlan, results, loading, pianoAttivoId, profile, setPianoAttivoId]);
+
   if (!currentPlan || !results) {
     return (
       <Screen>
@@ -140,7 +216,11 @@ export default function RisultatiScreen() {
     <Screen
       footer={
         <View style={styles.actions}>
-          <Button label={ui("Vedi il menù")} icon="restaurant-outline" onPress={() => router.push("/menu")} />
+          <Button
+            label={ui("Vedi il menù")}
+            icon="restaurant-outline"
+            onPress={() => router.push("/menu")}
+          />
           <Button
             label={ui("Lista della spesa")}
             variant="secondary"
@@ -221,7 +301,9 @@ export default function RisultatiScreen() {
         senzaRisparmio={
           results.basketTotal !== null
             ? undefined
-            : ui("Non abbastanza prezzi per calcolarlo: le voci senza prezzo non entrano nel totale.")
+            : ui(
+                "Non abbastanza prezzi per calcolarlo: le voci senza prezzo non entrano nel totale.",
+              )
         }
         parziale={
           results.basketTotal !== null && results.missingPrices.length > 0
@@ -261,7 +343,11 @@ export default function RisultatiScreen() {
       </Card>
 
       <View style={styles.grid}>
-        <Stat icon="person-outline" label={ui("A persona / giorno")} value={money(results.costPerPersonPerDay, cur, language)} />
+        <Stat
+          icon="person-outline"
+          label={ui("A persona / giorno")}
+          value={money(results.costPerPersonPerDay, cur, language)}
+        />
         <Stat icon="ribbon-outline" label={ui("Punteggio")} value={`${results.score.total}/100`} />
       </View>
 
@@ -272,7 +358,6 @@ export default function RisultatiScreen() {
           <Body style={styles.muted}>{ui("risparmiati rispetto al tuo budget attuale")}</Body>
         </Card>
       ) : null}
-
 
       <Card>
         <Label icon="compass-outline">Vai a</Label>
@@ -316,15 +401,26 @@ export default function RisultatiScreen() {
           {loading
             ? ui("Sto calcolando i prezzi…")
             : results.savingsAvailable
-              ? ui("Prezzi trovati online nei negozi della tua zona, con i link controllati uno per uno. Dove nessun negozio pubblica il prezzo, la voce resta senza.")
+              ? ui(
+                  "Prezzi trovati online nei negozi della tua zona, con i link controllati uno per uno. Dove nessun negozio pubblica il prezzo, la voce resta senza.",
+                )
               : results.estimatedSpend > 0
-                // I numeri fuori dalla traduzione: sono uguali in ogni lingua,
-                // e tenerli dentro obbligherebbe a un dizionario per ogni conta.
-                ? `${results.missingPrices.length}/${currentPlan.groceryList.length} ` +
-                  ui("prodotti sono rimasti senza prezzo, quindi la spesa vera sarà un po' più alta. Gli altri sono prezzi trovati online, non stime.")
-                : ui("Non siamo riusciti a trovare abbastanza prezzi per questa lista. Il menù e la lista della spesa restano completi, e da ogni voce puoi cercare il prodotto nei negozi.")}
+                ? // I numeri fuori dalla traduzione: sono uguali in ogni lingua,
+                  // e tenerli dentro obbligherebbe a un dizionario per ogni conta.
+                  `${results.missingPrices.length}/${currentPlan.groceryList.length} ` +
+                  ui(
+                    "prodotti sono rimasti senza prezzo, quindi la spesa vera sarà un po' più alta. Gli altri sono prezzi trovati online, non stime.",
+                  )
+                : ui(
+                    "Non siamo riusciti a trovare abbastanza prezzi per questa lista. Il menù e la lista della spesa restano completi, e da ogni voce puoi cercare il prodotto nei negozi.",
+                  )}
         </Body>
       </Card>
+
+      {/* In fondo, dove prima c'era «Salva questo piano»: adesso il piano e'
+          gia' nell'elenco e qui si dice soltanto dov'e' finito — e a chi non
+          ha un account, cosa si porterebbe via un telefono perso. */}
+      <PianoArchiviato archiviato={archiviato} />
     </Screen>
   );
 }

@@ -55,14 +55,23 @@ function b64url(input: Buffer | string): string {
   return Buffer.from(input).toString("base64url");
 }
 
-/** Token opaco `payload.firma`, stessa idea di un JWT senza la libreria. */
-export function issueToken(userId: string): string {
-  const payload = b64url(JSON.stringify({ sub: userId, exp: Date.now() + TOKEN_TTL_MS }));
+/**
+ * Token opaco `payload.firma`, stessa idea di un JWT senza la libreria.
+ *
+ * Porta dentro anche la GENERAZIONE dell'utente. Serve a far scadere i token
+ * vecchi quando la password cambia: senza, chi aveva rubato un token restava
+ * dentro per novanta giorni anche dopo che il proprietario aveva cambiato
+ * tutto. Vedi `versioneToken` su `UserDoc`.
+ */
+export function issueToken(userId: string, versione = 1): string {
+  const payload = b64url(
+    JSON.stringify({ sub: userId, v: versione, exp: Date.now() + TOKEN_TTL_MS }),
+  );
   const sig = createHmac("sha256", secret()).update(payload).digest("base64url");
   return `${payload}.${sig}`;
 }
 
-export function verifyToken(token: string): string {
+export function verifyToken(token: string): { id: string; versione: number } {
   const [payload, sig] = token.split(".");
   if (!payload || !sig) throw new HttpError(401, "Token non valido");
 
@@ -73,16 +82,25 @@ export function verifyToken(token: string): string {
 
   const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
     sub?: string;
+    v?: number;
     exp?: number;
   };
   if (!parsed.sub || !parsed.exp || parsed.exp < Date.now()) {
     throw new HttpError(401, "Sessione scaduta");
   }
-  return parsed.sub;
+  return { id: parsed.sub, versione: parsed.v ?? 1 };
 }
 
-/** Estrae e verifica l'utente dall'header Authorization. */
-export function requireUser(req: { headers: Record<string, unknown> }): string {
+/**
+ * Estrae e verifica il token dall'header Authorization.
+ *
+ * Controlla firma e scadenza, non la generazione: quella richiede il database
+ * e sta in `utenteDaRichiesta`, che e' quello che le rotte devono usare.
+ */
+export function requireUser(req: { headers: Record<string, unknown> }): {
+  id: string;
+  versione: number;
+} {
   const header = req.headers.authorization;
   const value = typeof header === "string" ? header : "";
   if (!value.startsWith("Bearer ")) throw new HttpError(401, "Autenticazione richiesta");

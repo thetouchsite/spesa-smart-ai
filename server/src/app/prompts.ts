@@ -48,7 +48,8 @@ ${d.country ? `Country context: this recipe is for a household in ${d.country}${
 Servings: ${d.servings}.
 CRITICAL LANGUAGE RULE: Write ALL text in language code "${d.language}" — the recipe title, ingredient names, step instructions and allergen labels. If the dish name "${d.dishName}" is in English, translate it naturally into ${d.language} (or replace it with the culturally equivalent local dish name in ${d.country || "the target country"}). NEVER emit any English text when the target language is not English.
 Avoid these allergens/diets: ${d.allergies.join(", ") || "none"}.
-Ingredients must be a complete, realistic list with metric quantities (g, ml, pcs). Provide 4-8 clear step-by-step instructions a home cook can follow. Provide approximate per-serving nutrition (kcal, protein g, carbs g, fat g) and any common allergens.${vincoloDispensa(d.dispensa, d.servings)}`;
+Ingredients must be a complete, realistic list with metric quantities (g, ml, pcs). Provide 4-8 clear step-by-step instructions a home cook can follow. Provide approximate per-serving nutrition (kcal, protein g, carbs g, fat g) and any common allergens.
+PHOTO SEARCH: also return "photoQuery" — two to four words IN ENGLISH describing what the finished dish LOOKS LIKE, for searching a stock photo. Use the generic international dish name, not the local one: "baked eggplant parmigiana", "mushroom risotto", "lentil soup". Never a place name, a brand or a person's name.${vincoloDispensa(d.dispensa, d.servings)}`;
 }
 
 /** Regole comuni ai due rami dell'estrazione web (pagina reale e sintesi). */

@@ -9,6 +9,7 @@
  * `source.unsplash.com` è stato dismesso.
  */
 
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
@@ -27,6 +28,7 @@ import {
 import { useSession } from "../src/lib/state/session";
 import { localDay } from "../src/lib/days";
 import { DishPhoto } from "../src/components/dish-photo";
+import { fotoNota, useFotoDiPiuPiatti } from "../src/lib/recipes/foto";
 import { colors, font, radius, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 import { useI18n } from "../src/lib/i18n";
@@ -45,9 +47,20 @@ export default function MenuScreen() {
   const router = useRouter();
   const { currentPlan } = useSession();
 
+  /* Le foto di tutta la settimana in una richiesta sola.
+     Ventuno pasti sarebbero ventuno richieste, e con le miniature che si
+     ridisegnano a ogni scorrimento diventerebbero molte di piu'. Il gancio le
+     chiede insieme e fa ridisegnare quando sono arrivate; i valori veri li
+     legge `fotoNota` dalla sua memoria. */
+  useFotoDiPiuPiatti(
+    (currentPlan?.mealPlan ?? []).flatMap((g) =>
+      MEALS.map((m) => (g as Record<string, unknown>)[m.key] as string),
+    ),
+  );
+
   if (!currentPlan) {
     return (
-      <Screen>
+      <Screen barra>
         <TopBar onBack={() => tornaIndietro()} />
         <View style={styles.empty}>
           <Title>{ui("Nessun menù")}</Title>
@@ -58,16 +71,13 @@ export default function MenuScreen() {
     );
   }
 
+  /* IL PULSANTE «LISTA DELLA SPESA» NON C'E' PIU'.
+     Era il footer di questa schermata, e diceva esattamente quello che dice
+     la seconda voce della barra in basso, a tre centimetri di distanza. Due
+     comandi identici uno sopra l'altro non sono una comodita': fanno dubitare
+     che facciano la stessa cosa. */
   return (
-    <Screen
-      footer={
-        <Button
-          label={ui("Lista della spesa")}
-          icon="cart-outline"
-          onPress={() => router.push("/lista")}
-        />
-      }
-    >
+    <Screen barra>
       <TopBar title={ui("Il menù")} onBack={() => tornaIndietro("/risultati")} />
 
       <View style={styles.head}>
@@ -85,7 +95,11 @@ export default function MenuScreen() {
           <Card key={`${day.day}-${i}`}>
             <View style={styles.dayHead}>
               <Label icon="calendar-outline">{localDay(day.day, language)}</Label>
-              {zeroSpend ? <Pill tone="success" icon="leaf-outline">{ui("spesa zero")}</Pill> : null}
+              {zeroSpend ? (
+                <Pill tone="success" icon="leaf-outline">
+                  {ui("spesa zero")}
+                </Pill>
+              ) : null}
             </View>
 
             {MEALS.map((m) => {
@@ -105,8 +119,10 @@ export default function MenuScreen() {
                   style={({ pressed }) => [styles.meal, pressed && styles.mealPressed]}
                 >
                   {/* Senza foto vera si disegna un segnaposto: i servizi
-                      gratuiti cadono, e un riquadro rotto e' peggio. */}
-                  <DishPhoto uri={undefined} nome={dish} style={styles.thumb} compatto />
+                      gratuiti cadono, e un riquadro rotto e' peggio. Il
+                      credito nelle miniature non si mostra — non ci starebbe —
+                      e infatti compare sotto la foto grande, nella ricetta. */}
+                  <DishPhoto uri={fotoNota(dish)?.url} nome={dish} style={styles.thumb} compatto />
                   <View style={styles.mealText}>
                     <View style={styles.mealTop}>
                       <Ionicons name={m.icon} size={13} color={colors.mutedForeground} />

@@ -37,6 +37,7 @@ import { fetchRecipe, type ContentSource } from "../src/lib/content";
 import type { Recipe } from "../src/lib/recipes/types";
 import type { Recipe as GeneratedRecipe } from "../src/lib/plan-full";
 import { DishPhoto } from "../src/components/dish-photo";
+import { useFotoPiatto } from "../src/lib/recipes/foto";
 import { useSession } from "../src/lib/state/session";
 import { localDay } from "../src/lib/days";
 import { useI18n } from "../src/lib/i18n";
@@ -120,7 +121,12 @@ function toRecipe(g: GeneratedRecipe, dish: string, servings: number): Recipe {
 
 /** Identificatore stabile a partire dal nome del piatto. */
 function norm32(t: string): string {
-  return t.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 32) || "ricetta";
+  return (
+    t
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
+      .slice(0, 32) || "ricetta"
+  );
 }
 
 export default function RicettaScreen() {
@@ -135,6 +141,7 @@ export default function RicettaScreen() {
   const servings = Math.max(1, parseInt((profile.household || "4").replace("+", ""), 10) || 4);
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const fotoTrovata = useFotoPiatto(recipe?.title);
   const [source, setSource] = useState<ContentSource>("locale");
   const [loading, setLoading] = useState(true);
 
@@ -166,9 +173,7 @@ export default function RicettaScreen() {
         allergies: profile.allergies,
         // La spesa gia' fatta. Senza, la ricetta si inventava ingredienti che
         // nella lista non c'erano, e chi apriva il piatto non poteva cucinarlo.
-        dispensa: (currentPlan?.groceryList ?? []).map((g) =>
-          `${g.name} ${g.quantity}`.trim(),
-        ),
+        dispensa: (currentPlan?.groceryList ?? []).map((g) => `${g.name} ${g.quantity}`.trim()),
       });
       if (!alive) return;
       setRecipe(result.recipe);
@@ -203,7 +208,21 @@ export default function RicettaScreen() {
 
   return (
     <Screen footer={<Button label={ui("Torna al menù")} onPress={() => tornaIndietro("/menu")} />}>
-      <DishPhoto uri={recipe.image} nome={recipe.title} style={styles.photo} />
+      {/* La barra in alto c'era solo nei rami «sto caricando» e «non trovata»:
+          nella schermata vera, quella che si guarda davvero, il tasto indietro
+          non c'era. Dal menu' si entrava in una ricetta e si restava li', e sui
+          telefoni senza tasto fisico non c'era via d'uscita. */}
+      <TopBar onBack={() => tornaIndietro("/menu")} />
+
+      {/* La foto arriva dal backend, che la cerca su Wikimedia Commons. Se la
+          ricetta ne porta gia' una — quelle di TheMealDB ce l'hanno — vince
+          quella: e' la foto DI QUEL piatto, non una trovata cercando il nome. */}
+      <DishPhoto
+        uri={recipe.image || fotoTrovata?.url}
+        credito={recipe.image ? undefined : fotoTrovata?.credito}
+        nome={recipe.title}
+        style={styles.photo}
+      />
 
       <View style={styles.head}>
         {params.giorno ? (
@@ -218,7 +237,10 @@ export default function RicettaScreen() {
       <View style={styles.facts}>
         <Fact value={`${recipe.prepMinutes}′`} label="preparazione" />
         <Fact value={`${recipe.cookMinutes}′`} label="cottura" />
-        <Fact value={`${recipe.servings}`} label={recipe.servings === 1 ? "porzione" : "porzioni"} />
+        <Fact
+          value={`${recipe.servings}`}
+          label={recipe.servings === 1 ? "porzione" : "porzioni"}
+        />
         <Fact value={DIFFICULTY[recipe.difficulty] ?? recipe.difficulty} label={ui("difficoltà")} />
       </View>
 

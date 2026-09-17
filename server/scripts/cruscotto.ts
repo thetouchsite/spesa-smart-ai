@@ -27,7 +27,7 @@
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { FONTI, SENZA_PREZZO } from "../src/api/catalogo-fonti.js";
+
 
 interface RigaPaese {
   paese: string;
@@ -46,6 +46,10 @@ interface Quadro {
   orfane: number;
   orfaneLink: number;
   paesi: RigaPaese[];
+  insegneInElenco: number;
+  mute: Array<{ paese: string; insegna: string; stimati: number }>;
+  tuttoMuto: string[];
+  fuori: Array<{ paese: string; insegna: string; stimati: number; esclusa: string }>;
 }
 
 const q: Quadro = JSON.parse(readFileSync("diario/quadro-db.json", "utf8"));
@@ -58,10 +62,30 @@ const n = (x: number) =>
   String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-/** Insegne con e senza prezzo leggibile, dall'elenco (non dal database). */
-const mute = FONTI.filter((f) => f.resa === 0);
-const senzaPrezzoPerPaese = new Map<string, number>();
-for (const f of mute) senzaPrezzoPerPaese.set(f.paese, (senzaPrezzoPerPaese.get(f.paese) ?? 0) + 1);
+/* Tutto viene dal quadro: questo file disegna e basta. Un disegnatore che
+   interroga il database per conto suo puo' mostrare numeri diversi da quelli
+   che ha in cima alla pagina, ed e' successo. */
+const mute = q.mute;
+const fuori = q.fuori;
+
+/**
+ * DUE MODI DIVERSI DI STARE AL BUIO, E VANNO SEPARATI.
+ *
+ * Un paese senza prezzi puo' esserlo per due ragioni opposte, e confonderle
+ * fa sbagliare la mossa successiva:
+ *
+ *   NON ANCORA PREZZATO    ha insegne che il prezzo lo pubblicano, e basta
+ *                          farci girare il notturno. Costa tempo macchina.
+ *   NESSUNA INSEGNA RENDE  tutte le sue fonti hanno `resa: 0`. Qui il
+ *                          notturno non puo' fare niente: servono insegne
+ *                          nuove, o un lettore per la loro API.
+ *
+ * Misurato: sette paesi sono del secondo tipo — Bosnia, Belgio, Canada,
+ * India, Corea, Serbia, Stati Uniti — per 126.742 indirizzi. In Belgio sono
+ * mute tutte e quattro le insegne: 267 candidati saltati, zero pagine da
+ * aprire.
+ */
+const tuttoMuto = new Set(q.tuttoMuto);
 
 /** Paesi con il catalogo e nessun prezzo: e' il buco che conta. */
 const alBuio = q.paesi.filter((r) => r.prezzi === 0 && r.link > 0).sort((a, b) => b.link - a.link);
@@ -89,8 +113,15 @@ const righeTabella = q.paesi
   .join("\n");
 
 const righeBuio = alBuio
-  .slice(0, 14)
-  .map((r) => `    <li><b>${esc(r.paese)}</b> &mdash; ${n(r.link)} link, nessun prezzo</li>`)
+  .slice(0, 16)
+  .map(
+    (r) =>
+      `    <li><b>${esc(r.paese)}</b> &mdash; ${n(r.link)} link, ` +
+      (tuttoMuto.has(r.paese)
+        ? "<b>nessuna insegna pubblica il prezzo</b>"
+        : "non ancora prezzato") +
+      "</li>",
+  )
   .join("\n");
 
 const html = `<title>Cruscotto dati MealMint</title>
@@ -184,25 +215,36 @@ const html = `<title>Cruscotto dati MealMint</title>
   <div class="allarme">
     <p><b>Il catalogo &egrave; pieno, il magazzino dei prezzi &egrave; vuoto.</b> ${n(q.totale.link)} indirizzi di prodotto contro <b>${n(q.totale.cifre)} prezzi</b> ancora validi. &Egrave; lo ${(q.totale.cifre / q.totale.link * 100).toFixed(2).replace(".", ",")}% del catalogo.</p>
     <p><b>${alBuio.length} paesi su ${q.paesi.length} hanno il catalogo e nessun prezzo</b>, per ${n(linkAlBuio)} indirizzi. Per quei paesi l&#39;app apre le pagine dal vivo mentre l&#39;utente aspetta: &egrave; il comportamento che il magazzino doveva togliere.</p>
-    <p>Non &egrave; un guasto, &egrave; il disegno: il lavoro notturno prezza sessanta voci per paese per sei candidati, circa trecento pagine. Con otto paesi fanno 2.400, e torna esatto.</p>
+    <p><b>Il magazzino e&#39; stato svuotato apposta, e si sta riempiendo adesso.</b> La riga di prezzo pesava 443 byte e il prezzo ne occupava dodici: tutto il resto — l&#39;indirizzo per esteso, il nome, l&#39;insegna, la parola &laquo;verificato&raquo; — era gi&agrave; scritto nel catalogo. A quel peso, nei 440 MB liberi del piano ci stavano un milione di prezzi, e il progetto si fermava l&igrave;. Adesso la riga pesa <b>77 byte</b>, e le trentunomila vecchie sono state buttate perch&eacute; incompatibili: si rifanno in venticinque minuti.</p>
+    <p><b>Il giro continuo</b> apre le schede che mancano o sono scadute, le insegne pi&ugrave; generose per prime, e riprende ogni notte da dove si era fermato. Misurato: <b>21 pagine al secondo, 99,9% con prezzo</b> — il catalogo intero si prezza in tre notti, lo stesso ritmo della freschezza.</p>
   </div>
 
   <div class="cifre">
     <div class="cifra ok"><b>${n(q.totale.link)}</b><span>link servibili</span></div>
     <div class="cifra"><b>${q.paesi.length}</b><span>paesi</span></div>
-    <div class="cifra"><b>${FONTI.length}</b><span>insegne in elenco</span></div>
+    <div class="cifra"><b>${q.insegneInElenco}</b><span>insegne in elenco</span></div>
     <div class="cifra male"><b>${n(q.totale.cifre)}</b><span>prezzi validi</span></div>
     <div class="cifra male"><b>${alBuio.length}</b><span>paesi senza prezzi</span></div>
   </div>
 
+  <p class="nota"><b>Come leggere le cinque cifre qui sopra.</b>
+  <b>Link servibili</b>: indirizzi di prodotto salvati, di insegne ancora in elenco — quel che l&#39;API pu&ograve; dare subito.
+  <b>Insegne in elenco</b>: le catene attive nella collezione <code>fonti</code> su Mongo.
+  <b>Prezzi validi</b>: indirizzi con una cifra letta nelle ultime <b>settantadue</b> ore.
+  <b>Paesi senza prezzi</b>: hanno il catalogo e nessuna cifra.</p>
+
   <h2>Paese per paese, dal database</h2>
+  <p class="nota"><b>Due numeri per riga, e non si sommano.</b>
+  <b>Link salvati</b> sono gli indirizzi di prodotto che il magazzino conosce: l&#39;API li serve senza aprire una pagina. Valgono trenta ore e li riscrive il lavoro notturno.
+  <b>Con prezzo</b> sono quanti di quegli indirizzi hanno una cifra letta e ancora valida: valgono settantadue ore, poi la riga resta ma non si mostra e la pagina si riapre. Tre giorni, non uno: un magazzino che si svuota ogni giorno non pu&ograve; essere pi&ugrave; grande di quanto riesci a riempirlo in un giorno.
+  La barra dice solo quanto pesa quel paese rispetto al piu&#39; grande.</p>
   <div class="paesi">
-    <div class="riga intestazione"><span>Paese</span><span>Link</span><span>Indirizzi</span><span>Prezzi</span></div>
+    <div class="riga intestazione"><span>Paese</span><span>quanto pesa</span><span>link salvati</span><span>con prezzo</span></div>
 ${righeTabella}
   </div>
 
   <h2>I paesi al buio</h2>
-  <p class="nota">Catalogo salvato e fresco, zero prezzi. Sono ${n(linkAlBuio)} indirizzi che l&#39;API conosce e non sa quotare.</p>
+  <p class="nota">Catalogo salvato e fresco, zero prezzi: ${n(linkAlBuio)} indirizzi che l&#39;API conosce e non sa quotare. <b>Ma sono due problemi diversi.</b> Dove c&#39;&egrave; scritto &laquo;non ancora prezzato&raquo; basta far girare il lavoro notturno. Dove nessuna insegna pubblica il prezzo il notturno non pu&ograve; farci niente: servono insegne nuove o un lettore per la loro API. Sono ${tuttoMuto.size} paesi, ${n(alBuio.filter((r) => tuttoMuto.has(r.paese)).reduce((a, r) => a + r.link, 0))} indirizzi.</p>
   <ul class="semplice">
 ${righeBuio}
   </ul>
@@ -222,7 +264,7 @@ ${righeBuio}
 
   <h2>Insegne senza prezzo leggibile</h2>
   <p class="nota">${mute.length} insegne in elenco hanno <code>resa: 0</code>: le pagine si aprono, il prezzo non c&#39;&egrave;. Restano nel catalogo perch&eacute; un nome e un link valgono anche senza prezzo, ma <b>il lavoro notturno non le apre pi&ugrave;</b> &mdash; misurato: 684 pagine risparmiate su otto paesi.</p>
-  <p class="nota">Altre ${SENZA_PREZZO.length} sono uscite del tutto, per ${n(SENZA_PREZZO.reduce((a, f) => a + f.stimati, 0))} prodotti: CoopShop, Esselunga, Al&igrave;, Tigros e Basko vogliono che uno acceda. Stanno in <code>SENZA_PREZZO</code> con accanto il motivo, per non rifare quel lavoro fra sei mesi.</p>
+  <p class="nota">Altre ${fuori.length} sono uscite del tutto, per ${n(fuori.reduce((a, f) => a + f.stimati, 0))} prodotti: CoopShop, Esselunga, Al&igrave;, Tigros e Basko vogliono che uno acceda. Stanno in <code>SENZA_PREZZO</code> con accanto il motivo, per non rifare quel lavoro fra sei mesi.</p>
 
   <p class="pie">
     Generato da <code>scripts/cruscotto.ts</code> a partire da <code>diario/quadro-db.json</code>, che scrive <code>scripts/quadro-db.ts</code> leggendo Mongo.

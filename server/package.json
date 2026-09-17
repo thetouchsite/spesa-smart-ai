@@ -14,10 +14,12 @@
     "@ai-sdk/google": "^2.0.0",
     "ai": "^6.0.205",
     "mongodb": "^6.10.0",
+    "nodemailer": "^10.0.10",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.16.5",
+    "@types/nodemailer": "^8.0.2",
     "tsx": "^4.19.0",
     "typescript": "^5.8.3"
   },

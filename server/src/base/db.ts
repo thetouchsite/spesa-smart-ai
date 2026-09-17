@@ -26,6 +26,25 @@ export interface UserDoc {
   passwordHash: string;
   displayName?: string;
   createdAt: Date;
+  /**
+   * Il numero di generazione dei token di questo utente.
+   *
+   * I token durano novanta giorni — giusto, per un'app che non deve chiedere
+   * l'accesso ogni settimana. Ma senza questo campo cambiare la password NON
+   * scollegava nessuno: chi si era preso il telefono, o il token, restava
+   * dentro per tre mesi anche dopo che il legittimo proprietario aveva
+   * cambiato tutto. Cambiare password alza il numero, i token vecchi portano
+   * quello di prima e non valgono piu'.
+   *
+   * Assente vuol dire 1: gli utenti registrati prima di questo campo non vanno
+   * scollegati per un aggiornamento del codice.
+   */
+  versioneToken?: number;
+  /** Impronta del codice di recupero, mai il codice in chiaro. */
+  recuperoHash?: string;
+  recuperoScadeIl?: Date;
+  /** Quanti tentativi sbagliati: al terzo il codice muore. */
+  recuperoTentativi?: number;
 }
 
 export interface PlanDoc {
@@ -51,18 +70,54 @@ export interface PlanDoc {
  * persone che generano un piano a Madrid erano seimila richieste ai negozi
  * spagnoli invece di sessanta. Vedi `prezzi-magazzino.ts`.
  */
+/**
+ * Un prezzo in magazzino, nella forma stretta.
+ *
+ * PERCHE' I NOMI SONO DI UNA LETTERA
+ * ----------------------------------
+ * Perche' il nome del campo sta dentro OGNI documento. Con cinque milioni di
+ * righe, chiamare `prezzo` una cosa che si potrebbe chiamare `p` costa
+ * trenta megabyte di sole etichette.
+ *
+ * La forma di prima pesava 443 byte per riga, indici compresi, e il prezzo ne
+ * occupava dodici. Tutto il resto era roba gia' scritta altrove:
+ *
+ *   _id       60 byte   l'indirizzo per esteso, ripetuto per ogni riga
+ *   nome      25 byte   sta gia' nel catalogo
+ *   insegna   17 byte   sta gia' nel catalogo
+ *   verifica  22 byte   la parola «verificato», scritta cinque milioni di volte
+ *   scadeIl   35 byte   ricavabile da `visto`
+ *
+ * A 443 byte in 440 MB liberi ci stanno un milione di prezzi. Bastava quello a
+ * fermare il progetto: il magazzino si riempiva in tre notti e poi non poteva
+ * piu' crescere.
+ *
+ * L'INDIRIZZO DIVENTA UN'IMPRONTA, E VA CAPITO COSA SI PERDE
+ * ----------------------------------------------------------
+ * `_id` non e' piu' l'indirizzo ma la sua impronta a 96 bit, sedici caratteri.
+ * Quindi da una riga NON si risale piu' all'indirizzo: chi legge deve gia'
+ * avere in mano l'URL e cercarne l'impronta. E' come funziona davvero — si
+ * parte sempre da un candidato del catalogo — ma va saputo, perche' rende
+ * impossibile «elencare i prezzi» senza passare dal catalogo.
+ *
+ * Perche' 96 bit e non 64: con cinque milioni di righe un'impronta a 64 bit
+ * darebbe una collisione ogni tanto, e una collisione qui significa mostrare
+ * il prezzo di un prodotto sotto il nome di un altro. E' esattamente il
+ * difetto che abbiamo passato la serata a togliere.
+ */
 export interface PrezzoDoc {
-  _id: string; // l'indirizzo della scheda
-  /** Null quando la pagina si apre ma il prezzo non e' nell'HTML. */
-  prezzo: number | null;
-  valuta: string;
-  nome: string;
-  insegna: string;
-  verifica: VerifyStatus;
-  /** Quando l'abbiamo letta: decide se vale ancora. */
-  visto: Date;
-  /** TTL: Mongo la cancella da sola a questa data. */
-  scadeIl: Date;
+  /** Impronta a 96 bit dell'indirizzo, in base64url: sedici caratteri. */
+  _id: string;
+  /** Il prezzo. Null quando la pagina si apre ma il prezzo non c'e'. */
+  p: number | null;
+  /** La valuta. */
+  v: string;
+  /** Com'e' andata la lettura, in un numero: vedi `STATO` in prezzi-magazzino. */
+  s: number;
+  /** Quando l'abbiamo letta. Fa da freschezza E da scadenza: il TTL e' su questa. */
+  t: Date;
+  /** Il numero dell'insegna, non il nome: serve al giro continuo e al cruscotto. */
+  c: number;
 }
 
 /**
@@ -103,6 +158,123 @@ export interface ParolaDoc {
   _id: string; // "parola|lingua"
   tradotta: string;
   imparata: Date;
+}
+
+/**
+ * Una fonte del catalogo: l'insegna, dove sta la sua sitemap, quanto rende.
+ *
+ * PERCHE' SUL DATABASE E NON PIU' SOLO IN UN FILE
+ * -----------------------------------------------
+ * L'elenco delle fonti e' sempre stato un file TypeScript scritto a mano, e i
+ * suoi numeri non li confrontava nessuno col database. Al 16 settembre 2026 i
+ * due dicevano cose diverse: il file 1.902.334 prodotti, il magazzino
+ * 1.716.324, e dentro il file c'era Carrefour Brasile a 80.000 prodotti
+ * mentre il magazzino non ne aveva nemmeno il catalogo.
+ *
+ * Due elenchi che dovrebbero dire la stessa cosa divergono sempre, perche' si
+ * aggiornano in momenti diversi e con strumenti diversi: le rese le scriveva
+ * uno script, i conteggi un altro, le aggiunte una persona a mano. Qui c'e'
+ * una copia sola, e chi misura scrive li'.
+ *
+ * Il file resta come SEMENTE: serve al primo avvio, e serve quando il database
+ * non risponde — meglio un elenco vecchio che nessun catalogo.
+ */
+export interface FonteDoc {
+  _id: string; // "PAESE|Insegna"
+  paese: string;
+  insegna: string;
+  dominio: string;
+  sitemap: string;
+  /** Quota di schede che espongono il prezzo, da 0 a 1. */
+  resa: number;
+  /** Indirizzi di prodotto pubblicati, contati. */
+  stimati: number;
+  /** Se c'e', l'insegna e' TENUTA FUORI e questa frase dice perche'. */
+  esclusa?: string;
+  /**
+   * Quel che si e' imparato su questa insegna, in chiaro.
+   *
+   * Stava nei commenti dentro `catalogo-fonti.ts`, e li' serviva solo a chi
+   * apriva quel file. Attaccato alla riga viaggia col dato: lo vede chi
+   * interroga il database, chi genera il cruscotto, e chi fra sei mesi si
+   * chiede perche' Alcampo punta all'indice e non alla prima parte.
+   *
+   * Non e' decorazione. Ogni riga qui dentro e' costata una serata: la sitemap
+   * sbagliata di Aldi Spagna, il volantino di Alcampo scambiato per una
+   * scheda, il divieto di Pingo Doce che non c'era mai stato.
+   */
+  nota?: string;
+  /**
+   * Un numero stabile per questa insegna.
+   *
+   * Serve alle righe di prezzo: scriverci «Carrefour Italia» cinque milioni di
+   * volte costa ottanta megabyte, un numero ne costa otto. Si assegna una
+   * volta e non cambia — se cambiasse, tutti i prezzi salvati punterebbero
+   * all'insegna sbagliata.
+   */
+  id?: number;
+  /** Quando l'ha toccata l'ultima misura. */
+  aggiornato: Date;
+}
+
+/** Una riga del diario dei giri. Vedi `giri()` per il perche'. */
+/**
+ * Un ordine per il lettore, lasciato sul database.
+ *
+ * PERCHE' NON UNA CHIAMATA DIRETTA
+ * --------------------------------
+ * Il pannello sta su una macchina, il lettore su un'altra — spesso dietro il
+ * router di casa, senza indirizzo pubblico e senza nessuna porta aperta. Una
+ * chiamata dal pannello al lettore non arriverebbe da nessuna parte, e aprire
+ * una porta su un PC di casa per comandarlo da internet e' una pessima idea.
+ *
+ * Quindi non si chiama nessuno: si lascia un biglietto dove entrambi passano.
+ * Il pannello lo scrive, il lettore lo legge insieme al battito che manda gia'
+ * ogni cinque secondi. Costa zero richieste in piu' e funziona ovunque sia il
+ * lettore, anche dietro sette firewall.
+ *
+ * IL PREZZO DA PAGARE, DETTO SUBITO
+ * ---------------------------------
+ * Fermare si puo' sempre, perche' c'e' qualcuno in ascolto. AVVIARE no: se sul
+ * PC non gira nessun processo, non c'e' nessuno che possa leggere il biglietto.
+ * Un pulsante «avvia» funziona solo dove il lettore vive come servizio sempre
+ * acceso — cioe' sul VPS, che e' poi uno dei motivi per cui il VPS serve.
+ */
+export interface ComandoDoc {
+  _id: "comando";
+  azione: "ferma";
+  /** Il nome di una macchina, oppure `tutti`. */
+  per: string;
+  quando: Date;
+  /** Chi l'ha dato: resta scritto, perche' un giro fermato senza spiegazione fa perdere un'ora. */
+  da: string;
+}
+
+export interface GiroDoc {
+  /** `battito` per la riga viva, `giro-<quando>` per quelle finite. */
+  _id: string;
+  tipo: "battito" | "giro";
+  /** Chi sta lavorando: il nome della macchina. Due lettori insieme si vedono. */
+  macchina: string;
+  /** Che lavoro e': il giro continuo, la notte, una prova a mano. */
+  lavoro: string;
+  inizio: Date;
+  /** L'ultima volta che ha dato segno di vita. Su una riga finita e' la fine. */
+  tocco: Date;
+  aperte: number;
+  conPrezzo: number;
+  saltate: number;
+  /** Solo sulle righe finite: perche' ha smesso. */
+  esito?: "tempo scaduto" | "catalogo finito" | "interrotto";
+  paesi?: string[];
+  /* Lo stato della macchina che sta leggendo, preso al volo insieme al battito.
+     Serve perche' quando il lettore rallenta la prima domanda e' sempre «e' la
+     macchina che non ce la fa, o sono i negozi che non rispondono?» — e senza
+     questi tre numeri si risponde tirando a indovinare. */
+  ramUsataMb?: number;
+  ramTotaleMb?: number;
+  carico?: number;
+  accesaDaSec?: number;
 }
 
 export interface CacheDoc {
@@ -148,13 +320,32 @@ export async function getDb(): Promise<Db> {
     db.collection<CacheDoc>("cache").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection<CacheDoc>("cache_api").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection<CacheDoc>("cache_app").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
-    db.collection<PrezzoDoc>("prezzi").createIndex({ scadeIl: 1 }, { expireAfterSeconds: 0 }),
+    /* Il TTL sta su `t`, che e' anche la data di lettura: un campo solo fa due
+       mestieri, e si risparmiano trentacinque byte per riga piu' il suo indice.
+       Trenta giorni, non ventiquattro ore: una riga vecchia non si mostra ma
+       evita di riaprire la pagina di una citta' visitata di rado. */
+    db.collection<PrezzoDoc>("prezzi").createIndex({ t: 1 }, { expireAfterSeconds: 30 * 86_400 }),
     // Si cercano sempre per indirizzo E per freschezza insieme: un indice solo
     // su `visto` farebbe scorrere tutte le righe recenti per trovarne dodici.
-    db.collection<PrezzoDoc>("prezzi").createIndex({ visto: -1 }),
+    // Il giro continuo chiede «di questa insegna, cosa e' ancora fresco».
+    db.collection<PrezzoDoc>("prezzi").createIndex({ c: 1, t: -1 }),
     // Nessun indice sul contenuto: qui dentro non si cerca, si legge il
     // pacchetto della propria insegna e lo si scompatta.
     db.collection<CatalogoDoc>("cataloghi").createIndex({ paese: 1 }),
+    /* Non serve a cercare: serve a NON LEGGERE. Il conto dei link per paese
+       somma il campo `prodotti`, e senza questo indice Mongo aprirebbe ogni
+       documento — che porta dentro un blocco compresso da quasi un megabyte.
+       Centocinquanta megabyte letti per sommare centosessanta numeri. */
+    db.collection<CatalogoDoc>("cataloghi").createIndex({ paese: 1, prodotti: 1 }),
+    // Le fonti si chiedono sempre per paese, e quasi sempre ordinate per resa.
+    db.collection<FonteDoc>("fonti").createIndex({ paese: 1, resa: -1 }),
+    /* Il diario si legge sempre in ordine di tempo, e le righe dei giri finiti
+       dopo un mese non servono piu' a nessuno: le butta Mongo da sola. */
+    db.collection<GiroDoc>("giri").createIndex({ tocco: -1 }),
+    db.collection<GiroDoc>("giri").createIndex(
+      { inizio: 1 },
+      { expireAfterSeconds: 30 * 86_400, partialFilterExpression: { tipo: "giro" } },
+    ),
   ]);
 
   console.info("[db] connesso a MongoDB");
@@ -219,12 +410,49 @@ export async function prezzi(): Promise<Collection<PrezzoDoc>> {
   return (await getDb()).collection<PrezzoDoc>("prezzi");
 }
 
+/**
+ * Il registro dei giri: cosa sta facendo il lettore, e cosa ha fatto ieri.
+ *
+ * PERCHE' PASSA DAL DATABASE E NON DALLA MEMORIA
+ * ----------------------------------------------
+ * Il lettore e il pannello non girano sulla stessa macchina, e non e' un caso:
+ * il lettore sta dove costa poco restare accesi tutta la notte, il pannello
+ * sta dove sta l'API. Una variabile in memoria la vedrebbe solo il processo
+ * che l'ha scritta, quindi il pannello mostrerebbe sempre «fermo» mentre il
+ * lettore macina da un'altra parte.
+ *
+ * Il database e' l'unica cosa che i due hanno in comune. Quindi l'avanzamento
+ * si scrive li': il lettore batte un colpo ogni tanto, il pannello lo legge.
+ *
+ * DUE TIPI DI RIGA
+ * ----------------
+ *   battito   una sola, sempre la stessa, sovrascritta: cosa sta succedendo
+ *             ADESSO. Se la sua ora e' vecchia di qualche minuto, il lettore
+ *             e' morto senza dire niente — ed e' proprio quello che si vuole
+ *             vedere.
+ *   giro      una per ogni giro finito: quanto e' durato, cosa ha prodotto.
+ *             Serve a rispondere a «ieri notte e' andata?» senza leggere i log
+ *             di un servizio che i log li tiene un'ora.
+ */
+export async function giri(): Promise<Collection<GiroDoc>> {
+  return (await getDb()).collection<GiroDoc>("giri");
+}
+
+/** Gli ordini per il lettore. Una riga sola, sovrascritta. Vedi `ComandoDoc`. */
+export async function comandi(): Promise<Collection<ComandoDoc>> {
+  return (await getDb()).collection<ComandoDoc>("comandi");
+}
+
 export async function cataloghi(): Promise<Collection<CatalogoDoc>> {
   return (await getDb()).collection<CatalogoDoc>("cataloghi");
 }
 
 export async function vocabolario(): Promise<Collection<ParolaDoc>> {
   return (await getDb()).collection<ParolaDoc>("vocabolario");
+}
+
+export async function fonti(): Promise<Collection<FonteDoc>> {
+  return (await getDb()).collection<FonteDoc>("fonti");
 }
 
 /**

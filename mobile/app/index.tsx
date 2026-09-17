@@ -28,6 +28,8 @@ import {
 } from "../src/components/ui";
 import { ping } from "../src/api/client";
 import { useSession } from "../src/lib/state/session";
+import { useUtente } from "../src/lib/state/utente";
+import { CruscottoOggi } from "../src/components/cruscotto-oggi";
 import { QuotaBanner } from "../src/components/quota-banner";
 import { deviceDefaults } from "../src/lib/format";
 import { BottoneCaldo, GrigliaPromesse, HeroHome } from "../src/components/hero-home";
@@ -54,6 +56,7 @@ const STEPS = [
 ];
 
 export default function Home() {
+  const { utente } = useUtente();
   const { language } = useI18n();
   /** Testo nella lingua scelta dall'utente. */
   const ui = (t: string) => uiText(t, language);
@@ -73,9 +76,53 @@ export default function Home() {
     if (__DEV__) ping().then(setApi);
   }, []);
 
+  /* CHI E' ENTRATO NON VEDE LA VETRINA.
+     La home con l'eroe e «Crea il mio piano» serve a chi non sa ancora cosa fa
+     l'app. A chi ha gia' un piano in corso chiede ogni volta di ricominciare
+     da capo — e' l'unica cosa che offre — mentre la domanda che si fa aprendo
+     l'app alle sette di sera e' un'altra: cosa mangio stasera, e ho comprato
+     tutto? Quella risposta e' il cruscotto. */
+  if (utente) {
+    return (
+      <Screen barra>
+        <TopBar
+          logo
+          right={
+            <Button
+              label=""
+              nomeAccessibile="Il tuo account"
+              icon="person-circle"
+              variant="ghost"
+              style={styles.iconaAccount}
+              onPress={() => router.push("/piani")}
+            />
+          }
+        />
+        <QuotaBanner />
+        <CruscottoOggi />
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
-      <TopBar logo />
+      {/* L'account sta nella barra in alto e non solo piu' in basso nell'elenco:
+          li' bisognava scorrere per trovarlo, e una porta che si trova solo
+          scorrendo e' una porta che non si trova. L'icona cambia a seconda che
+          si sia entrati o no, cosi' dice anche in che stato sei. */}
+      <TopBar
+        logo
+        right={
+          <Button
+            label=""
+            nomeAccessibile={utente ? "Il tuo account" : "Accedi o registrati"}
+            icon={utente ? "person-circle" : "person-circle-outline"}
+            variant="ghost"
+            style={styles.iconaAccount}
+            onPress={() => router.push(utente ? "/piani" : "/accedi")}
+          />
+        }
+      />
 
       <QuotaBanner />
 
@@ -87,7 +134,9 @@ export default function Home() {
       <HeroHome
         titolo={ui("Risparmia sulla spesa")}
         titoloCorsivo={ui("con l'IA")}
-        sottotitolo={ui("Pianifica i pasti, trova i prezzi migliori e fai la spesa in modo intelligente ogni settimana.")}
+        sottotitolo={ui(
+          "Pianifica i pasti, trova i prezzi migliori e fai la spesa in modo intelligente ogni settimana.",
+        )}
         azioni={
           <>
             <BottoneCaldo
@@ -145,6 +194,18 @@ export default function Home() {
       </Card>
 
       <Card>
+        {/* L'account sta in cima e non dentro le impostazioni: le schermate
+            d'accesso esistevano gia' ma l'unico modo di raggiungerle era due
+        {/* Qui ci arriva solo chi NON e' entrato: il cruscotto intercetta gli
+            altri molto piu' su. Quindi niente rami — una riga sola, che spiega
+            a cosa serve un account invece di dire «accedi», che non e' un
+            motivo per fare niente. */}
+        <ListRow
+          icon="person-add-outline"
+          title={ui("Accedi o registrati")}
+          subtitle={ui("Per ritrovare i tuoi piani su ogni telefono")}
+          onPress={() => router.push("/accedi")}
+        />
         <ListRow
           icon="settings-outline"
           title={ui("Impostazioni")}
@@ -154,7 +215,7 @@ export default function Home() {
         {/* L'indagine Altroconsumo copre solo il mercato italiano:
             mostrarla a un utente francese sarebbe fuorviante. */}
         {isItaly ? (
-        <ListRow
+          <ListRow
             icon="trophy-outline"
             title={ui("Le catene più economiche")}
             subtitle={ui("Indagine Altroconsumo 2026")}
@@ -183,7 +244,9 @@ export default function Home() {
             che si leggeva aprendo l'app, e negava esattamente cio' che l'app fa
             di meglio. */}
         <Body style={styles.small}>
-          {ui("I prezzi li cerchiamo online nei negozi che consegnano dove vivi, e ogni link viene aperto e controllato prima di mostrartelo. Dove nessun negozio pubblica il prezzo, la voce resta senza: preferiamo dirtelo che inventarlo.")}
+          {ui(
+            "I prezzi li cerchiamo online nei negozi che consegnano dove vivi, e ogni link viene aperto e controllato prima di mostrartelo. Dove nessun negozio pubblica il prezzo, la voce resta senza: preferiamo dirtelo che inventarlo.",
+          )}
         </Body>
       </Card>
 
@@ -202,6 +265,7 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
+  iconaAccount: { minHeight: 38, width: 38, paddingHorizontal: 0 },
   hero: { gap: spacing.md, paddingTop: spacing.md },
   actions: { gap: spacing.sm },
 

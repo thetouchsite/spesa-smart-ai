@@ -48,9 +48,11 @@
  * CATALOGO_PAESI, e gli altri si caricano da soli quando qualcuno li chiede.
  */
 
-import { catalogoDi, statoCatalogo } from "./catalogo.js";
-import { paesiConCatalogo } from "./catalogo-fonti.js";
+import { catalogoDi, dimenticaPaese, statoCatalogo } from "./catalogo.js";
+import { caricaFontiDalDb, paesiConCatalogo, statoFonti } from "./catalogo-fonti.js";
 import { riempiPrezzi } from "./prezzi-notturni.js";
+import { giroContinuo } from "./prezzi-continuo.js";
+import { cataloghi } from "../base/db.js";
 
 /**
  * Quante voci della spesa di base prezzare per paese, ogni notte.
@@ -61,6 +63,28 @@ import { riempiPrezzi } from "./prezzi-notturni.js";
  * lista su venti.
  */
 const VOCI_PER_PAESE = Number(process.env.PREZZI_VOCI_PER_PAESE ?? 60);
+
+/**
+ * Quanti minuti dare al giro continuo, dopo il lavoro mirato.
+ *
+ * Il lavoro mirato prezza le voci della spesa di base: poche centinaia di
+ * pagine per paese, ed e' quel che serve alle richieste vere. Il giro continuo
+ * riempie il resto del catalogo, e a differenza del primo NON FINISCE MAI —
+ * c'e' un milione e ottocentomila indirizzi. Percio' si da' un tempo, non un
+ * obiettivo: quel che non fa stanotte lo fa domani, perche' riprende sempre da
+ * cio' che manca.
+ *
+ * Quarantacinque minuti e' un valore prudente per il piano gratuito di Render,
+ * dove la macchina si spegne dopo un quarto d'ora di silenzio e la tiene sveglia
+ * solo un ping esterno. Su una macchina che non dorme si puo' alzare molto: a
+ * ventuno pagine al secondo, quattro ore fanno trecentomila prezzi.
+ *
+ * A `0` il giro continuo non parte: resta solo il lavoro mirato.
+ */
+const MINUTI_GIRO_CONTINUO = Number(process.env.PREZZI_MINUTI_GIRO ?? 45);
+
+/** Sotto questa eta' i cataloghi si considerano buoni e l'avvio non li rifa'. */
+const ORE_PRIMA_DI_RIFARE = Number(process.env.CATALOGO_ORE_VALIDE ?? 20);
 
 /**
  * I paesi da tenere sempre pronti.
@@ -119,9 +143,45 @@ export async function aggiornaCatalogo(motivo: string): Promise<void> {
     return;
   }
 
+  /* ALL'AVVIO NON SI RIFA' QUEL CHE E' GIA' FRESCO.
+     Sessanta secondi dopo ogni avvio partiva l'aggiornamento completo. Su una
+     macchina che resta in piedi e' giusto: si scalda il catalogo e via. Su una
+     che viene uccisa per memoria e riavviata diventa una ruota da criceto —
+     misurato su Render nella notte del 17 settembre: dieci cicli in cinque ore,
+     uno ogni quarantadue minuti, ognuno con la sua ripassata alle sitemap di
+     centosessanta negozi. Il lavoro non finiva mai e il carico lo prendevano
+     loro.
+     Se il magazzino dei cataloghi e' stato rinfrescato da poco non c'e' niente
+     da rifare: quel che serve e' gia' su Mongo, e si legge da li'. */
+  if (motivo === "avvio") {
+    const eta = await etaCataloghi();
+    if (eta !== null && eta < ORE_PRIMA_DI_RIFARE * 3_600_000) {
+      console.info(
+        `[catalogo] all'avvio non c'e' niente da rifare: i cataloghi hanno ` +
+          `${(eta / 3_600_000).toFixed(1)}h. Si riparte a mezzanotte.`,
+      );
+      return;
+    }
+  }
+
   inCorso = true;
   const inizio = Date.now();
   console.info(`[catalogo] aggiornamento (${motivo}): ${paesi.join(" ")}`);
+
+  /* PRIMA LE FONTI, POI I CATALOGHI.
+     L'elenco delle insegne sta sul database, e il file `catalogo-fonti.ts` e'
+     solo la semente per il primo avvio. Rileggerlo qui vuol dire che una resa
+     corretta stanotte vale gia' stanotte, senza aspettare un rilascio.
+
+     Se il database non risponde non cambia niente: si tiene la semente e si
+     lavora lo stesso. Un elenco vecchio di qualche giorno fa girare l'app,
+     nessun elenco la ferma. */
+  const quante = await caricaFontiDalDb();
+  console.info(
+    quante > 0
+      ? `[fonti] ${quante} insegne lette dal database`
+      : `[fonti] database muto: resta la semente del file`,
+  );
 
   try {
     for (const p of paesi) {
@@ -143,13 +203,45 @@ export async function aggiornaCatalogo(motivo: string): Promise<void> {
           await riempiPrezzi(p, VOCI_PER_PAESE);
         } catch (err) {
           console.warn(`[prezzi] ${p} fallito (il catalogo resta buono):`, err);
+        } finally {
+          /* FINITO CON QUESTO PAESE, LO SI LASCIA ANDARE.
+             Il catalogo resta salvato su Mongo: quel che si butta e' la copia
+             in memoria, che costa sessanta megabyte ogni duecentomila voci.
+             Il ricambio automatico ne tiene tre, ma con trentun paesi in fila
+             sono comunque centottanta megabyte di roba gia' usata — ed e' cio'
+             che ha fatto superare il limite a Render. */
+          dimenticaPaese(p);
         }
       } catch (err) {
         // Un paese che fallisce non deve fermare gli altri.
         console.warn(`[catalogo] ${p} fallito:`, err);
       }
     }
+    /* IL GIRO CONTINUO VIENE DOPO, E SOLO SE C'E' TEMPO.
+       Prima si prezza quel che la gente chiede — la spesa di base, paese per
+       paese — perche' se la notte viene interrotta e' quello che deve esserci.
+       Il resto del catalogo e' un di piu' che si accumula col tempo. */
+    /* Il giro continuo SOLO nell'appuntamento di mezzanotte. All'avvio e' la
+       parte che consuma di piu', e su un riavvio dopo un'uccisione per memoria
+       e' quella che rifa' uccidere: il ciclo si chiude e non si apre piu'. */
+    if (MINUTI_GIRO_CONTINUO > 0 && motivo !== "avvio") {
+      try {
+        const e = await giroContinuo(paesi, MINUTI_GIRO_CONTINUO, (fatte, con) => {
+          if (fatte % 500 === 0) console.info(`[prezzi] giro continuo: ${fatte} aperte, ${con} con prezzo`);
+        });
+        console.info(
+          `[prezzi] giro continuo: ${e.aperte} aperte, ${e.conPrezzo} con prezzo, ` +
+            `${e.saltate} gia' fresche, in ${e.secondi.toFixed(0)}s` +
+            (e.finito ? " — catalogo finito" : " — tempo scaduto, riprende domani"),
+        );
+      } catch (err) {
+        console.warn("[prezzi] giro continuo fallito:", err);
+      }
+    }
+
     const s = statoCatalogo();
+    const sf = statoFonti();
+    console.info(`[fonti] ${sf.quante} insegne in memoria`);
     const totale = s.caricati.reduce((n, c) => n + c.prodotti, 0);
     console.info(
       `[catalogo] aggiornamento finito in ${((Date.now() - inizio) / 1000).toFixed(0)}s — ` +
@@ -174,6 +266,44 @@ export function avviaCatalogoNotturno(): void {
     return;
   }
 
+  /* PRIMA LE FONTI, POI GLI APPUNTAMENTI — E IN QUEST'ORDINE.
+     L'elenco delle insegne sta sul database, e `paesiDaScaldare()` lo
+     interroga per sapere quali paesi tenere pronti. Chiamandola prima che il
+     database abbia risposto trova zero insegne, conclude «nessun paese» e non
+     programma niente: il lavoro notturno non partirebbe mai, e il registro non
+     direbbe nulla di strano.
+
+     Ci sono cascato scrivendo questa stessa funzione, mezz'ora fa. */
+  void caricaFontiDalDb().then((quante) => {
+    console.info(
+      quante > 0
+        ? `[fonti] ${quante} insegne lette dal database`
+        : "[fonti] il database non ha dato insegne: niente catalogo",
+    );
+    programma();
+  });
+}
+
+/** Gli appuntamenti veri, chiamati solo dopo che le fonti ci sono. */
+/**
+ * Quanto tempo fa e' stato rinfrescato il catalogo piu' recente, in millisecondi.
+ *
+ * Torna `null` se non ce n'e' nessuno: in quel caso c'e' davvero da lavorare.
+ */
+async function etaCataloghi(): Promise<number | null> {
+  try {
+    const c = await cataloghi();
+    const ultimo = await c.find({}).sort({ aggiornato: -1 }).limit(1).next();
+    if (!ultimo?.aggiornato) return null;
+    return Date.now() - new Date(ultimo.aggiornato).getTime();
+  } catch {
+    /* Se il database non risponde, meglio non rifare niente: chi non sa non
+       tocca. A mezzanotte si riprova comunque. */
+    return 0;
+  }
+}
+
+function programma(): void {
   const paesi = paesiDaScaldare();
   if (paesi.length === 0) return;
 

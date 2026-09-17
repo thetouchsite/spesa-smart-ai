@@ -1,70 +1,77 @@
 /**
- * Da dove viene il catalogo: una riga per insegna.
+ * Da dove viene il catalogo: le insegne, le loro sitemap, quanto rendono.
  *
- * NON SI RIGENERA ALLA CIECA. LEGGERE PRIMA.
- * `scripts/aggiorna-fonti.mjs` sa costruire questo file dalle misure, ma non
- * sa cio' che e' stato aggiunto a mano dopo: sette insegne britanniche che il
- * censimento non trova, la deduplica per sitemap (sedici insegne contate due
- * volte, 225.731 prodotti doppi) e le esclusioni decise guardando i prodotti
- * uno per uno. Rigenerare senza recuperare quelle cose le cancella.
+ * L'ELENCO STA SUL DATABASE. QUI NON CI SONO PIU' DATI.
+ * ====================================================
+ * Fino al 16 settembre 2026 le insegne erano un array scritto a mano dentro
+ * questo file, e il database era una copia che si riempiva per conto suo. Due
+ * elenchi che dovrebbero dire la stessa cosa divergono SEMPRE, perche' li
+ * aggiornano strumenti diversi in momenti diversi: le rese uno script, i
+ * conteggi un altro, le aggiunte una persona.
  *
- * Le righe si possono correggere a mano. Il generatore serve a proporre, non
- * a decidere.
+ * Misurato quel giorno, e sono tre numeri che dovevano essere uno:
  *
- * 144 insegne · 38 paesi · 2.675.799 prodotti
+ *   il file diceva            1.902.334 prodotti
+ *   il magazzino ne serviva   1.716.324
+ *   e dentro il file c'era Carrefour Brasile a 80.000 prodotti, di cui il
+ *   magazzino non aveva nemmeno il catalogo
+ *
+ * Adesso la collezione `fonti` e' l'unico posto dove si scrive. Chi misura
+ * scrive li'. Questo file sa solo leggerla e tenerla in memoria.
+ *
+ * SE MONGO NON RISPONDE NON C'E' CATALOGO, E VA SAPUTO
+ * ----------------------------------------------------
+ * Prima un database muto rendeva l'app lenta: le sitemap si scaricavano al
+ * volo. Adesso la rende VUOTA — senza insegne non c'e' niente da scaricare.
+ * E' una scelta deliberata: una copia sola non puo' divergere da se stessa, e
+ * il prezzo di quella garanzia e' questo.
+ *
+ * Le note che spiegavano le singole insegne — l'indice di Alcampo, il divieto
+ * di Pingo Doce che non c'era, la `/p` di Carrefour Brasile — stanno nel campo
+ * `nota` di ogni riga, sul database. Viaggiano col dato invece che con un
+ * commento, quindi le vede anche chi il codice non lo apre.
+ *
+ * ── QUEL CHE SI E' IMPARATO, E VALE PER TUTTE ──────────────────────
  *
  * I NUMERI SONO CONTATI, NON STIMATI
- * ----------------------------------
- * `stimati` e' quanti indirizzi di prodotto quell'insegna pubblica davvero,
- * contati uno per uno scendendo in tutto l'albero delle sitemap. La versione
- * precedente campionava e moltiplicava, e sbagliava di molto: Mercator
- * risultava con 336 prodotti e ne ha 17.241.
+ * `stimati` e' quanti indirizzi quell'insegna pubblica davvero, contati uno
+ * per uno scendendo in tutto l'albero delle sitemap. La versione che
+ * campionava e moltiplicava sbagliava di molto: Mercator risultava con 336
+ * prodotti e ne ha 17.241.
  *
- * LA RESA E' LA COSA PIU' IMPORTANTE DI QUESTO FILE
- * -------------------------------------------------
- * `resa` e' la quota di schede che il prezzo lo dichiara, misurata aprendone
- * trenta per insegna. Serve a decidere chi provare per primo, e non e' un
- * dettaglio: in Spagna, aggiungendo quattro catene, le voci con prezzo erano
- * SCESE da quattro a una su nove, perche' i candidati si concentravano sulle
- * insegne mute. Un catalogo grande non e' un catalogo utile.
+ * LA RESA E' LA COSA PIU' IMPORTANTE
+ * `resa` e' la quota di schede che il prezzo lo dichiara. Decide chi provare
+ * per primo, e non e' un dettaglio: in Spagna, aggiungendo quattro catene, le
+ * voci con prezzo erano SCESE da quattro a una su nove, perche' i candidati si
+ * concentravano sulle insegne mute. Un catalogo grande non e' un catalogo
+ * utile. E una resa SBAGLIATA e' peggio di una mancante: manda quell'insegna
+ * in fondo alla fila per sempre. E' costato Alcampo (86.555 prodotti), Iperal
+ * (23.255), Consum (18.385), Naturasi (7.711) e dm Austria.
  *
- * LA GERMANIA NON SI RISOLVE CON I GRANDI, E VA SAPUTO
- * ----------------------------------------------------
- * REWE, Edeka e Kaufland non sono qui, e non per un nostro difetto. REWE
- * pubblica 95.950 schede prodotto e su ognuna scrive «Konkreter Preis
- * abhaengig vom Standort»: il prezzo dipende dal punto vendita, e senza
- * scegliere un negozio col CAP non esiste per nessuno. Edeka e' un consorzio
- * di negozianti indipendenti e i prezzi sono le offerte settimanali del
- * singolo mercato; ci respinge comunque con 403 su ogni pagina, e aggirarlo
- * non si fa. Kaufland uguale.
+ * LA GERMANIA NON SI RISOLVE CON I GRANDI
+ * REWE, Edeka e Kaufland non ci sono, e non per un nostro difetto. REWE
+ * pubblica 95.950 schede e su ognuna scrive «Konkreter Preis abhaengig vom
+ * Standort»: senza scegliere un negozio col CAP il prezzo non esiste per
+ * nessuno. Edeka e' un consorzio di negozianti indipendenti e i prezzi sono le
+ * offerte del singolo mercato; ci respinge con 403 e aggirarlo non si fa.
+ * Kaufland uguale. Il tedesco si copre con chi il prezzo lo fa nazionale: i
+ * discount e le consegne online. Meno prodotti, ma con un prezzo.
  *
- * Quindi il tedesco si copre con chi il prezzo lo fa nazionale: i discount
- * (Lidl, Aldi, Netto) e le consegne online (Knuspr, Mytime). Sono meno
- * prodotti dei grandi, ma sono prodotti con un prezzo.
+ * CHI NON C'E', E PERCHE'
+ * I negozi che non vendono la spesa, tolti guardando cosa hanno dentro:
+ * Muller, Rossmann e dm sono drogherie e fra il 6% e il 10% dei loro prodotti
+ * sembra cibo; flaschenpost consegna bevande; Weinfreunde e' un'enoteca;
+ * Marks & Spencer usciva con 270.094 capi d'abbigliamento. E chi nel
+ * `robots.txt` vieta le schede: Tesco, Sainsbury's, Lidl Spagna e Polonia,
+ * Ahorramas, Hipercor, Walmart.
  *
- * CHI NON C'E'
- * ------------
- * I NEGOZI CHE NON VENDONO LA SPESA, tolti guardando cosa hanno dentro:
- * Muller, Rossmann e dm sono drogherie — salviette, cosmetici, detersivi e
- * perfino vestiti, e fra il 6% e il 10% dei loro prodotti sembra cibo;
- * flaschenpost consegna bevande; Weinfreunde e' un'enoteca. Insieme erano
- * 167.000 prodotti tedeschi che rispondevano con schede senza prezzo e
- * occupavano il posto dei supermercati veri.
- *
- * Chi nel `robots.txt` vieta le schede prodotto — Tesco, Sainsbury's, Lidl
- * Spagna e Polonia, Ahorramas, Hipercor, Walmart. E i generalisti tipo
- * Galaxus: hanno milioni di prodotti e non sono roba da mangiare.
- *
- * PINGO DOCE ERA IN QUELL'ELENCO ED ERA SBAGLIATO.
- * Riletto il 16 settembre 2026: il suo `robots.txt` non ha nessun
- * `Disallow: /`, vieta soltanto carrello, pagamento, area cliente e la
- * navigazione a filtri. Le schede prodotto sono consentite e la sitemap e'
- * dichiarata. Misurata: 7 su 10 con prezzo, 12.441 prodotti — tenuti fuori
- * per anni da una nota che nessuno aveva piu' verificato.
- *
- * Vale come avvertimento generale: un «no» scritto qui dentro invecchia. I
- * negozi cambiano il `robots.txt` senza dirlo a nessuno, e un divieto dato per
- * scontato costa quanto un'insegna mai trovata.
+ * UN «NO» INVECCHIA
+ * Pingo Doce era in quell'elenco ed era sbagliato. Riletto il 16 settembre
+ * 2026: nessun `Disallow: /`, vieta soltanto carrello, pagamento e area
+ * cliente. Le schede sono consentite, 7 su 10 danno il prezzo, 12.441
+ * prodotti tenuti fuori da una nota che nessuno aveva piu' verificato. I
+ * negozi cambiano il `robots.txt` senza dirlo, e un divieto dato per scontato
+ * costa quanto un'insegna mai trovata.
  */
 
 export interface FonteCatalogo {
@@ -77,314 +84,151 @@ export interface FonteCatalogo {
   /**
    * Quota di schede che espongono il prezzo, da 0 a 1.
    *
-   * Misurata su trenta schede sparse per il catalogo. Decide l'ordine in cui
-   * si provano le insegne quando una voce della lista ha piu' candidati.
+   * Decide l'ordine in cui si provano le insegne quando una voce della lista
+   * ha piu' candidati. A `0` il lavoro notturno non apre nemmeno le sue
+   * pagine: non e' una scommessa sfortunata, e' una certezza misurata.
    */
   resa: number;
   /** Indirizzi di prodotto pubblicati, contati. */
   stimati: number;
-  /**
-   * Perche' questa insegna e' tenuta FUORI dal catalogo.
-   *
-   * Presente solo in `SENZA_PREZZO`. E' una frase, non un codice, perche' chi
-   * la legge fra sei mesi deve capire se la situazione e' cambiata senza
-   * rifare le prove: «serve accedere» invita a riguardare ogni tanto, «il loro
-   * robots.txt vieta l'API» invita a scrivere un'email.
-   */
-  escusa?: string;
+  /** Quel che si e' imparato su questa insegna. Sta sul database, non qui. */
+  nota?: string;
 }
 
-export const FONTI: FonteCatalogo[] = [
+/* ══════════════════════════════════════════════════════════════════
+   L'ELENCO IN MEMORIA
+   ══════════════════════════════════════════════════════════════════ */
 
-  /* SEDICI DOPPIONI TOLTI, 225.731 PRODOTTI CONTATI DUE VOLTE.
-     La raccolta trovava la stessa insegna sotto due nomi — «Esselunga a
-     Casa» ed «Esselunga», «Conad Spesa Online» e «Conad» — con LA STESSA
-     sitemap. Non e' un difetto estetico: quel catalogo si scaricava e si
-     indicizzava due volte, e soprattutto ingannava la diversita' per
-     insegna, che serve a non dare tre candidati dello stesso negozio. Due
-     nomi diversi sembravano due catene, e i due candidati «diversi» erano
-     lo stesso scaffale.
-     La chiave e' paese + sitemap: se puntano allo stesso file, sono lo
-     stesso negozio, comunque si chiamino. */
-  { paese: "AL", insegna: "SPAR Albania Online", dominio: "shop.spar.al", sitemap: "https://shop.spar.al/wp-sitemap.xml", resa: 0.73, stimati: 2000 },
+let vive: FonteCatalogo[] = [];
+let caricate = false;
+/** Un caricamento alla volta: dieci richieste all'avvio non fanno dieci letture. */
+let inCorso: Promise<number> | null = null;
 
-  { paese: "AR", insegna: "Carrefour Argentina", dominio: "www.carrefour.com.ar", sitemap: "https://www.carrefour.com.ar/sitemap/product-0.xml", resa: 0.5, stimati: 422 },
+/**
+ * L'elenco in uso.
+ *
+ * Vuoto finche' nessuno ha chiamato `caricaFontiDalDb`. Chi puo' aspettare usi
+ * `assicuraFonti()`, che il caricamento lo fa da solo.
+ */
+export function tutteLeFonti(): FonteCatalogo[] {
+  return vive;
+}
 
-  { paese: "AT", insegna: "Interspar", dominio: "www.interspar.at", sitemap: "https://www.interspar.at/shop/lebensmittel/sitemap.xml", resa: 0, stimati: 22489 },
-  { paese: "AT", insegna: "Bipa", dominio: "www.bipa.at", sitemap: "https://www.bipa.at/main-sitemap.xml", resa: 1, stimati: 15317 },
-  /* dm Austria era a zero, e un lettore per la sua API ce l'abbiamo da giorni:
-     e' la stessa trappola di Naturasi, un lettore scritto e mai chiamato.
-     Puntava all'indice invece che a `product-sitemap.xml`. Misurata 3 su 8.
-     DA DECIDERE: e' una drogheria, e la regola dice «solo roba da mangiare» —
-     su otto schede aperte sei erano cosmetici. In Germania dm era gia' stata
-     tolta per questo. Qui resta finche' non lo si decide. */
-  { paese: "AT", insegna: "dm Austria", dominio: "www.dm.at", sitemap: "https://www.dm.at/product-sitemap.xml", resa: 0.5, stimati: 13577 },
-  { paese: "AT", insegna: "MPreis", dominio: "www.mpreis.at", sitemap: "https://www.mpreis.at/sitemap.xml", resa: 0.8, stimati: 12793 },
-  { paese: "AT", insegna: "BILLA Online Shop", dominio: "shop.billa.at", sitemap: "https://shop.billa.at/sitemap.xml", resa: 1, stimati: 12536 },
-  { paese: "AT", insegna: "Hofer", dominio: "www.hofer.at", sitemap: "https://www.hofer.at/sitemap_products.xml", resa: 1, stimati: 1157 },
+/** Quante insegne abbiamo in mano, e se sono mai state lette. */
+export function statoFonti(): { caricate: boolean; quante: number } {
+  return { caricate, quante: vive.length };
+}
 
-  { paese: "BA", insegna: "Glovo Sarajevo - Spesa", dominio: "glovoapp.com", sitemap: "https://glovoapp.com/sitemap-index.xml", resa: 0, stimati: 373 },
+/**
+ * Rilegge le insegne dal database.
+ *
+ * Si chiama all'avvio e a ogni giro notturno: una resa corretta stanotte vale
+ * gia' stanotte, senza aspettare un rilascio.
+ *
+ * Le righe con `esclusa` restano fuori. Non sono cancellate — il motivo per
+ * cui stanno fuori e' scritto accanto a loro, perche' fra sei mesi qualcuno
+ * non rifaccia una serata di prove per riscoprire che CoopShop vuole che uno
+ * acceda.
+ */
+export async function caricaFontiDalDb(): Promise<number> {
+  if (inCorso) return inCorso;
+  inCorso = (async () => {
+    try {
+      const { fonti } = await import("../base/db.js");
+      const righe = await (await fonti()).find({ esclusa: { $exists: false } }).toArray();
+      if (righe.length > 0) {
+        vive = righe.map((r) => ({
+          paese: r.paese,
+          insegna: r.insegna,
+          dominio: r.dominio,
+          sitemap: r.sitemap,
+          resa: r.resa,
+          stimati: r.stimati,
+          ...(r.nota ? { nota: r.nota } : {}),
+        }));
+        caricate = true;
 
-  /* Piattaforma Aldi Nord, come Germania e Spagna: la sitemap dei prodotti
-     e' `/sitemaps/.aldi-nord-sitemap-products.xml`, non l'indice. */
-  { paese: "BE", insegna: "Aldi Belgique", dominio: "www.aldi.be", sitemap: "https://www.aldi.be/sitemaps/.aldi-nord-sitemap-products.xml", resa: 0, stimati: 2814 },
-  { paese: "BE", insegna: "Delhaize", dominio: "www.delhaize.be", sitemap: "https://www.delhaize.be/sitemap/delhaizesitemapindex.xml", resa: 0, stimati: 14668 },
-  { paese: "BE", insegna: "Okay", dominio: "www.okay.be", sitemap: "https://www.okay.be/sitemap.xml", resa: 0, stimati: 8126 },
-  { paese: "BE", insegna: "Intermarché BE", dominio: "www.intermarche.be", sitemap: "https://www.intermarche.be/sitemap_index.xml", resa: 0, stimati: 214 },
+        /* I prezzi salvano il NUMERO dell'insegna, non il nome: ottanta
+           megabyte di differenza su cinque milioni di righe. La corrispondenza
+           la tiene il magazzino, e gliela si passa qui perche' e' l'unico
+           punto in cui le fonti entrano in memoria. */
+        const { ricordaNumeriInsegne } = await import("./prezzi-magazzino.js");
+        ricordaNumeriInsegne(
+          righe.filter((r) => typeof r.id === "number").map((r) => [r.insegna, r.id as number]),
+        );
+      }
+      return vive.length;
+    } catch {
+      return vive.length;
+    } finally {
+      inCorso = null;
+    }
+  })();
+  return inCorso;
+}
 
-  { paese: "BG", insegna: "eBag", dominio: "www.ebag.bg", sitemap: "https://www.ebag.bg/sitemap.xml", resa: 1, stimati: 34412 },
-  { paese: "BG", insegna: "Lidl BG", dominio: "www.lidl.bg", sitemap: "https://www.lidl.bg/static/sitemap.xml", resa: 1, stimati: 683 },
+/** Come sopra, ma non rilegge se l'elenco c'e' gia'. */
+export async function assicuraFonti(): Promise<number> {
+  if (caricate) return vive.length;
+  return caricaFontiDalDb();
+}
 
-  { paese: "BR", insegna: "Carrefour Brasil", dominio: "mercado.carrefour.com.br", sitemap: "https://mercado.carrefour.com.br/sitemap.xml", resa: 0.5, stimati: 80000 },
+/**
+ * Le insegne TENUTE FUORI, col motivo.
+ *
+ * Non entrano nel catalogo e non consumano il tetto per paese, ma non sono
+ * cancellate: il motivo per cui stanno fuori e' scritto accanto a loro.
+ * Cancellarle vorrebbe dire che fra sei mesi qualcuno le ritrova, le rimette,
+ * e rifa' una serata di prove per riscoprire che CoopShop vuole che uno acceda.
+ *
+ * Misurato togliendo le cinque italiane: la quota di catalogo con prezzo
+ * leggibile passa dal 42% al 77%, e la spesa di prova resta 16 voci su 16.
+ * Non si perde niente, perche' quelle insegne un prezzo non lo davano a
+ * nessuna delle sedici.
+ *
+ * Vale la pena ricontrollare chi dice «serve accedere»: un negozio che apre la
+ * vetrina cambia idea da un giorno all'altro. Chi invece vieta l'API nel
+ * `robots.txt` non cambia da solo — li' serve chiedere il permesso, ed e' una
+ * decisione commerciale.
+ */
+export async function fontiEscluse(): Promise<Array<FonteCatalogo & { esclusa: string }>> {
+  try {
+    const { fonti } = await import("../base/db.js");
+    const righe = await (await fonti()).find({ esclusa: { $exists: true } }).toArray();
+    return righe.map((r) => ({
+      paese: r.paese,
+      insegna: r.insegna,
+      dominio: r.dominio,
+      sitemap: r.sitemap,
+      resa: r.resa,
+      stimati: r.stimati,
+      esclusa: r.esclusa ?? "tenuta fuori",
+      ...(r.nota ? { nota: r.nota } : {}),
+    }));
+  } catch {
+    return [];
+  }
+}
 
-  { paese: "CA", insegna: "Voila by Sobeys", dominio: "voila.ca", sitemap: "https://voila.ca/sitemaps/sitemap-products-part1.xml", resa: 0, stimati: 50000 },
-
-  { paese: "CH", insegna: "Lidl Svizzera", dominio: "www.lidl.ch", sitemap: "https://www.lidl.ch/static/sitemap.xml", resa: 1, stimati: 678 },
-
-  /* Billa Cechia e Slovacchia: gli indirizzi ci sono, il prezzo no — il
-     browser lo disegna dopo. Restano perche' un nome e un link valgono anche
-     senza prezzo, e il lavoro notturno non le apre nemmeno. */
-  { paese: "CZ", insegna: "Billa", dominio: "www.billa.cz", sitemap: "https://www.billa.cz/sitemap.xml", resa: 0, stimati: 12416 },
-  { paese: "CZ", insegna: "Billa CZ", dominio: "www.billa.cz", sitemap: "https://www.billa.cz/sitemap.xml", resa: 1, stimati: 13303 },
-
-  { paese: "DE", insegna: "Knuspr", dominio: "www.knuspr.de", sitemap: "https://www.knuspr.de/sitemap_products.xml", resa: 0.93, stimati: 15177 },
-  { paese: "DE", insegna: "Lidl Deutschland", dominio: "www.lidl.de", sitemap: "https://www.lidl.de/static/sitemap.xml", resa: 0.97, stimati: 12720 },
-  { paese: "DE", insegna: "Mytime", dominio: "www.mytime.de", sitemap: "https://www.mytime.de/sitemaps/mytime/sitemap.produkte.xml", resa: 1, stimati: 12265 },
-  { paese: "DE", insegna: "Aldi Süd", dominio: "www.aldi-sued.de", sitemap: "https://www.aldi-sued.de/sitemap_products.xml", resa: 1, stimati: 4786 },
-  { paese: "DE", insegna: "Aldi Nord", dominio: "www.aldi-nord.de", sitemap: "https://www.aldi-nord.de/sitemaps/.aldi-nord-sitemap-products.xml", resa: 0, stimati: 2337 },
-  { paese: "DE", insegna: "Alnatura", dominio: "www.alnatura.de", sitemap: "https://www.alnatura.de/sitemap.xml", resa: 0.4, stimati: 3115 },
-  { paese: "DE", insegna: "Netto", dominio: "www.netto-online.de", sitemap: "https://www.netto-online.de/sitemap.xml", resa: 1, stimati: 1803 },
-
-  { paese: "DK", insegna: "BilkaToGo", dominio: "www.bilkatogo.dk", sitemap: "https://www.bilkatogo.dk/sitemap-products.xml", resa: 0, stimati: 37087 },
-  { paese: "DK", insegna: "Føtex", dominio: "foetex.dk", sitemap: "https://foetex.dk/sitemap/sitemap-index.xml", resa: 0.7, stimati: 28338 },
-  { paese: "DK", insegna: "Matas", dominio: "www.matas.dk", sitemap: "https://www.matas.dk/sitemap", resa: 1, stimati: 7441 },
-  { paese: "DK", insegna: "Nemlig.com", dominio: "www.nemlig.com", sitemap: "https://www.nemlig.com/googleproductsitemap", resa: 0, stimati: 4046 },
-
-  { paese: "EE", insegna: "Rimi Estonia", dominio: "www.rimi.ee", sitemap: "https://www.rimi.ee/epood/sitemap.xml", resa: 1, stimati: 58320 },
-  { paese: "EE", insegna: "Barbora Estonia", dominio: "barbora.ee", sitemap: "https://barbora.ee/sitemap.xml", resa: 1, stimati: 18595 },
-
-  // La resa resta 1 e NON si abbassa: misurata a ritmo nostro da 4 pagine su
-  // 10, ma tutte e quattro col prezzo. Le altre sei non erano senza prezzo,
-  // erano richieste rifiutate perche' andavamo troppo in fretta. Il rimedio e'
-  // rallentare la raccolta, non mandare in fondo alla fila centomila schede
-  // che il prezzo ce l'hanno. Verificato a mano: 10,16 EUR a schermo e in
-  // `og:price`, sulla stessa scheda che la misura non era riuscita ad aprire.
-  { paese: "ES", insegna: "Naturitas", dominio: "www.naturitas.es", sitemap: "https://www.naturitas.es/sitemap.xml", resa: 1, stimati: 108646 },
-  // Una riga sola: le due di prima erano lo stesso negozio contato due volte.
-  // 50.000 prodotti stanno in part1 e 36.555 in part2; puntando all'indice si
-  // prendono entrambe, e `paScheda` scarta volantini, ricette e categorie.
-  { paese: "ES", insegna: "Alcampo", dominio: "www.compraonline.alcampo.es", sitemap: "https://www.compraonline.alcampo.es/sitemaps/sitemap_index.xml", resa: 0.6, stimati: 86555 },
-  { paese: "ES", insegna: "Bonpreu Esclat", dominio: "www.compraonline.bonpreuesclat.cat", sitemap: "https://www.compraonline.bonpreuesclat.cat/sitemaps/sitemap-products-part1.xml", resa: 0.6, stimati: 21126 },
-  { paese: "ES", insegna: "Consum", dominio: "tienda.consum.es", sitemap: "https://tienda.consum.es/sitemap.xml", resa: 1, stimati: 18385 },
-  { paese: "ES", insegna: "Mercadona Online", dominio: "tienda.mercadona.es", sitemap: "https://tienda.mercadona.es/sitemap.xml", resa: 0, stimati: 4320 },
-  { paese: "ES", insegna: "Aldi España", dominio: "www.aldi.es", sitemap: "https://www.aldi.es/sitemaps/.aldi-nord-sitemap-products.xml", resa: 0, stimati: 2072 },
-
-  { paese: "FI", insegna: "Lidl Suomi", dominio: "www.lidl.fi", sitemap: "https://www.lidl.fi/static/sitemap.xml", resa: 1, stimati: 439 },
-
-  { paese: "FR", insegna: "Greenweez", dominio: "cdn.greenweez.com", sitemap: "https://cdn.greenweez.com/sitemaps/sitemap-products_0.xml", resa: 0, stimati: 45317 },
-  { paese: "FR", insegna: "Auchan", dominio: "www.auchan.fr", sitemap: "https://www.auchan.fr/sitemap.xml", resa: 1, stimati: 8708 },
-  { paese: "FR", insegna: "Kazidomi", dominio: "www.kazidomi.com", sitemap: "https://www.kazidomi.com/sitemap/sitemap.xml", resa: 1, stimati: 8039 },
-  { paese: "FR", insegna: "Naturalia", dominio: "www.naturalia.fr", sitemap: "https://www.naturalia.fr/media/sitemap_product.xml", resa: 1, stimati: 6072 },
-  /* MISURATA 0 SU 10 DA `resa-veloce.ts` E 12 SU 12 DAL CATALOGO VERO.
-     Vince il catalogo vero, e il perche' conta piu' del numero: `resa-veloce`
-     campiona la sitemap grezza, e l'indice di questa insegna porta a pagine
-     `coup-de-coeur` che hanno la forma di una scheda ma non lo sono. Il
-     catalogo invece le scarta, e quel che resta rende il 100%.
-     Regola: quando le due misure litigano, ha ragione quella che campiona da
-     `daUnaFonte`. L'altra e' veloce, non esatta. */
-  { paese: "FR", insegna: "La Grande Épicerie", dominio: "www.lagrandeepicerie.com", sitemap: "https://www.lagrandeepicerie.com/sitemap_index.xml", resa: 1, stimati: 3956 },
-  { paese: "FR", insegna: "Picard", dominio: "www.picard.fr", sitemap: "https://www.picard.fr/sitemap_0.xml", resa: 0.97, stimati: 1569 },
-
-  { paese: "GB", insegna: "Morrisons Groceries", dominio: "groceries.morrisons.com", sitemap: "https://groceries.morrisons.com/sitemaps/sitemap_index.xml", resa: 0.93, stimati: 32873 },
-  { paese: "GB", insegna: "Waitrose", dominio: "www.waitrose.com", sitemap: "https://www.waitrose.com/sitemapIndex.xml", resa: 1, stimati: 18182 },
-  { paese: "GB", insegna: "Aldi UK", dominio: "www.aldi.co.uk", sitemap: "https://www.aldi.co.uk/sitemap_products.xml", resa: 0.93, stimati: 4989 },
-  { paese: "GB", insegna: "Lidl UK", dominio: "www.lidl.co.uk", sitemap: "https://www.lidl.co.uk/static/sitemap.xml", resa: 0.42, stimati: 1820 },
-  /* LE ALIMENTARI BRITANNICHE CHE LA RACCOLTA AUTOMATICA NON VEDE.
-     Aggiunte a mano il 16 settembre, misurate una per una: la scoperta le
-     manca perche' due di loro rispondono 403 se interrogate in fretta —
-     Sainsbury's e Aldi — e le altre non si annunciano con nomi di sitemap
-     riconoscibili. Andando a una richiesta ogni secondo e mezzo rispondono
-     tutte, e il prezzo si legge: Sainsbury's 0,99 su un cetriolo, Co-op
-     0/4 (solo link, la scheda la riempie il browser), Planet Organic 4/4.
-
-     SE QUESTO FILE VIENE RIGENERATO, QUESTE RIGHE VANNO RIMESSE. Il
-     generatore non le trova da solo, e senza di loro il Regno Unito passa da
-     undici catene a quattro. */
-  { paese: "GB", insegna: "Sainsbury's", dominio: "www.sainsburys.co.uk", sitemap: "https://www.sainsburys.co.uk/product-sitemap.xml", resa: 1, stimati: 9898 },
-  { paese: "GB", insegna: "Co-op", dominio: "www.coop.co.uk", sitemap: "https://www.coop.co.uk/products/sitemap.xml", resa: 0, stimati: 3639 },
-  { paese: "GB", insegna: "Planet Organic", dominio: "www.planetorganic.com", sitemap: "https://www.planetorganic.com/sitemap.xml", resa: 1, stimati: 3099 },
-  { paese: "GB", insegna: "Poundland", dominio: "www.poundland.co.uk", sitemap: "https://www.poundland.co.uk/sitemap.xml", resa: 1, stimati: 1487 },
-  { paese: "GB", insegna: "MuscleFood", dominio: "www.musclefood.com", sitemap: "https://www.musclefood.com/sitemap.xml", resa: 1, stimati: 318 },
-  { paese: "GB", insegna: "Milk & More", dominio: "www.milkandmore.co.uk", sitemap: "https://www.milkandmore.co.uk/sitemap.xml", resa: 1, stimati: 269 },
-  { paese: "GB", insegna: "Heron Foods", dominio: "heronfoods.com", sitemap: "https://heronfoods.com/sitemap.xml", resa: 1, stimati: 256 },
-
-  /* TOLTE PERCHE' NON SONO SPESA, non perche' non funzionino.
-     Marks & Spencer pubblica 270.094 schede e Pets at Home 16.156, con una
-     resa alta: la raccolta le promuove perche' misura se il PREZZO si legge,
-     non se il prodotto e' cibo. Ma sono maglioni e articoli per animali, e
-     col tetto di 50.000 per insegna da sole riempirebbero il catalogo
-     britannico soffocando le alimentari. Misurato sui nomi: M&S da' "wool
-     rich roll neck jumper", "pure linen midi shirt dress".
-     Stesso motivo per cui restano fuori B&M e Holland & Barrett. */
-
-  { paese: "GR", insegna: "Masoutis", dominio: "www.masoutis.gr", sitemap: "https://www.masoutis.gr/images/sitemapthree.xml", resa: 0, stimati: 15434 },
-  { paese: "GR", insegna: "Kritikos", dominio: "kritikos-sm.gr", sitemap: "https://kritikos-sm.gr/sitemap-1.xml", resa: 0, stimati: 5000 },
-  { paese: "GR", insegna: "Sklavenitis", dominio: "www.sklavenitis.gr", sitemap: "https://www.sklavenitis.gr/sitemap/Products/sitemap_index.xml", resa: 1, stimati: 4552 },
-  { paese: "GR", insegna: "Lidl Hellas", dominio: "www.lidl-hellas.gr", sitemap: "https://www.lidl-hellas.gr/static/sitemap.xml", resa: 1, stimati: 589 },
-
-  /* Trovata sondando sedici insegne dell'Europa dell'Est e balcanica.
-     Pubblica `sitemap_products.xml` separata dal resto: 11.153 schede, e il
-     prezzo sta in `og:price`. */
-  { paese: "HR", insegna: "Konzum", dominio: "www.konzum.hr", sitemap: "https://www.konzum.hr/sitemap_products.xml", resa: 0.9, stimati: 11153 },
-  { paese: "HR", insegna: "Tommy", dominio: "www.tommy.hr", sitemap: "https://www.tommy.hr/sitemap.xml", resa: 0.97, stimati: 28640 },
-  { paese: "HR", insegna: "Konzum Online", dominio: "www.konzum.hr", sitemap: "https://www.konzum.hr/sitemap_products.xml", resa: 0.97, stimati: 11153 },
-
-  { paese: "HU", insegna: "Aldi HU", dominio: "www.aldi.hu", sitemap: "https://www.aldi.hu/sitemap_products.xml", resa: 1, stimati: 806 },
-  { paese: "HU", insegna: "Spar HU", dominio: "www.spar.at", sitemap: "https://www.spar.at/index.sitemap-index.xml", resa: 0, stimati: 459 },
-  { paese: "HU", insegna: "Auchan Online", dominio: "auchan.hu", sitemap: "https://auchan.hu/sitemap.xml", resa: 1, stimati: 249 },
-  { paese: "HU", insegna: "Kifli.hu", dominio: "kifli.hu", sitemap: "https://www.kifli.hu/sitemap_products.xml", resa: 0.5, stimati: 28 },
-
-  { paese: "IE", insegna: "Tesco Ireland", dominio: "www.tesco.ie", sitemap: "https://www.tesco.ie/sitemaps/en-IE/groceries/products-index.xml", resa: 0, stimati: 22467 },
-  { paese: "IE", insegna: "SuperValu Online", dominio: "shop.supervalu.ie", sitemap: "https://shop.supervalu.ie/sitemap.xml", resa: 0, stimati: 11807 },
-  { paese: "IE", insegna: "Aldi Ireland", dominio: "www.aldi.ie", sitemap: "https://www.aldi.ie/sitemap_products.xml", resa: 0.97, stimati: 4300 },
-  { paese: "IE", insegna: "Lidl Ireland", dominio: "www.lidl.ie", sitemap: "https://www.lidl.ie/static/sitemap.xml", resa: 0.1, stimati: 1494 },
-
-  { paese: "IN", insegna: "JioMart", dominio: "www.jiomart.com", sitemap: "https://www.jiomart.com/sitemap.xml", resa: 0, stimati: 9332 },
-
-  { paese: "IT", insegna: "Carrefour Italia", dominio: "www.carrefour.it", sitemap: "https://www.carrefour.it/sitemap_index.xml", resa: 0.8, stimati: 28352 },
-  { paese: "IT", insegna: "Iperal Spesa Online", dominio: "www.iperalspesaonline.it", sitemap: "https://www.iperalspesaonline.it/sitemap.xml", resa: 0.7, stimati: 23255 },
-  { paese: "IT", insegna: "Bennet", dominio: "www.bennet.com", sitemap: "https://www.bennet.com/sitemap.xml", resa: 1, stimati: 20709 },
-  { paese: "IT", insegna: "Unes", dominio: "www.spesaonline.unes.it", sitemap: "https://www.spesaonline.unes.it/sitemap.xml", resa: 0.93, stimati: 15363 },
-  { paese: "IT", insegna: "Naturasi", dominio: "www.naturasi.it", sitemap: "https://www.naturasi.it/sitemap.xml", resa: 0.6, stimati: 7711 },
-  // Trovata provando trenta insegne italiane e spagnole: e' l'unica delle
-  // trenta che pubblichi un catalogo con i prezzi dentro. Il nome del file e'
-  // scritto male da loro, `stemap`, e va copiato cosi' com'e'.
-  // Dichiara 7.590 indirizzi ma ne teniamo 722: solo quelli portano il codice
-  // articolo in fondo. Gli altri sono `/it/<nome>.html` senza numero, e una
-  // forma cosi' generica non si puo' accettare senza far entrare mezzo sito.
-  { paese: "IT", insegna: "Prezzemolo e Vitale", dominio: "www.prezzemoloevitale.it", sitemap: "https://www.prezzemoloevitale.it/media/sitemap/stemap_www_it_product.xml", resa: 1, stimati: 722 },
-  { paese: "IT", insegna: "Coop", dominio: "www.easycoop.com", sitemap: "https://www.easycoop.com/sitemap/sitemap.xml", resa: 1, stimati: 6636 },
-  { paese: "IT", insegna: "Cortilia", dominio: "www.cortilia.it", sitemap: "https://www.cortilia.it/sitemap.xml", resa: 1, stimati: 6536 },
-  { paese: "IT", insegna: "Pam", dominio: "www.pampanorama.it", sitemap: "https://www.pampanorama.it/sitemap.xml", resa: 0, stimati: 6165 },
-  { paese: "IT", insegna: "Conad Spesa Online", dominio: "spesaonline.conad.it", sitemap: "https://spesaonline.conad.it/sitemap/products.xml", resa: 0.1, stimati: 5433 },
-  { paese: "IT", insegna: "Eataly", dominio: "www.eataly.net", sitemap: "https://www.eataly.net/sitemap.xml", resa: 1, stimati: 5073 },
-  { paese: "IT", insegna: "Unicoop Tirreno", dominio: "coopacasa.coopetruria.coop.it", sitemap: "https://coopacasa.coopetruria.coop.it/sitemap_index.xml", resa: 0.4, stimati: 2033 },
-  { paese: "IT", insegna: "Aldi", dominio: "www.aldi.it", sitemap: "https://www.aldi.it/sitemap_products.xml", resa: 1, stimati: 678 },
-  { paese: "IT", insegna: "Lidl Italia", dominio: "www.lidl.it", sitemap: "https://www.lidl.it/static/sitemap.xml", resa: 0.7, stimati: 445 },
-
-  { paese: "KR", insegna: "Emart Mall", dominio: "emart.ssg.com", sitemap: "https://emart.ssg.com/sitemap/best.xml", resa: 0, stimati: 498 },
-
-  { paese: "LT", insegna: "Rimi Lituania", dominio: "www.rimi.lt", sitemap: "https://www.rimi.lt/e-parduotuve/sitemap.xml", resa: 0.7, stimati: 61956 },
-  { paese: "LT", insegna: "LastMile", dominio: "www.lastmile.lt", sitemap: "https://www.lastmile.lt/sitemap.xml", resa: 0, stimati: 61013 },
-  { paese: "LT", insegna: "Rimi e-shop", dominio: "www.rimi.lt", sitemap: "https://www.rimi.lt/e-parduotuve/sitemaps/categories/siteMap_rimiLtSite_Category_ru_1.xml", resa: 0.87, stimati: 702 },
-
-  { paese: "LV", insegna: "Rimi Latvia", dominio: "www.rimi.lv", sitemap: "https://www.rimi.lv/e-veikals/sitemap.xml", resa: 1, stimati: 55793 },
-  { paese: "LV", insegna: "Rimi e-veikals", dominio: "www.rimi.lv", sitemap: "https://www.rimi.lv/e-veikals/sitemaps/categories/siteMap_rimiLvSite_Category_en_1.xml", resa: 0.97, stimati: 724 },
-  { paese: "LV", insegna: "Barbora Latvia", dominio: "barbora.lv", sitemap: "https://barbora.lv/sitemap.xml", resa: 1, stimati: 495 },
-
-  { paese: "NL", insegna: "Etos", dominio: "www.etos.nl", sitemap: "https://www.etos.nl/sitemap_index.xml", resa: 1, stimati: 9281 },
-  { paese: "NL", insegna: "Spar NL", dominio: "www.spar.nl", sitemap: "https://www.spar.nl/sitemap.xml", resa: 0.97, stimati: 6647 },
-  { paese: "NL", insegna: "Gall & Gall", dominio: "www.gall.nl", sitemap: "https://www.gall.nl/sitemap_index.xml", resa: 1, stimati: 4968 },
-  { paese: "NL", insegna: "Dirk", dominio: "www.dirk.nl", sitemap: "https://www.dirk.nl/sitemap.xml", resa: 0.97, stimati: 4781 },
-
-  { paese: "NO", insegna: "Vinmonopolet", dominio: "www.vinmonopolet.no", sitemap: "https://www.vinmonopolet.no/sitemap.xml", resa: 1, stimati: 36098 },
-  { paese: "NO", insegna: "MENY Nettbutikk", dominio: "meny.no", sitemap: "https://meny.no/sitemap.xml", resa: 0.93, stimati: 10825 },
-  { paese: "NO", insegna: "SPAR Nettbutikk", dominio: "spar.no", sitemap: "https://spar.no/sitemap.xml", resa: 0.93, stimati: 6983 },
-
-  { paese: "PL", insegna: "Auchan Zakupy", dominio: "zakupy.auchan.pl", sitemap: "https://zakupy.auchan.pl/sitemaps/sitemap-products-part1.xml", resa: 0.17, stimati: 24140 },
-  { paese: "PL", insegna: "Auchan Polska", dominio: "zakupy.auchan.pl", sitemap: "https://zakupy.auchan.pl/sitemaps/sitemap_index.xml", resa: 0.1, stimati: 24140 },
-  { paese: "PL", insegna: "Rossmann Polska", dominio: "www.rossmann.pl", sitemap: "https://www.rossmann.pl/sitemap.xml", resa: 1, stimati: 14078 },
-
-  { paese: "PT", insegna: "Continente Online", dominio: "www.continente.pt", sitemap: "https://www.continente.pt/sitemap_index.xml", resa: 1, stimati: 89297 },
-  { paese: "PT", insegna: "Auchan Portugal", dominio: "www.auchan.pt", sitemap: "https://www.auchan.pt/sitemap_index.xml", resa: 0.97, stimati: 44039 },
-  { paese: "PT", insegna: "Recheio", dominio: "www.recheio.pt", sitemap: "https://www.recheio.pt/portal/sitemap.xml", resa: 0, stimati: 20283 },
-  { paese: "PT", insegna: "Pingo Doce", dominio: "www.pingodoce.pt", sitemap: "https://www.pingodoce.pt/home/sitemap_index.xml", resa: 0.7, stimati: 12441 },
-  { paese: "PT", insegna: "Wells", dominio: "www.wells.pt", sitemap: "https://www.wells.pt/sitemap_index.xml", resa: 0.97, stimati: 7859 },
-  { paese: "PT", insegna: "Garrafeira Nacional", dominio: "www.garrafeiranacional.com", sitemap: "https://www.garrafeiranacional.com/pub/sitemap.xml", resa: 0, stimati: 413 },
-  { paese: "PT", insegna: "Lidl Portugal", dominio: "www.lidl.pt", sitemap: "https://www.lidl.pt/static/sitemap.xml", resa: 1, stimati: 333 },
-
-  { paese: "RO", insegna: "Freshful", dominio: "www.freshful.ro", sitemap: "https://www.freshful.ro/sitemap_index.xml", resa: 1, stimati: 46531 },
-
-  { paese: "RS", insegna: "IDEA Online", dominio: "online.idea.rs", sitemap: "https://online.idea.rs/sitemap.xml", resa: 0, stimati: 10762 },
-  { paese: "RS", insegna: "Maxi", dominio: "www.maxi.rs", sitemap: "https://www.maxi.rs/sitemap/delhaizesitemapindex.xml", resa: 0, stimati: 9955 },
-
-  { paese: "SE", insegna: "ICA Handla Online", dominio: "ica.se", sitemap: "https://www.ica.se/recept/sitemaps/", resa: 0.5, stimati: 16539 },
-  { paese: "SE", insegna: "Coop Sverige", dominio: "www.coop.se", sitemap: "https://www.coop.se/sitemap.xml", resa: 0, stimati: 14466 },
-  { paese: "SE", insegna: "ICA", dominio: "www.ica.se", sitemap: "https://www.ica.se/butiker/sitemap.xml", resa: 0.07, stimati: 8297 },
-  { paese: "SE", insegna: "Lidl Sverige", dominio: "www.lidl.se", sitemap: "https://www.lidl.se/static/sitemap.xml", resa: 1, stimati: 489 },
-
-  { paese: "SI", insegna: "Mercator Online", dominio: "mercatoronline.si", sitemap: "https://mercatoronline.si/sitemap.xml", resa: 1, stimati: 17241 },
-  { paese: "SI", insegna: "Hofer SI", dominio: "www.hofer.si", sitemap: "https://www.hofer.si/sitemap_products.xml", resa: 0.93, stimati: 1035 },
-
-  { paese: "SK", insegna: "Billa Slovensko", dominio: "www.billa.sk", sitemap: "https://www.billa.sk/sitemap.xml", resa: 0, stimati: 3673 },
-  { paese: "SK", insegna: "Billa SK", dominio: "www.billa.sk", sitemap: "https://www.billa.sk/sitemap.xml", resa: 0.93, stimati: 4286 },
-
-  { paese: "TR", insegna: "Migros Sanal Market", dominio: "www.migros.com.tr", sitemap: "https://www.migros.com.tr/hermes/api/sitemaps/sitemap.xml", resa: 1, stimati: 350 },
-
-  { paese: "US", insegna: "Kroger", dominio: "www.kroger.com", sitemap: "https://www.kroger.com/pdp-sitemap/kroger-product-details-sitemap-1.xml", resa: 0, stimati: 20000 },
-
-  { paese: "ZA", insegna: "Checkers Sixty60", dominio: "www.checkers.co.za", sitemap: "https://www.checkers.co.za/sitemap.xml", resa: 0.43, stimati: 98307 },
-];
+/** Per le prove: svuota l'elenco in memoria. */
+export function dimenticaFonti(): void {
+  vive = [];
+  caricate = false;
+}
 
 /** I paesi per cui esiste almeno una fonte. */
 export function paesiConCatalogo(): string[] {
-  return [...new Set(FONTI.map((f) => f.paese))].sort();
+  return [...new Set(vive.map((f) => f.paese))].sort();
 }
 
-
 /**
- * LE INSEGNE TENUTE FUORI, E PERCHE'. NON RIFARE QUESTO LAVORO.
+ * Le fonti di un paese, la piu' generosa per prima.
  *
- * Non sono cancellate: sono qui. Cancellarle significherebbe che fra sei mesi
- * qualcuno le ritrova, le rimette, e rifa' una sera di prove per riscoprire
- * che CoopShop vuole che uno acceda.
- *
- * Stanno fuori da `FONTI`, quindi non entrano nel catalogo e non consumano il
- * tetto di 200.000 voci per paese — che in Italia era pieno, e con dentro
- * centodiecimila prodotti senza prezzo.
- *
- * COSA CAMBIA A TOGLIERLE, MISURATO
- *   Italia, quota di catalogo con prezzo leggibile:  42% -> 77%
- *   Italia, spesa vera di sedici voci:               16/16 prima, 16/16 dopo
- *
- * La seconda riga e' quella importante: NON SI PERDE NIENTE. Quelle insegne
- * non davano un prezzo a nessuna delle sedici voci, perche' non ne danno a
- * nessuno. Davano solo un nome e un indirizzo, e per ogni voce c'erano gia'
- * almeno quattro alternative che il prezzo ce l'hanno.
- *
- * QUANDO RIMETTERNE UNA DENTRO
- * Quando la sua riga qui sotto smette di essere vera. Vale la pena ricontrollare
- * chi dice «serve accedere»: un negozio che apre la vetrina cambia idea da un
- * giorno all'altro. Chi invece vieta l'API nel `robots.txt` non cambia da solo:
- * li' serve chiedere il permesso, ed e' una decisione commerciale.
+ * L'ordine conta: il tetto per paese taglia la coda, e cosi' taglia le insegne
+ * che i prezzi non li danno invece di quelle che li danno.
  */
-export const SENZA_PREZZO: FonteCatalogo[] = [
-  /* CoopShop, Esselunga e Basko: la scheda si apre e mostra tutto tranne la
-     cifra. Verificato aprendo le pagine con gli occhi, il 16 settembre 2026.
-     Su CoopShop e Basko l'API `/ebsn/api/products` e' pure CONSENTITA e
-     risponde — ma il campo `price` nella risposta non c'e' proprio. */
-  { paese: "IT", insegna: "CoopShop", dominio: "coopshop.it", sitemap: "https://coopshop.it/sitemap.xml", resa: 0, stimati: 54576,
-    escusa: "serve accedere per vedere il prezzo; l'API e' consentita ma non ha il campo price" },
-  { paese: "IT", insegna: "Esselunga a Casa", dominio: "spesaonline.esselunga.it", sitemap: "https://spesaonline.esselunga.it/sitemap_index.xml", resa: 0, stimati: 17716,
-    escusa: "serve accedere per vedere il prezzo" },
-  { paese: "IT", insegna: "Basko", dominio: "www.basko.it", sitemap: "https://www.basko.it/sitemap.xml", resa: 0, stimati: 9028,
-    escusa: "la scheda apre la finestra di accesso; l'API e' consentita ma non ha il campo price" },
-
-  /* ALI' E' UN CASO DIVERSO, E VA RILETTO SE MAI SI PARLA CON LORO.
-     Il prezzo sulla pagina SI VEDE — 18,90 euro, e pure il prezzo al chilo.
-     Ma l'HTML e' un guscio da 16 KB: la cifra la prende il browser da
-     `/ebsn/api/`, che il loro robots.txt vieta per nome. Non c'e' niente di
-     rotto da riparare: c'e' un permesso da chiedere, per 29.531 prodotti fra
-     le due. */
-  { paese: "IT", insegna: "Alì Supermercati", dominio: "www.alisupermercati.it", sitemap: "https://www.alisupermercati.it/sitemap.xml", resa: 0, stimati: 17696,
-    escusa: "il prezzo si vede in pagina ma arriva da /ebsn/api/, che il loro robots.txt vieta" },
-  { paese: "IT", insegna: "Tigros", dominio: "www.tigros.it", sitemap: "https://www.tigros.it/sitemap.xml", resa: 0, stimati: 11835,
-    escusa: "Disallow: /ebsn/ nel loro robots.txt" },
-];
-
-/** Le fonti di un paese, le piu' generose per prime. */
 export function fontiDi(paese: string): FonteCatalogo[] {
-  return FONTI.filter((f) => f.paese === paese.toUpperCase()).sort((a, b) => b.resa - a.resa);
+  return vive.filter((f) => f.paese === paese.toUpperCase()).sort((a, b) => b.resa - a.resa);
 }
 
 /**

@@ -35,11 +35,21 @@ import { createHash } from "node:crypto";
 import { generateText, Output } from "ai";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import { createApp, HttpError } from "./base/http.js";
+import { createApp, HttpError, Pagina } from "./base/http.js";
 import { isConfigured, model, MODEL_ID } from "./app/gemini.js";
 import { fetchPageContext, rankHits, searchProvider } from "./app/search.js";
 import { cache, cacheVecchia, isDbConfigured, plans, users } from "./base/db.js";
-import { hashPassword, issueToken, requireUser, verifyPassword } from "./app/auth.js";
+import { hashPassword, issueToken, verifyPassword } from "./app/auth.js";
+import {
+  avviaRecupero,
+  cambiaPassword,
+  concludiRecupero,
+  eliminaAccount,
+  utenteDaRichiesta,
+  utentePubblico,
+} from "./app/utente.js";
+import { registraPush, dimenticaPush } from "./app/notifiche.js";
+import { fotoDelPiatto, fotoDiPiuPiatti } from "./app/foto-piatti.js";
 import { isShoppingConfigured, searchShopping } from "./app/shopping.js";
 import {
   type Blocco,
@@ -85,6 +95,7 @@ import { rispostaPrezziV1 } from "./api/contratto-v1.js";
 import { collegaTraduttore } from "./api/aiuti-esterni.js";
 import { consumoDiOggi, controllaChiave } from "./api/chiavi.js";
 import { cercaNelCatalogo, statoCatalogo, svuotaCatalogo } from "./api/catalogo.js";
+import { avviaQui, datiPannello, ordinaDiFermare, paginaPannello } from "./api/pannello.js";
 import { paesiConCatalogo } from "./api/catalogo-fonti.js";
 import { negoziInCitta, statoNegozi, tuttiINegozi } from "./api/negozi.js";
 import { aggiornaCatalogo, avviaCatalogoNotturno } from "./api/catalogo-notturno.js";
@@ -339,9 +350,10 @@ app.post("/auth/register", async (body) => {
     passwordHash: await hashPassword(password),
     displayName,
     createdAt: new Date(),
+    versioneToken: 1,
   };
   const { insertedId } = await col.insertOne(doc);
-  return { token: issueToken(String(insertedId)), email: normalized, displayName };
+  return { token: issueToken(String(insertedId), 1), email: normalized, displayName };
 });
 
 app.post("/auth/login", async (body) => {
@@ -355,17 +367,108 @@ app.post("/auth/login", async (body) => {
     throw new HttpError(401, "Email o password non corretti");
   }
   return {
-    token: issueToken(String(user._id)),
+    token: issueToken(String(user._id), user.versioneToken ?? 1),
     email: user.email,
     displayName: user.displayName,
   };
 });
 
 app.get("/me", async (_body, req) => {
-  const userId = requireUser(req as never);
-  const user = await (await users()).findOne({ _id: new ObjectId(userId) });
-  if (!user) throw new HttpError(404, "Utente non trovato");
-  return { email: user.email, displayName: user.displayName, createdAt: user.createdAt };
+  const { doc } = await utenteDaRichiesta(req);
+  return utentePubblico(doc);
+});
+
+/* ──────────────────────── Le foto dei piatti ──────────────────────── */
+
+/**
+ * La foto di un piatto, cercata su Wikimedia Commons e ricordata.
+ *
+ * Non chiede la chiave dell'API: non costa niente al modello, non e' quello che
+ * vendiamo, e serve all'app a ogni ricetta. La cache la protegge dagli abusi
+ * meglio di una chiave — la seconda richiesta per lo stesso piatto non esce
+ * nemmeno da qui.
+ *
+ * Risponde `{ foto: null }` quando non trova niente, e l'app disegna il suo
+ * segnaposto. Mai un indirizzo indovinato: e' l'errore che ci ha portati ai
+ * riquadri rotti in cima a ogni ricetta.
+ */
+app.post("/piatto/foto", async (body) => {
+  const { nome, cerca } = parse(
+    z.object({
+      nome: z.string().min(1).max(160),
+      /* Le parole con cui cercarla, quando chi chiede le ha: l'IA che ha
+         scritto la ricetta sa dire com'e' fatto il piatto meglio del suo
+         titolo. Vedi `photoQuery` in `base/schemas.ts`. */
+      cerca: z.string().max(80).optional(),
+    }),
+    body,
+  );
+  return { foto: await fotoDelPiatto(nome, cerca) };
+});
+
+app.post("/piatto/foto-molte", async (body) => {
+  const { nomi, cerche } = parse(
+    z.object({
+      nomi: z.array(z.string().min(1).max(160)).min(1).max(30),
+      cerche: z.record(z.string(), z.string().max(80)).optional(),
+    }),
+    body,
+  );
+  return { foto: await fotoDiPiuPiatti(nomi, cerche ?? {}) };
+});
+
+/* ─────────────────────── Password: cambio e recupero ─────────────────────── */
+
+/**
+ * «Ho dimenticato la password».
+ *
+ * Risponde SEMPRE allo stesso modo, che l'indirizzo esista o no: altrimenti
+ * diventa uno strumento per scoprire chi e' iscritto, provando un elenco di
+ * indirizzi e guardando quali rispondono diversamente.
+ */
+app.post("/auth/password/dimenticata", async (body) => {
+  const { email } = parse(z.object({ email: z.string().email().max(200) }), body);
+  const esito = await avviaRecupero(email);
+  return {
+    ok: true,
+    messaggio: "Se l'indirizzo e' registrato, riceverai un codice a sei cifre.",
+    ...esito,
+  };
+});
+
+app.post("/auth/password/reimposta", async (body) => {
+  const dati = parse(
+    z.object({
+      email: z.string().email().max(200),
+      codice: z.string().regex(/^\d{6}$/, "Il codice ha sei cifre"),
+      password: z.string().min(8).max(200),
+    }),
+    body,
+  );
+  return concludiRecupero(dati.email, dati.codice, dati.password);
+});
+
+app.post("/auth/password/cambia", async (body, req) => {
+  const dati = parse(
+    z.object({
+      attuale: z.string().min(1).max(200),
+      nuova: z.string().min(8).max(200),
+    }),
+    body,
+  );
+  return cambiaPassword(req, dati.attuale, dati.nuova);
+});
+
+/**
+ * Cancellazione dell'account, dall'app.
+ *
+ * Non e' una gentilezza: Apple e Google la impongono a ogni app con
+ * registrazione, ed e' uno dei motivi di rifiuto piu' frequenti.
+ */
+app.post("/account/elimina", async (body, req) => {
+  const { password } = parse(z.object({ password: z.string().min(1).max(200) }), body);
+  const esito = await eliminaAccount(req, password);
+  return { ok: true, pianiCancellati: esito.piani };
 });
 
 /* ─────────────────────────── Piani salvati ─────────────────────────── */
@@ -380,7 +483,7 @@ const SavePlan = z.object({
 });
 
 app.get("/plans", async (_body, req) => {
-  const userId = requireUser(req as never);
+  const { id: userId } = await utenteDaRichiesta(req);
   const rows = await (await plans())
     .find({ userId })
     .sort({ createdAt: -1 })
@@ -390,7 +493,7 @@ app.get("/plans", async (_body, req) => {
 });
 
 app.post("/plans", async (body, req) => {
-  const userId = requireUser(req as never);
+  const { id: userId } = await utenteDaRichiesta(req);
   const data = parse(SavePlan, body);
   const now = new Date();
   const { insertedId } = await (await plans()).insertOne({
@@ -403,13 +506,41 @@ app.post("/plans", async (body, req) => {
 });
 
 app.post("/plans/delete", async (body, req) => {
-  const userId = requireUser(req as never);
+  const { id: userId } = await utenteDaRichiesta(req);
   const { id } = parse(z.object({ id: z.string().min(1) }), body);
   // Il filtro include userId: senza, un id indovinato cancellerebbe il piano
   // di un altro utente.
   const res = await (await plans()).deleteOne({ _id: new ObjectId(id), userId });
   if (res.deletedCount === 0) throw new HttpError(404, "Piano non trovato");
   return { ok: true };
+});
+
+/* ───────────────────────── Notifiche push ───────────────────────── */
+
+/**
+ * Il telefono consegna il suo indirizzo, legato a chi e' entrato.
+ *
+ * Serve un account: un token senza utente e' un indirizzo senza destinatario
+ * — non sapremmo di chi e' la lista della spesa da confrontare coi prezzi.
+ */
+app.post("/notifiche/registra", async (body, req) => {
+  const { id: userId } = await utenteDaRichiesta(req);
+  const dati = parse(
+    z.object({
+      push: z.string().min(10).max(200),
+      piattaforma: z.string().max(20).optional(),
+      fuso: z.string().max(60).optional(),
+    }),
+    body,
+  );
+  return registraPush(userId, dati);
+});
+
+/** Si chiama uscendo dall'account: questo telefono non e' piu' suo. */
+app.post("/notifiche/dimentica", async (body, req) => {
+  const { id: userId } = await utenteDaRichiesta(req);
+  const { push } = parse(z.object({ push: z.string().min(10).max(200) }), body);
+  return dimenticaPush(userId, push);
 });
 
 /* ─────────────────────────────── AI ─────────────────────────────── */
@@ -1571,6 +1702,43 @@ app.post("/product/shopping", async (body) => {
  *
  * QUESTE ROTTE NON COSTANO NIENTE: nessuna chiamata al modello, nessuna quota.
  */
+
+/**
+ * Il pannello: le stesse cose di `/catalogo/stato`, ma da guardare.
+ *
+ * Sta qui e non in un artefatto rigenerato a mano perche' i numeri cambiano da
+ * soli e nessuno lancia tre comandi ogni tre minuti per accorgersene. La pagina
+ * e il perche' stanno in `pannello.ts`.
+ */
+app.get("/pannello", async () => new Pagina(paginaPannello()));
+
+app.get("/pannello/dati", async () => datiPannello());
+
+/**
+ * Ferma la lettura, ovunque stia girando.
+ *
+ * E' una POST e non una GET di proposito: una GET la apre un browser per
+ * sbaglio, la segue un crawler, la mette in cache un proxy. Un ordine che
+ * ferma il lavoro di una notte non deve poter partire da un clic distratto.
+ */
+/**
+ * Avvia la lettura sul server che riceve questa richiesta.
+ *
+ * Su Render vuol dire: accendi Render. Il processo del servizio web e' sempre
+ * in piedi, quindi c'e' chi puo' partire — ed e' proprio il caso in cui un
+ * pulsante «avvia» ha senso.
+ */
+app.post("/pannello/avvia", async (body) => {
+  const { chiave } = (body ?? {}) as { chiave?: string };
+  const messaggio = await avviaQui(String(chiave ?? ""));
+  return { ok: messaggio.startsWith("Partito"), messaggio };
+});
+
+app.post("/pannello/ferma", async (body) => {
+  const { chiave, per } = (body ?? {}) as { chiave?: string; per?: string };
+  const messaggio = await ordinaDiFermare(String(chiave ?? ""), per || "tutti");
+  return { ok: messaggio.startsWith("Ordine"), messaggio };
+});
 
 /** Cosa copriamo, e cosa e' pronto adesso. */
 app.get("/catalogo/stato", async () => ({
