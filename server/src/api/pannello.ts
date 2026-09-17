@@ -96,10 +96,19 @@ export async function avviaQui(chiave: string): Promise<string> {
   if (quante === 0) return "Nessuna insegna sul database: non c'e' niente da leggere.";
 
   giroInCorsoQui = true;
+
   /* NON si aspetta la fine: un giro dura un'ora e la richiesta scadrebbe molto
-     prima. Si risponde subito «e' partito», e il pannello lo vede comparire
-     fra i vivi al battito successivo — che e' anche la conferma che e' vero. */
-  void (async () => {
+     prima. Si risponde subito «e' partito», e il pannello lo vede comparire fra
+     i vivi al battito successivo — che e' anche la conferma che e' vero.
+     
+     E si parte con `setTimeout` e non chiamando direttamente: il corpo di una
+     funzione asincrona comincia SUBITO, e prima del primo `await` il giro
+     costruisce la coda decomprimendo i cataloghi con `gunzipSync`, che e'
+     sincrono. Su trentotto paesi sono decine di secondi in cui il processo non
+     risponde a nessuno — compresa la richiesta che ha appena premuto il
+     pulsante, che moriva senza risposta. Col rinvio la risposta parte prima, e
+     il lavoro pesante comincia quando il browser ha gia' ricevuto. */
+  setTimeout(() => void (async () => {
     try {
       const e = await giroContinuo(paesiConCatalogo(), MINUTI_A_MANO);
       console.info(
@@ -111,7 +120,7 @@ export async function avviaQui(chiave: string): Promise<string> {
     } finally {
       giroInCorsoQui = false;
     }
-  })();
+  })(), 0);
 
   return `Partito: ${MINUTI_A_MANO} minuti su ${paesiConCatalogo().length} paesi. Comparira' fra i vivi entro cinque secondi.`;
 }
