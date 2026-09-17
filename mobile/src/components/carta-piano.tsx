@@ -18,13 +18,23 @@
  * QUALE NUMERO VA GRANDE
  * ----------------------
  * Il risparmio, non la spesa — quando c'e'. E' la stessa scelta dei risultati
- * ed e' la piu' importante di tutto il disegno: «68 EUR» dice quanto esce dal
- * portafoglio, «22 EUR» dice cosa ci resta dentro. La spesa non sparisce,
- * scende nella striscia insieme a prodotti e giorni.
+ * ed e' la piu' importante di tutto il disegno: «68 €» dice quanto esce dal
+ * portafoglio, «82 €» dice cosa ci resta dentro. La spesa non sparisce, scende
+ * nella striscia insieme a prodotti e giorni.
  *
- * Quando il risparmio non si puo' calcolare — prezzi di una sola insegna, o
- * nessun prezzo vero — non si scrive zero e non si inventa: va grande la
- * spesa, e il titolo cambia di conseguenza.
+ * E I NUMERI NON SE LI CALCOLA LEI
+ * --------------------------------
+ * Glieli passa `CruscottoOggi`, che li prende da `computeResults` — lo stesso
+ * posto da cui li prende la schermata del piano. Per un giorno non e' stato
+ * cosi': la carta faceva il suo conto (risparmio rispetto all'insegna piu'
+ * cara) e la schermata il suo (budget meno spesa), e si leggevano due numeri
+ * diversi per lo stesso piano a un tocco di distanza. Due conti giusti che
+ * rispondono a due domande diverse sono peggio di un conto sbagliato: nessuno
+ * dei due sembra un errore, e non si capisce a quale credere.
+ *
+ * Quando il risparmio non c'e' — budget non impostato, o nessun prezzo — non
+ * si scrive zero: va grande la spesa e il titolo cambia. Quando invece si e'
+ * sopra il budget va grande di quanto, con il titolo dei risultati.
  */
 
 import { Platform, Pressable, StyleSheet, View } from "react-native";
@@ -38,20 +48,32 @@ export function CartaPiano({
   spesa,
   valuta,
   risparmio,
+  sfora = false,
+  periodo = "a settimana",
   prodotti,
   giorni,
   onPress,
 }: {
   spesa: number;
   valuta: string;
-  /** Rispetto all'insegna piu' cara. `null` quando non si e' potuto calcolare. */
+  /**
+   * Budget meno spesa. Quando `sfora` e' vero e' invece di quanto si e' sopra:
+   * e' lo stesso valore che la schermata del piano mette in grande, ed e' lei
+   * a sceglierlo — qui si disegna soltanto.
+   */
   risparmio?: number | null;
+  /** Si sta spendendo piu' del budget. Cambia il titolo, non il disegno. */
+  sfora?: boolean;
+  /** «a settimana» o «al mese», secondo la frequenza scelta. */
+  periodo?: string;
   prodotti: number;
   giorni: number;
   onPress: () => void;
 }) {
-  const siRisparmia = typeof risparmio === "number" && risparmio > 0;
-  const cifra = Math.round(siRisparmia ? risparmio : spesa);
+  const quanto = typeof risparmio === "number" ? risparmio : 0;
+  const siRisparmia = !sfora && quanto > 0;
+  const mostraRisparmio = sfora ? quanto > 0 : siRisparmia;
+  const cifra = Math.round(mostraRisparmio ? quanto : spesa);
 
   /* La striscia non ripete mai la cifra grande: se sopra c'e' il risparmio,
      sotto c'e' la spesa; se sopra c'e' gia' la spesa, restano in due. */
@@ -77,9 +99,11 @@ export function CartaPiano({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={
-        siRisparmia
-          ? `Il tuo piano: risparmi ${cifra} ${valuta} sulla settimana, spesa ${Math.round(spesa)} ${valuta}. Apri il piano`
-          : `Il tuo piano: spesa ${cifra} ${valuta} sulla settimana. Apri il piano`
+        sfora
+          ? `Il tuo piano: ${cifra} ${valuta} sopra il budget. Apri il piano`
+          : siRisparmia
+            ? `Il tuo piano: risparmi ${cifra} ${valuta}, spesa ${Math.round(spesa)} ${valuta}. Apri il piano`
+            : `Il tuo piano: spesa ${cifra} ${valuta}. Apri il piano`
       }
       onPress={onPress}
       style={({ pressed }) => [stili.carta, pressed && stili.premuta]}
@@ -98,17 +122,19 @@ export function CartaPiano({
       </View>
 
       <Body style={stili.titolo}>
-        {siRisparmia ? "Ecco quanto stai risparmiando." : "La tua settimana è pronta."}
+        {sfora
+          ? "Qualche ritocco e ci siamo."
+          : siRisparmia
+            ? "Ecco quanto stai risparmiando."
+            : "La tua settimana è pronta."}
       </Body>
 
       <View style={stili.cifra}>
         <Body style={stili.valuta}>{valuta}</Body>
         <Body style={stili.numero}>{cifra}</Body>
-        <Body style={stili.periodo}>{siRisparmia ? "in meno" : "a settimana"}</Body>
+        <Body style={stili.periodo}>{sfora ? "oltre il budget" : periodo}</Body>
       </View>
-      {siRisparmia ? (
-        <Body style={stili.nota}>rispetto all'insegna più cara della tua città</Body>
-      ) : null}
+      {siRisparmia ? <Body style={stili.nota}>rispetto al budget che hai messo</Body> : null}
 
       <View style={stili.striscia}>
         {colonne.map((c) => (

@@ -34,6 +34,9 @@ import { useSession } from "../lib/state/session";
 import { useUtente } from "../lib/state/utente";
 import { fotoNota } from "../lib/recipes/foto";
 import { dayIndex, localDay } from "../lib/days";
+import { computeResults } from "../lib/results/compute-results";
+import { pricingFromOffers } from "../lib/plan-full";
+import { simboloValuta } from "../lib/format";
 import { useI18n } from "../lib/i18n";
 import { kv } from "../lib/kv";
 import { colors, font, radius, spacing } from "../theme";
@@ -86,8 +89,34 @@ function salutoDelMomento(): string {
 export function CruscottoOggi() {
   const router = useRouter();
   const { language } = useI18n();
-  const { currentPlan, planExtra } = useSession();
+  const { profile, currentPlan, planExtra } = useSession();
   const { utente } = useUtente();
+
+  /**
+   * I numeri della carta, calcolati come li calcola la schermata del piano.
+   *
+   * PERCHE' NON A MANO, QUI
+   * -----------------------
+   * Li facevo a mano, e dicevano un'altra cosa. La carta in home mostrava
+   * «68 EUR» — la spesa — e la schermata in fondo al tocco «82 € risparmiati»:
+   * due numeri diversi per lo stesso piano, a un tocco di distanza. Non era un
+   * errore di calcolo, era peggio: contavano due cose diverse. La carta
+   * guardava il risparmio rispetto all'insegna piu' cara, che senza prezzi
+   * veri di piu' insegne non esiste; la schermata guarda il budget meno la
+   * spesa, che esiste sempre.
+   *
+   * `computeResults` e' l'unico posto dove budget, risparmio e punteggio
+   * vengono decisi — lo dice la sua schermata in cima al file — e adesso lo e'
+   * anche per la home. `pricingFromOffers` e' sincrona e lavora su quello che
+   * c'e' gia' in memoria: nessuna richiesta in piu' per disegnare una carta.
+   */
+  const conti = useMemo(() => {
+    if (!currentPlan) return null;
+    const prezzi = planExtra?.prodotti?.length
+      ? pricingFromOffers(planExtra, currentPlan.groceryList)
+      : null;
+    return computeResults({ profile, plan: currentPlan, pricing: prezzi });
+  }, [profile, currentPlan, planExtra]);
 
   /* Il giorno di oggi dentro il piano. `getDay()` conta da domenica, i giorni
      del piano da lunedì: la rotazione allinea i due calendari. */
@@ -154,12 +183,14 @@ export function CruscottoOggi() {
           stesso oggetto in fondo al tocco dice che si e' arrivati dove si
           voleva. Due stili diversi per la stessa cosa farebbero sembrare la
           seconda un'altra pagina. */}
-      {planExtra ? (
+      {conti ? (
         <CartaPiano
-          spesa={planExtra.totali.spesaAlMiglioPrezzo}
-          valuta={planExtra.totali.valuta}
-          risparmio={planExtra.risparmioVsPiuCara}
-          prodotti={planExtra.totali.vociInLista}
+          spesa={conti.estimatedSpend}
+          valuta={simboloValuta(profile.currency, language)}
+          risparmio={conti.status === "over" ? conti.overBudgetAmount : conti.savings}
+          sfora={conti.status === "over"}
+          periodo={profile.frequency === "monthly" ? "al mese" : "a settimana"}
+          prodotti={currentPlan.groceryList.length}
           giorni={currentPlan.mealPlan.length}
           onPress={() => router.push("/risultati")}
         />
