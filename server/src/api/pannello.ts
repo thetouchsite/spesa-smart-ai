@@ -32,7 +32,7 @@
 import { chiStaLavorando, giriPassati } from "./giri.js";
 import { comandi, isDbConfigured } from "../base/db.js";
 import { giroContinuo } from "./prezzi-continuo.js";
-import { assicuraFonti } from "./catalogo-fonti.js";
+import { assicuraFonti, tutteLeFonti } from "./catalogo-fonti.js";
 import { contiPesanti } from "./statistiche.js";
 import { statoMagazzino } from "./prezzi-magazzino.js";
 import { statoCataloghi } from "./catalogo-magazzino.js";
@@ -84,7 +84,28 @@ const MINUTI_A_MANO = Number(process.env.PANNELLO_MINUTI ?? 60);
  * dodici negozi diversi a ogni istante — e il giro successivo riparte dai paesi
  * dopo, perche' l'ordine ruota a ogni avvio.
  */
-const PAESI_A_MANO = Number(process.env.PANNELLO_PAESI ?? 12);
+const PAESI_A_MANO = Number(process.env.PANNELLO_PAESI ?? 4);
+
+/**
+ * I paesi in ordine di quanto rendono, e mai quelli al buio.
+ *
+ * Il primo giro lanciato a mano ha preso AL AR AT BA BE BG BR CA CH CZ DE DK —
+ * l'ordine alfabetico. Dentro c'erano BA, BE e CA, dove NESSUNA insegna
+ * pubblica i prezzi: pagine aperte sapendo gia' che non avrebbero dato niente.
+ * La resa e' scesa dall'80% di una notte normale al 33%: due pagine su tre
+ * buttate, e ogni pagina buttata e' comunque una richiesta a un negozio.
+ *
+ * Il punteggio e' la somma di `resa x stimati` delle insegne del paese: quante
+ * schede prezzate ci si puo' aspettare di trovarci. Chi fa zero non entra mai.
+ */
+function paesiCheRendono(): string[] {
+  const punteggio = new Map<string, number>();
+  for (const f of tutteLeFonti()) {
+    if (f.resa <= 0) continue;
+    punteggio.set(f.paese, (punteggio.get(f.paese) ?? 0) + f.resa * f.stimati);
+  }
+  return [...punteggio.entries()].sort((a, b) => b[1] - a[1]).map(([p]) => p);
+}
 
 /* Da dove ricominciare il prossimo giro. Senza, un pulsante premuto dieci volte
    rifarebbe dieci volte i primi dodici paesi e gli altri ventisei non li
@@ -120,7 +141,8 @@ export async function avviaQui(chiave: string): Promise<string> {
   if (quante === 0) return "Nessuna insegna sul database: non c'e' niente da leggere.";
 
   /* Si ruota: ogni avvio riparte da dove aveva smesso il precedente. */
-  const tutti = paesiConCatalogo();
+  const tutti = paesiCheRendono();
+  if (tutti.length === 0) return "Nessun paese con insegne che pubblicano prezzi.";
   const scelti: string[] = [];
   for (let i = 0; i < Math.min(PAESI_A_MANO, tutti.length); i++) {
     scelti.push(tutti[(daQualePaese + i) % tutti.length]);

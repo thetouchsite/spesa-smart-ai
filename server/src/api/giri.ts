@@ -33,7 +33,8 @@
  * serve che nessuno glielo comunichi.
  */
 
-import { hostname, totalmem, freemem, loadavg, uptime } from "node:os";
+import { hostname, totalmem, loadavg, uptime } from "node:os";
+import { readFileSync } from "node:fs";
 import { comandi, giri, isDbConfigured, type GiroDoc } from "../base/db.js";
 
 /** Oltre questo silenzio il lettore si considera morto, non lento. */
@@ -60,17 +61,56 @@ const QUESTA_MACCHINA = process.env.NOME_MACCHINA ?? hostname();
 const CHIAVE_BATTITO = `battito-${QUESTA_MACCHINA}-${process.pid}`;
 
 /**
- * Come sta la macchina che legge, in tre numeri.
+ * Il tetto di memoria VERO, che dentro un container non e' quello della macchina.
+ *
+ * `os.totalmem()` legge `/proc/meminfo`, e quel file dentro un container non e'
+ * isolato: mostra il computer fisico. Su Render diceva 31.387 MB — trentun giga
+ * del server condiviso con gli altri clienti — mentre il nostro servizio ne ha
+ * 512. Il risultato era un indicatore cieco proprio dove serviva: potevamo
+ * essere a 480 MB su 512, a un respiro dall'essere uccisi, e la barra restava
+ * tranquilla perche' guardava il serbatoio della macchina accanto. E' successo:
+ * Render ci ha uccisi per memoria mentre il pannello dava tutto sereno.
+ *
+ * Il limite vero sta nel cgroup. Due posti, perche' ci sono due versioni di
+ * cgroup in giro, e nessuno dei due esiste fuori da Linux — su Windows si torna
+ * alla RAM della macchina, che li' e' la risposta giusta: il PC non e' dentro
+ * nessun container.
+ */
+function tettoMemoria(): number {
+  for (const dove of ["/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"]) {
+    try {
+      const t = readFileSync(dove, "utf8").trim();
+      /* `max` vuol dire «nessun limite»: e' il caso di un Linux non in container. */
+      if (t && t !== "max") {
+        const n = Number(t);
+        /* Un limite assurdamente grande e' il modo di cgroup v1 di dire «nessuno». */
+        if (Number.isFinite(n) && n > 0 && n < 1024 ** 4) return n;
+      }
+    } catch {
+      /* Il file non c'e': non siamo in un container, o non e' Linux. */
+    }
+  }
+  return totalmem();
+}
+
+const TETTO_MEMORIA = tettoMemoria();
+
+/**
+ * Come sta chi legge, in tre numeri.
+ *
+ * La memoria e' quella DEL NOSTRO PROCESSO, non della macchina: `rss` e' cio'
+ * che il sistema conta per decidere se ucciderci, quindi e' l'unico numero che
+ * predice il guaio. Quella libera sulla macchina non c'entra niente — e su
+ * Render parlava di un altro computer.
  *
  * Su Windows `loadavg()` torna sempre zero: e' una misura che il sistema non
- * tiene. Non si finge — si lascia zero, e chi guarda il pannello vede che li'
- * quel dato non c'e' invece di leggerne uno inventato.
+ * tiene. Non si finge — si lascia zero, e il pannello scrive «non misurato»
+ * invece di mostrare uno zero che sembra un carico bassissimo.
  */
 function comeSta() {
-  const tot = totalmem();
   return {
-    ramUsataMb: Math.round((tot - freemem()) / 1048576),
-    ramTotaleMb: Math.round(tot / 1048576),
+    ramUsataMb: Math.round(process.memoryUsage().rss / 1048576),
+    ramTotaleMb: Math.round(TETTO_MEMORIA / 1048576),
     carico: Math.round(loadavg()[0] * 100) / 100,
     accesaDaSec: Math.round(uptime()),
   };

@@ -127,7 +127,12 @@ const cataloghiLetti = new Map<string, Array<{ url: string; nome: string }>>();
  * stanno. Quando si supera il tetto si butta via il catalogo letto per primo:
  * alla prossima passata si rilegge, e costa un gunzip invece di un 502.
  */
-const MAX_VOCI_IN_MEMORIA = Number(process.env.GIRO_MAX_VOCI ?? 60_000);
+/* Ventimila e non sessantamila, e il valore di prima era una misura fatta su
+   una macchina con sedici giga. Su Render, mezzo giga in tutto, sessantamila
+   voci tenute in memoria piu' il picco della decompressione ci hanno fatti
+   uccidere due volte in una notte: la seconda con la mail di Render alle 02:54.
+   Chi ha memoria da spendere alza la variabile e se la riprende. */
+const MAX_VOCI_IN_MEMORIA = Number(process.env.GIRO_MAX_VOCI ?? 20_000);
 let vociInMemoria = 0;
 
 function faiPosto(quante: number): void {
