@@ -29,6 +29,7 @@ import {
 import { ping } from "../src/api/client";
 import { useSession } from "../src/lib/state/session";
 import { useUtente } from "../src/lib/state/utente";
+import { CruscottoOggi } from "../src/components/cruscotto-oggi";
 import { QuotaBanner } from "../src/components/quota-banner";
 import { deviceDefaults } from "../src/lib/format";
 import { BottoneCaldo, GrigliaPromesse, HeroHome } from "../src/components/hero-home";
@@ -75,8 +76,36 @@ export default function Home() {
     if (__DEV__) ping().then(setApi);
   }, []);
 
+  /* CHI E' ENTRATO NON VEDE LA VETRINA.
+     La home con l'eroe e «Crea il mio piano» serve a chi non sa ancora cosa fa
+     l'app. A chi ha gia' un piano in corso chiede ogni volta di ricominciare
+     da capo — e' l'unica cosa che offre — mentre la domanda che si fa aprendo
+     l'app alle sette di sera e' un'altra: cosa mangio stasera, e ho comprato
+     tutto? Quella risposta e' il cruscotto. */
+  if (utente) {
+    return (
+      <Screen barra>
+        <TopBar
+          logo
+          right={
+            <Button
+              label=""
+              nomeAccessibile="Il tuo account"
+              icon="person-circle"
+              variant="ghost"
+              style={styles.iconaAccount}
+              onPress={() => router.push("/piani")}
+            />
+          }
+        />
+        <QuotaBanner />
+        <CruscottoOggi />
+      </Screen>
+    );
+  }
+
   return (
-    <Screen barra>
+    <Screen>
       {/* L'account sta nella barra in alto e non solo piu' in basso nell'elenco:
           li' bisognava scorrere per trovarlo, e una porta che si trova solo
           scorrendo e' una porta che non si trova. L'icona cambia a seconda che
@@ -167,19 +196,15 @@ export default function Home() {
       <Card>
         {/* L'account sta in cima e non dentro le impostazioni: le schermate
             d'accesso esistevano gia' ma l'unico modo di raggiungerle era due
-            tocchi dentro un menu', dietro un'icona a ingranaggio. Una porta
-            che non si vede e' una porta che non c'e'.
-
-            La riga cambia faccia: a chi e' entrato mostra i suoi piani, a chi
-            non lo e' spiega a cosa serve un account invece di dire «accedi»,
-            che non e' un motivo. */}
+        {/* Qui ci arriva solo chi NON e' entrato: il cruscotto intercetta gli
+            altri molto piu' su. Quindi niente rami — una riga sola, che spiega
+            a cosa serve un account invece di dire «accedi», che non e' un
+            motivo per fare niente. */}
         <ListRow
-          icon={utente ? "person-circle-outline" : "person-add-outline"}
-          title={utente ? utente.displayName || ui("Il tuo account") : ui("Accedi o registrati")}
-          subtitle={
-            utente ? (utente.email ?? undefined) : ui("Per ritrovare i tuoi piani su ogni telefono")
-          }
-          onPress={() => router.push(utente ? "/piani" : "/accedi")}
+          icon="person-add-outline"
+          title={ui("Accedi o registrati")}
+          subtitle={ui("Per ritrovare i tuoi piani su ogni telefono")}
+          onPress={() => router.push("/accedi")}
         />
         <ListRow
           icon="settings-outline"

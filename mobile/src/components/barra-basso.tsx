@@ -21,6 +21,11 @@
  * sei senza dover riconoscere quattro simboli, e tiene la barra stretta.
  * Un'icona senza testo resta comunque leggibile da chi usa il lettore di
  * schermo, perché il nome sta in `accessibilityLabel`.
+ *
+ * E NON SI VEDE DA SCONOSCIUTI
+ * ----------------------------
+ * Tre delle quattro destinazioni, senza un piano, sono stanze vuote. Vedi
+ * `if (stato !== "dentro")` più sotto.
  */
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -28,6 +33,7 @@ import { usePathname, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, font, radius, shadow, spacing } from "../theme";
+import { useUtente } from "../lib/state/utente";
 
 interface Voce {
   chiave: string;
@@ -47,6 +53,18 @@ export function BarraBasso() {
   const router = useRouter();
   const percorso = usePathname();
   const insets = useSafeAreaInsets();
+  const { stato } = useUtente();
+
+  /* CHI NON E' ENTRATO NON LA VEDE, e la regola sta qui invece che nelle
+     quattro schermate che la mostrano: sparpagliata, ci si dimentica sempre
+     della quinta.
+
+     Il motivo non e' commerciale ma pratico: da sconosciuti tre delle quattro
+     destinazioni sono vuote — non c'e' un menu', non c'e' una lista, non ci
+     sono piani salvati. Una barra che porta in tre stanze vuote insegna solo
+     che l'app non funziona. La strada, da li', e' una sola: generare un piano.
+     Quando ce l'ha, la barra compare e porta in posti pieni. */
+  if (stato !== "dentro") return null;
 
   return (
     <View
