@@ -100,7 +100,11 @@ export default function RegistratiScreen() {
           variant="secondary"
           onPress={() => router.replace({ pathname: "/accedi", params: { email } })}
         />
-        <Button label="Continua senza account" variant="ghost" onPress={() => router.replace("/")} />
+        <Button
+          label="Continua senza account"
+          variant="ghost"
+          onPress={() => router.replace("/")}
+        />
       </View>
     </Screen>
   );

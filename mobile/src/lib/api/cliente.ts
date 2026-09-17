@@ -113,7 +113,9 @@ export const utenteApi = {
     chiama<Identita>("POST", "/auth/login", { corpo: { email, password } }),
 
   chiSono: (token: string) =>
-    chiama<{ email: string; displayName: string | null; createdAt: string }>("GET", "/me", { token }),
+    chiama<{ email: string; displayName: string | null; createdAt: string }>("GET", "/me", {
+      token,
+    }),
 
   passwordDimenticata: (email: string) =>
     chiama<{ ok: true; messaggio: string; codiceSoloPerProve?: string }>(
@@ -128,7 +130,10 @@ export const utenteApi = {
     }),
 
   passwordCambia: (token: string, attuale: string, nuova: string) =>
-    chiama<{ token: string }>("POST", "/auth/password/cambia", { token, corpo: { attuale, nuova } }),
+    chiama<{ token: string }>("POST", "/auth/password/cambia", {
+      token,
+      corpo: { attuale, nuova },
+    }),
 
   eliminaAccount: (token: string, password: string) =>
     chiama<{ ok: true; pianiCancellati: number }>("POST", "/account/elimina", {

@@ -10,7 +10,7 @@
  * periferia nessuno.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, View } from "react-native";
 import {
   Body,
@@ -31,6 +31,13 @@ import { searchNearbyStores } from "../src/lib/location";
 import type { NearbyStore } from "../src/lib/location/providers/types";
 import { loadResolvedLocation } from "../src/lib/location/store";
 import { colors, font, radius, spacing } from "../src/theme";
+import { useSession } from "../src/lib/state/session";
+import {
+  eDellaLista,
+  insegnaCorrispondente,
+  insegneDellaLista,
+  preparaInsegne,
+} from "../src/lib/retailers/insegne-della-lista";
 import { uiText } from "../src/lib/ui-strings";
 import { useI18n } from "../src/lib/i18n";
 import { tornaIndietro } from "../src/lib/navigazione";
@@ -39,6 +46,16 @@ const RADII = [1, 3, 5, 10];
 
 export default function NegoziScreen() {
   const { language } = useI18n();
+
+  /* Le insegne da cui vengono i prezzi della lista. Si preparano una volta:
+     l'elenco dei negozi si ridisegna a ogni scorrimento, e rifare il lavoro
+     trenta volte per schermata sarebbe sprecato. */
+  const { planExtra } = useSession();
+  const insegne = useMemo(
+    () => preparaInsegne((planExtra?.catene ?? []).map((c) => c.negozio)),
+    [planExtra],
+  );
+  const parole = useMemo(() => insegneDellaLista(insegne.map((i) => i.insegna)), [insegne]);
   /** Testo nella lingua scelta dall'utente. */
   const ui = (t: string) => uiText(t, language);
   const [radius_, setRadius] = useState(3);
@@ -129,25 +146,47 @@ export default function NegoziScreen() {
       {!loading && stores.length > 0 ? (
         <Card>
           <Label icon="storefront-outline">{stores.length} negozi trovati</Label>
-          {stores.map((s) => (
-            <ListRow
-              key={s.id}
-              icon="cart-outline"
-              title={s.name}
-              subtitle={[s.address, s.openingHours].filter(Boolean).join(" · ") || undefined}
-              onPress={() => openMaps(s)}
-              right={
-                <View style={styles.distance}>
-                  <Body style={styles.distanceText}>
-                    {s.distanceKm < 1
-                      ? `${Math.round(s.distanceKm * 1000)} m`
-                      : `${s.distanceKm.toFixed(1)} km`}
-                  </Body>
-                  <Ionicons name="navigate-outline" size={15} color={colors.primary} />
-                </View>
-              }
-            />
-          ))}
+          {/* I negozi della lista in cima: se ce n'e' uno a ottocento metri e
+              dieci botteghe piu' vicine, quello che serve e' l'ottavo della
+              fila e non lo vede nessuno. A parita', vince il piu' vicino. */}
+          {[...stores]
+            .sort((a, b) => {
+              const da = eDellaLista(a.name, parole) ? 0 : 1;
+              const db = eDellaLista(b.name, parole) ? 0 : 1;
+              return da !== db ? da - db : a.distanceKm - b.distanceKm;
+            })
+            .map((s) => {
+              const dellaLista = eDellaLista(s.name, parole);
+              const quale = dellaLista ? insegnaCorrispondente(s.name, insegne) : null;
+              return (
+                <ListRow
+                  key={s.id}
+                  icon={dellaLista ? "pricetag" : "cart-outline"}
+                  title={s.name}
+                  subtitle={
+                    quale
+                      ? `Prezzi della tua lista letti su ${quale}`
+                      : [s.address, s.openingHours].filter(Boolean).join(" · ") || undefined
+                  }
+                  onPress={() => openMaps(s)}
+                  right={
+                    <View style={styles.distance}>
+                      <View style={styles.distanceRiga}>
+                        {dellaLista ? (
+                          <Ionicons name="star" size={13} color={colors.accent} />
+                        ) : null}
+                        <Body style={styles.distanceText}>
+                          {s.distanceKm < 1
+                            ? `${Math.round(s.distanceKm * 1000)} m`
+                            : `${s.distanceKm.toFixed(1)} km`}
+                        </Body>
+                      </View>
+                      <Ionicons name="navigate-outline" size={15} color={colors.primary} />
+                    </View>
+                  }
+                />
+              );
+            })}
         </Card>
       ) : null}
 
@@ -183,7 +222,14 @@ const styles = StyleSheet.create({
   radiusText: { fontSize: font.size.sm, color: colors.mutedForeground },
   radiusTextOn: { color: colors.primary, fontWeight: font.weight.semibold },
   distance: { alignItems: "flex-end", gap: 2 },
-  distanceText: { fontSize: font.size.sm, fontWeight: font.weight.semibold, color: colors.foreground },
+  /* La stella accanto alla distanza e non sopra: in colonna sembrava una
+     seconda informazione, in riga e' un aggettivo di quella distanza. */
+  distanceRiga: { flexDirection: "row", alignItems: "center", gap: 4 },
+  distanceText: {
+    fontSize: font.size.sm,
+    fontWeight: font.weight.semibold,
+    color: colors.foreground,
+  },
   pressed: { opacity: 0.8 },
   note: { backgroundColor: colors.muted },
   small: { fontSize: font.size.sm, color: colors.mutedForeground, lineHeight: 20 },

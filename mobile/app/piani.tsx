@@ -99,7 +99,7 @@ export default function PianiScreen() {
 
   if (stato === "carico") {
     return (
-      <Screen>
+      <Screen barra>
         <TopBar title="I tuoi piani" onBack={() => tornaIndietro()} />
         <Loading text="Carico i tuoi piani…" />
       </Screen>
@@ -178,8 +178,8 @@ export default function PianiScreen() {
         {accesso !== "dentro" && piani.length > 0 ? (
           <Card>
             <Body style={styles.invito}>
-              Questi piani stanno solo su questo telefono. Con un account li ritrovi ovunque,
-              anche se lo cambi.
+              Questi piani stanno solo su questo telefono. Con un account li ritrovi ovunque, anche
+              se lo cambi.
             </Body>
             <Button
               label="Crea un account"

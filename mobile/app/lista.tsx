@@ -232,7 +232,7 @@ export default function ListaScreen() {
 
   if (!currentPlan) {
     return (
-      <Screen>
+      <Screen barra>
         <View style={styles.empty}>
           <Title>{ui("Nessuna lista")}</Title>
           <Subtitle>{ui("Crea prima un piano.")}</Subtitle>
@@ -286,8 +286,16 @@ export default function ListaScreen() {
     <Screen
       footer={
         <View style={styles.actions}>
-          <Button label={ui("Condividi la lista")} icon="share-social-outline" onPress={() => void shareList()} />
-          <Button label={ui("Torna ai risultati")} variant="ghost" onPress={() => tornaIndietro("/risultati")} />
+          <Button
+            label={ui("Condividi la lista")}
+            icon="share-social-outline"
+            onPress={() => void shareList()}
+          />
+          <Button
+            label={ui("Torna ai risultati")}
+            variant="ghost"
+            onPress={() => tornaIndietro("/risultati")}
+          />
         </View>
       }
     >
@@ -436,7 +444,9 @@ export default function ListaScreen() {
       <Card style={styles.note}>
         <Label icon="information-circle-outline">{ui("Sui prezzi e sui link")}</Label>
         <Body style={styles.small}>
-          {ui("Ogni prezzo è quello trovato sul sito del negozio, e il link porta alla pagina di quel prodotto. Tocca una voce per vedere tutte le offerte a confronto.")}
+          {ui(
+            "Ogni prezzo è quello trovato sul sito del negozio, e il link porta alla pagina di quel prodotto. Tocca una voce per vedere tutte le offerte a confronto.",
+          )}
         </Body>
       </Card>
     </Screen>

@@ -71,7 +71,7 @@ export default function MenuScreen() {
 
   if (!currentPlan) {
     return (
-      <Screen>
+      <Screen barra>
         <TopBar onBack={() => tornaIndietro()} />
         <View style={styles.empty}>
           <Title>{ui("Nessun menù")}</Title>
@@ -109,7 +109,11 @@ export default function MenuScreen() {
           <Card key={`${day.day}-${i}`}>
             <View style={styles.dayHead}>
               <Label icon="calendar-outline">{localDay(day.day, language)}</Label>
-              {zeroSpend ? <Pill tone="success" icon="leaf-outline">{ui("spesa zero")}</Pill> : null}
+              {zeroSpend ? (
+                <Pill tone="success" icon="leaf-outline">
+                  {ui("spesa zero")}
+                </Pill>
+              ) : null}
             </View>
 
             {MEALS.map((m) => {
@@ -132,12 +136,7 @@ export default function MenuScreen() {
                       gratuiti cadono, e un riquadro rotto e' peggio. Il
                       credito nelle miniature non si mostra — non ci starebbe —
                       e infatti compare sotto la foto grande, nella ricetta. */}
-                  <DishPhoto
-                    uri={fotoNota(dish)?.url}
-                    nome={dish}
-                    style={styles.thumb}
-                    compatto
-                  />
+                  <DishPhoto uri={fotoNota(dish)?.url} nome={dish} style={styles.thumb} compatto />
                   <View style={styles.mealText}>
                     <View style={styles.mealTop}>
                       <Ionicons name={m.icon} size={13} color={colors.mutedForeground} />

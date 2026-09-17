@@ -37,6 +37,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LanguagePicker } from "./language-picker";
 import { colors, font, radius, shadow, spacing } from "../theme";
+import { BarraBasso } from "./barra-basso";
 
 /** Il serif di sistema per i titoli: il prototipo usa un display serif, e
     caricarne uno costerebbe mezzo megabyte nel pacchetto. */
@@ -51,12 +52,21 @@ export function Screen({
   scroll = true,
   footer,
   edgeToEdge = false,
+  barra = false,
 }: {
   children: ReactNode;
   scroll?: boolean;
   footer?: ReactNode;
   /** Toglie il margine superiore: per le schermate che iniziano con un'immagine. */
   edgeToEdge?: boolean;
+  /**
+   * La barra di navigazione che galleggia in basso.
+   *
+   * Non c'e' ovunque: nelle sei domande dell'avvio sarebbe un invito a
+   * scappare a meta' strada, e nel caricatore non ci sarebbe niente da
+   * raggiungere. Si accende sulle quattro schermate dove si torna spesso.
+   */
+  barra?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   /* SENZA SCORRIMENTO SERVE UN'ALTEZZA DA RIEMPIRE.
@@ -82,7 +92,9 @@ export function Screen({
     <View style={styles.screen}>
       {scroll ? (
         <ScrollView
-          contentContainerStyle={{ paddingBottom: spacing.xxxl }}
+          /* Lo spazio in fondo tiene conto della barra: senza, l'ultima riga
+             dell'elenco finisce sotto la pillola e non si riesce a premerla. */
+          contentContainerStyle={{ paddingBottom: barra ? 116 : spacing.xxxl }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -94,6 +106,7 @@ export function Screen({
       {footer ? (
         <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>{footer}</View>
       ) : null}
+      {barra ? <BarraBasso /> : null}
     </View>
   );
 }
@@ -471,7 +484,9 @@ export function Campo({
              un modo di far sbagliare: "Mario@" non e' l'indirizzo di nessuno. */
           autoCapitalize={tipo === "testo" ? "sentences" : "none"}
           autoCorrect={tipo === "testo"}
-          keyboardType={tipo === "email" ? "email-address" : tipo === "cifre" ? "number-pad" : "default"}
+          keyboardType={
+            tipo === "email" ? "email-address" : tipo === "cifre" ? "number-pad" : "default"
+          }
           textContentType={segreto ? "password" : tipo === "email" ? "emailAddress" : "none"}
           maxLength={tipo === "cifre" ? 6 : 200}
           placeholderTextColor={colors.mutedForeground}
@@ -500,20 +515,120 @@ export function Campo({
   );
 }
 
+/**
+ * Un riquadro quadrato con l'icona in un disco tinto.
+ *
+ * E' l'elemento che nel riferimento riempie la griglia a due colonne. Serve a
+ * un tipo di contenuto preciso: una destinazione, non un dato. Per i numeri
+ * c'e' `Stat`, che ha un'altra gerarchia — li' comanda la cifra, qui il gesto.
+ *
+ * La tinta si sceglie fra quattro, e non a caso: righe adiacenti con lo stesso
+ * disco sembrano un errore di copia-incolla, e un arcobaleno sembra una
+ * tavolozza. Quattro bastano a far respirare una griglia senza farla gridare.
+ */
+export function Riquadro({
+  icona,
+  titolo,
+  sotto,
+  tinta = "verde",
+  onPress,
+}: {
+  icona: IconName;
+  titolo: string;
+  sotto?: string;
+  tinta?: "verde" | "ambra" | "blu" | "viola";
+  onPress?: () => void;
+}) {
+  const fondi = {
+    verde: colors.tintaVerde,
+    ambra: colors.tintaAmbra,
+    blu: colors.tintaBlu,
+    viola: colors.tintaViola,
+  } as const;
+  const inchiostri = {
+    verde: colors.primary,
+    ambra: colors.accent,
+    blu: "#2E5E8F",
+    viola: "#6A4FA3",
+  } as const;
+
+  return (
+    <Pressable
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={sotto ? `${titolo}. ${sotto}` : titolo}
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => [styles.riquadro, pressed && onPress && styles.pressed]}
+    >
+      <View style={[styles.riquadroDisco, { backgroundColor: fondi[tinta] }]}>
+        <Ionicons name={icona} size={21} color={inchiostri[tinta]} />
+      </View>
+      <Text style={styles.riquadroTitolo}>{titolo}</Text>
+      {sotto ? <Text style={styles.riquadroSotto}>{sotto}</Text> : null}
+    </Pressable>
+  );
+}
+
+/**
+ * Le pillole di filtro in cima a un elenco.
+ *
+ * Quella attiva e' PIENA, non solo bordata: su uno schermo piccolo, alla luce
+ * del sole, un bordo di un pixel non si vede e l'utente non sa cosa sta
+ * guardando.
+ */
+export function Filtri<T extends string>({
+  voci,
+  scelta,
+  onScegli,
+}: {
+  voci: ReadonlyArray<{ chiave: T; etichetta: string }>;
+  scelta: T;
+  onScegli: (v: T) => void;
+}) {
+  return (
+    <View style={styles.filtri}>
+      {voci.map((v) => {
+        const attiva = v.chiave === scelta;
+        return (
+          <Pressable
+            key={v.chiave}
+            accessibilityRole="button"
+            accessibilityState={{ selected: attiva }}
+            onPress={() => onScegli(v.chiave)}
+            style={({ pressed }) => [
+              styles.filtro,
+              attiva && styles.filtroAttivo,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={[styles.filtroTesto, attiva && styles.filtroTestoAttivo]}>
+              {v.etichetta}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 export { Ionicons };
 
 /* ─────────────────────────────── Stili ──────────────────────────────── */
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  /* Il fondo tinto e non il bianco sporco: e' quello che fa galleggiare le
+     schede. Con pagina e scheda dello stesso colore, ombre e angoli non si
+     vedono e il restyling non esiste. */
+  screen: { flex: 1, backgroundColor: colors.pagina },
   screenBody: { paddingHorizontal: spacing.lg, gap: spacing.lg },
   screenBodyPieno: { flex: 1 },
   footer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
     backgroundColor: colors.card,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    ...shadow.raised,
   },
 
   topBar: {
@@ -524,14 +639,13 @@ const styles = StyleSheet.create({
   },
   logo: { width: 108, height: 28 },
   backBtn: {
-    width: 38,
-    height: 38,
+    width: 42,
+    height: 42,
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    ...shadow.card,
   },
   topRight: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   topBarTitle: {
@@ -581,8 +695,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: radius.lg,
     padding: spacing.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    /* NIENTE BORDO. Prima c'era un filo grigio, e insieme all'ombra faceva due
+       lavori uguali: il bordo disegna il limite, l'ombra lo solleva. Tenendoli
+       entrambi la scheda sembrava ritagliata. */
     gap: spacing.sm,
     ...shadow.card,
   },
@@ -596,8 +711,10 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    minHeight: 52,
-    borderRadius: radius.md,
+    minHeight: 54,
+    /* Pillola. Un pulsante ad angoli vivi accanto a schede da 22 pixel di
+       raggio stona: la forma dev'essere una sola in tutta l'app. */
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.xl,
@@ -635,11 +752,13 @@ const styles = StyleSheet.create({
     minHeight: 52,
     paddingVertical: spacing.sm,
   },
+  /* Cerchio, non quadretto arrotondato. E' il segno piu' riconoscibile della
+     forma nuova: l'icona dentro un disco tinto invece che in un riquadro. */
   rowIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.md,
-    backgroundColor: colors.successBg,
+    width: 42,
+    height: 42,
+    borderRadius: radius.pill,
+    backgroundColor: colors.tintaVerde,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -648,6 +767,46 @@ const styles = StyleSheet.create({
   rowSubtitle: { fontSize: font.size.sm, color: colors.mutedForeground },
 
   pressed: { opacity: 0.75 },
+
+  riquadro: {
+    flex: 1,
+    minWidth: 140,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.xs,
+    ...shadow.card,
+  },
+  riquadroDisco: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.sm,
+  },
+  riquadroTitolo: {
+    fontSize: font.size.md,
+    fontWeight: font.weight.semibold,
+    color: colors.foreground,
+  },
+  riquadroSotto: { fontSize: font.size.sm, color: colors.mutedForeground },
+
+  filtri: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  filtro: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.card,
+    ...shadow.card,
+  },
+  filtroAttivo: { backgroundColor: colors.foreground },
+  filtroTesto: {
+    fontSize: font.size.sm,
+    fontWeight: font.weight.medium,
+    color: colors.mutedForeground,
+  },
+  filtroTestoAttivo: { color: colors.primaryForeground },
 
   campoBlocco: { gap: spacing.xs },
   campoEtichetta: {

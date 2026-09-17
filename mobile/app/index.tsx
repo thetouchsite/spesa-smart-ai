@@ -76,7 +76,7 @@ export default function Home() {
   }, []);
 
   return (
-    <Screen>
+    <Screen barra>
       {/* L'account sta nella barra in alto e non solo piu' in basso nell'elenco:
           li' bisognava scorrere per trovarlo, e una porta che si trova solo
           scorrendo e' una porta che non si trova. L'icona cambia a seconda che
@@ -105,7 +105,9 @@ export default function Home() {
       <HeroHome
         titolo={ui("Risparmia sulla spesa")}
         titoloCorsivo={ui("con l'IA")}
-        sottotitolo={ui("Pianifica i pasti, trova i prezzi migliori e fai la spesa in modo intelligente ogni settimana.")}
+        sottotitolo={ui(
+          "Pianifica i pasti, trova i prezzi migliori e fai la spesa in modo intelligente ogni settimana.",
+        )}
         azioni={
           <>
             <BottoneCaldo
@@ -173,7 +175,7 @@ export default function Home() {
             che non e' un motivo. */}
         <ListRow
           icon={utente ? "person-circle-outline" : "person-add-outline"}
-          title={utente ? (utente.displayName || ui("Il tuo account")) : ui("Accedi o registrati")}
+          title={utente ? utente.displayName || ui("Il tuo account") : ui("Accedi o registrati")}
           subtitle={
             utente ? (utente.email ?? undefined) : ui("Per ritrovare i tuoi piani su ogni telefono")
           }
@@ -188,7 +190,7 @@ export default function Home() {
         {/* L'indagine Altroconsumo copre solo il mercato italiano:
             mostrarla a un utente francese sarebbe fuorviante. */}
         {isItaly ? (
-        <ListRow
+          <ListRow
             icon="trophy-outline"
             title={ui("Le catene più economiche")}
             subtitle={ui("Indagine Altroconsumo 2026")}
@@ -217,7 +219,9 @@ export default function Home() {
             che si leggeva aprendo l'app, e negava esattamente cio' che l'app fa
             di meglio. */}
         <Body style={styles.small}>
-          {ui("I prezzi li cerchiamo online nei negozi che consegnano dove vivi, e ogni link viene aperto e controllato prima di mostrartelo. Dove nessun negozio pubblica il prezzo, la voce resta senza: preferiamo dirtelo che inventarlo.")}
+          {ui(
+            "I prezzi li cerchiamo online nei negozi che consegnano dove vivi, e ogni link viene aperto e controllato prima di mostrartelo. Dove nessun negozio pubblica il prezzo, la voce resta senza: preferiamo dirtelo che inventarlo.",
+          )}
         </Body>
       </Card>
 

@@ -30,6 +30,16 @@ export const colors = {
 
   /** Sfondi tenui per gli stati, derivati dai colori sopra. */
   successBg: "#E4F1EA",
+  /* Fondi tinti per le icone dentro i cerchi: quattro toni che convivono con
+     il verde del marchio senza contendergli l'attenzione. */
+  tintaVerde: "#E4F1EA",
+  tintaAmbra: "#FDF0DC",
+  tintaBlu: "#E3ECF5",
+  tintaViola: "#EDE8F6",
+  /* Il fondo della pagina nel nuovo aspetto: appena piu' saturo del bianco
+     sporco di prima, perche' le schede bianche ci si stacchino sopra. Senza
+     questo scarto, riquadri e pagina si confondono e le ombre non servono. */
+  pagina: "#F3F5F1",
   warningBg: "#FDF0DC",
   dangerBg: "#FBE4E3",
 } as const;
@@ -44,11 +54,20 @@ export const spacing = {
   xxxl: 48,
 } as const;
 
+/**
+ * Angoli.
+ *
+ * Sono cresciuti tutti di un gradino nel restyling del 17 settembre. La forma
+ * che si voleva — riquadri che galleggiano su un fondo tinto — regge solo con
+ * raggi generosi: a 12 pixel una scheda sembra un riquadro di modulo, a 20
+ * sembra un oggetto posato sulla pagina. E' la differenza fra un'interfaccia
+ * di lavoro e una che si tocca con le dita.
+ */
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
+  sm: 12,
+  md: 16,
+  lg: 22,
+  xl: 30,
   pill: 999,
 } as const;
 
@@ -78,19 +97,37 @@ export const font = {
  * Impostarli entrambi è l'unico modo per ottenere lo stesso risultato sui due
  * sistemi — su Android le proprietà `shadow*` vengono semplicemente ignorate.
  */
+/**
+ * Ombre.
+ *
+ * Larghe e tenui, non piccole e scure. Un'ombra stretta disegna un bordo e fa
+ * sembrare l'elemento incollato; una larga e appena accennata lo fa galleggiare
+ * — ed e' l'effetto su cui si regge tutta la forma nuova.
+ *
+ * Il colore non e' nero ma l'inchiostro dell'app, leggermente blu: un'ombra
+ * nera su un fondo caldo vira al grigio sporco.
+ */
 export const shadow = {
   card: {
     shadowColor: "#1D2A37",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 18,
+    elevation: 3,
   },
   raised: {
     shadowColor: "#1D2A37",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.12,
+    shadowRadius: 28,
+    elevation: 8,
+  },
+  /** Per la barra in basso, che deve staccarsi dal contenuto che le scorre sotto. */
+  flottante: {
+    shadowColor: "#0B1A12",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 24,
+    elevation: 14,
   },
 } as const;

@@ -43,7 +43,10 @@ import { useI18n } from "../src/lib/i18n";
 import { colors, font, radius, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 
-const STATUS: Record<string, { label: string; tone: "success" | "warning" | "danger"; icon: string }> = {
+const STATUS: Record<
+  string,
+  { label: string; tone: "success" | "warning" | "danger"; icon: string }
+> = {
   comfortable: { label: "Sei dentro il budget", tone: "success", icon: "checkmark-circle-outline" },
   optimized: { label: "Budget usato quasi tutto", tone: "warning", icon: "speedometer-outline" },
   over: { label: "Sopra il budget", tone: "danger", icon: "alert-circle-outline" },
@@ -141,7 +144,11 @@ export default function RisultatiScreen() {
     <Screen
       footer={
         <View style={styles.actions}>
-          <Button label={ui("Vedi il menù")} icon="restaurant-outline" onPress={() => router.push("/menu")} />
+          <Button
+            label={ui("Vedi il menù")}
+            icon="restaurant-outline"
+            onPress={() => router.push("/menu")}
+          />
           <Button
             label={ui("Lista della spesa")}
             variant="secondary"
@@ -222,7 +229,9 @@ export default function RisultatiScreen() {
         senzaRisparmio={
           results.basketTotal !== null
             ? undefined
-            : ui("Non abbastanza prezzi per calcolarlo: le voci senza prezzo non entrano nel totale.")
+            : ui(
+                "Non abbastanza prezzi per calcolarlo: le voci senza prezzo non entrano nel totale.",
+              )
         }
         parziale={
           results.basketTotal !== null && results.missingPrices.length > 0
@@ -262,7 +271,11 @@ export default function RisultatiScreen() {
       </Card>
 
       <View style={styles.grid}>
-        <Stat icon="person-outline" label={ui("A persona / giorno")} value={money(results.costPerPersonPerDay, cur, language)} />
+        <Stat
+          icon="person-outline"
+          label={ui("A persona / giorno")}
+          value={money(results.costPerPersonPerDay, cur, language)}
+        />
         <Stat icon="ribbon-outline" label={ui("Punteggio")} value={`${results.score.total}/100`} />
       </View>
 
@@ -273,7 +286,6 @@ export default function RisultatiScreen() {
           <Body style={styles.muted}>{ui("risparmiati rispetto al tuo budget attuale")}</Body>
         </Card>
       ) : null}
-
 
       <Card>
         <Label icon="compass-outline">Vai a</Label>
@@ -317,13 +329,19 @@ export default function RisultatiScreen() {
           {loading
             ? ui("Sto calcolando i prezzi…")
             : results.savingsAvailable
-              ? ui("Prezzi trovati online nei negozi della tua zona, con i link controllati uno per uno. Dove nessun negozio pubblica il prezzo, la voce resta senza.")
+              ? ui(
+                  "Prezzi trovati online nei negozi della tua zona, con i link controllati uno per uno. Dove nessun negozio pubblica il prezzo, la voce resta senza.",
+                )
               : results.estimatedSpend > 0
-                // I numeri fuori dalla traduzione: sono uguali in ogni lingua,
-                // e tenerli dentro obbligherebbe a un dizionario per ogni conta.
-                ? `${results.missingPrices.length}/${currentPlan.groceryList.length} ` +
-                  ui("prodotti sono rimasti senza prezzo, quindi la spesa vera sarà un po' più alta. Gli altri sono prezzi trovati online, non stime.")
-                : ui("Non siamo riusciti a trovare abbastanza prezzi per questa lista. Il menù e la lista della spesa restano completi, e da ogni voce puoi cercare il prodotto nei negozi.")}
+                ? // I numeri fuori dalla traduzione: sono uguali in ogni lingua,
+                  // e tenerli dentro obbligherebbe a un dizionario per ogni conta.
+                  `${results.missingPrices.length}/${currentPlan.groceryList.length} ` +
+                  ui(
+                    "prodotti sono rimasti senza prezzo, quindi la spesa vera sarà un po' più alta. Gli altri sono prezzi trovati online, non stime.",
+                  )
+                : ui(
+                    "Non siamo riusciti a trovare abbastanza prezzi per questa lista. Il menù e la lista della spesa restano completi, e da ogni voce puoi cercare il prodotto nei negozi.",
+                  )}
         </Body>
       </Card>
 

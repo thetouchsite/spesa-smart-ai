@@ -79,9 +79,7 @@ export default function PasswordDimenticataScreen() {
       await aggiornaToken(esito.token);
       router.replace("/");
     } catch (e) {
-      setErrore(
-        e instanceof RispostaNegativa ? e.message : "Non riesco a cambiare la password.",
-      );
+      setErrore(e instanceof RispostaNegativa ? e.message : "Non riesco a cambiare la password.");
     } finally {
       setInCorso(false);
     }
@@ -114,15 +112,14 @@ export default function PasswordDimenticataScreen() {
         <>
           <View style={styles.testa}>
             <Title>Scegli la password nuova</Title>
-            <Subtitle>
-              Se {email.trim()} è registrata, il codice è in arrivo.
-            </Subtitle>
+            <Subtitle>Se {email.trim()} è registrata, il codice è in arrivo.</Subtitle>
           </View>
 
           {codiceDiProva ? (
             <Card>
               <Body style={styles.prova}>
-                Server in modalità di prova — il codice è <Body style={styles.prova}>{codiceDiProva}</Body>
+                Server in modalità di prova — il codice è{" "}
+                <Body style={styles.prova}>{codiceDiProva}</Body>
               </Body>
             </Card>
           ) : null}
@@ -158,8 +155,8 @@ export default function PasswordDimenticataScreen() {
           </View>
 
           <Body style={styles.avviso}>
-            Se il codice non arriva, il servizio di posta non è ancora attivo su questo
-            server: scrivici e lo reimpostiamo a mano.
+            Se il codice non arriva, il servizio di posta non è ancora attivo su questo server:
+            scrivici e lo reimpostiamo a mano.
           </Body>
         </>
       )}

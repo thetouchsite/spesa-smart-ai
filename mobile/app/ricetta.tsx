@@ -121,7 +121,12 @@ function toRecipe(g: GeneratedRecipe, dish: string, servings: number): Recipe {
 
 /** Identificatore stabile a partire dal nome del piatto. */
 function norm32(t: string): string {
-  return t.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 32) || "ricetta";
+  return (
+    t
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
+      .slice(0, 32) || "ricetta"
+  );
 }
 
 export default function RicettaScreen() {
@@ -168,9 +173,7 @@ export default function RicettaScreen() {
         allergies: profile.allergies,
         // La spesa gia' fatta. Senza, la ricetta si inventava ingredienti che
         // nella lista non c'erano, e chi apriva il piatto non poteva cucinarlo.
-        dispensa: (currentPlan?.groceryList ?? []).map((g) =>
-          `${g.name} ${g.quantity}`.trim(),
-        ),
+        dispensa: (currentPlan?.groceryList ?? []).map((g) => `${g.name} ${g.quantity}`.trim()),
       });
       if (!alive) return;
       setRecipe(result.recipe);
@@ -228,7 +231,10 @@ export default function RicettaScreen() {
       <View style={styles.facts}>
         <Fact value={`${recipe.prepMinutes}′`} label="preparazione" />
         <Fact value={`${recipe.cookMinutes}′`} label="cottura" />
-        <Fact value={`${recipe.servings}`} label={recipe.servings === 1 ? "porzione" : "porzioni"} />
+        <Fact
+          value={`${recipe.servings}`}
+          label={recipe.servings === 1 ? "porzione" : "porzioni"}
+        />
         <Fact value={DIFFICULTY[recipe.difficulty] ?? recipe.difficulty} label={ui("difficoltà")} />
       </View>
 

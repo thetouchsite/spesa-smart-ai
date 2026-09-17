@@ -75,8 +75,8 @@ export function SchedaAccount() {
       <Card>
         <Label icon="person-circle-outline">Account</Label>
         <Body style={styles.invito}>
-          Senza account i piani restano su questo telefono. Con un account li ritrovi ovunque,
-          anche se lo cambi o lo perdi.
+          Senza account i piani restano su questo telefono. Con un account li ritrovi ovunque, anche
+          se lo cambi o lo perdi.
         </Body>
         <View style={styles.bottoni}>
           <Button label="Accedi" variant="secondary" onPress={() => router.push("/accedi")} />

@@ -103,11 +103,7 @@ export function DishPhoto({
       style={[style, styles.segnaposto, { backgroundColor: FONDI[i] }]}
       accessibilityLabel={nome}
     >
-      <Ionicons
-        name="restaurant-outline"
-        size={compatto ? 18 : 30}
-        color={INCHIOSTRI[i]}
-      />
+      <Ionicons name="restaurant-outline" size={compatto ? 18 : 30} color={INCHIOSTRI[i]} />
       {compatto ? null : (
         <Body style={[styles.iniziale, { color: INCHIOSTRI[i] }]}>{iniziale}</Body>
       )}

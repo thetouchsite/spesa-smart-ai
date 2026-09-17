@@ -118,10 +118,7 @@ export const useUtente = create<StatoUtente>()((set, get) => ({
   },
 }));
 
-async function entra(
-  set: (s: Partial<StatoUtente>) => void,
-  identita: Identita,
-): Promise<void> {
+async function entra(set: (s: Partial<StatoUtente>) => void, identita: Identita): Promise<void> {
   await salvaToken(identita.token);
   set({
     stato: "dentro",

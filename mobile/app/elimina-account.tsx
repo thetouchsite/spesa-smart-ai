@@ -98,8 +98,8 @@ export default function EliminaAccountScreen() {
               : `i ${quantiPiani} piani che hai salvato`}
         </Body>
         <Body style={styles.nota}>
-          L'app continua a funzionare senza account: i piani che farai da qui in avanti
-          resteranno su questo telefono.
+          L'app continua a funzionare senza account: i piani che farai da qui in avanti resteranno
+          su questo telefono.
         </Body>
       </Card>
 

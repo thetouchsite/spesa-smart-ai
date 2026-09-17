@@ -112,7 +112,9 @@ export async function fotoDiPiuPiatti(nomi: string[]): Promise<void> {
  */
 export function useFotoPiatto(nome: string | undefined): FotoPiatto | null {
   const k = nome ? chiave(nome) : "";
-  const [foto, setFoto] = useState<FotoPiatto | null>(() => (k ? (ricordate.get(k) ?? null) : null));
+  const [foto, setFoto] = useState<FotoPiatto | null>(() =>
+    k ? (ricordate.get(k) ?? null) : null,
+  );
 
   useEffect(() => {
     if (!nome || !k) return;

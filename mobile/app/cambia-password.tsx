@@ -54,9 +54,7 @@ export default function CambiaPasswordScreen() {
         router.replace("/accedi");
         return;
       }
-      setErrore(
-        e instanceof RispostaNegativa ? e.message : "Non riesco a cambiare la password.",
-      );
+      setErrore(e instanceof RispostaNegativa ? e.message : "Non riesco a cambiare la password.");
     } finally {
       setInCorso(false);
     }
@@ -88,7 +86,13 @@ export default function CambiaPasswordScreen() {
       </View>
 
       <View style={styles.modulo}>
-        <Campo etichetta="Password attuale" valore={attuale} onChange={setAttuale} segreto autoFocus />
+        <Campo
+          etichetta="Password attuale"
+          valore={attuale}
+          onChange={setAttuale}
+          segreto
+          autoFocus
+        />
         <Campo
           etichetta="Nuova password"
           valore={nuova}
@@ -102,8 +106,8 @@ export default function CambiaPasswordScreen() {
       </View>
 
       <Body style={styles.avviso}>
-        Cambiandola, gli altri dispositivi in cui hai fatto l'accesso verranno scollegati.
-        Questo telefono resta dentro.
+        Cambiandola, gli altri dispositivi in cui hai fatto l'accesso verranno scollegati. Questo
+        telefono resta dentro.
       </Body>
     </Screen>
   );

@@ -86,7 +86,9 @@ export default function ImpostazioniScreen() {
 
       <View style={styles.head}>
         <Title>Impostazioni</Title>
-        <Subtitle>{ui("Lingua dell'app, dati del tuo profilo e gestione delle informazioni.")}</Subtitle>
+        <Subtitle>
+          {ui("Lingua dell'app, dati del tuo profilo e gestione delle informazioni.")}
+        </Subtitle>
       </View>
 
       <SchedaAccount />
@@ -167,11 +169,16 @@ export default function ImpostazioniScreen() {
       <Card>
         <Label icon="shield-outline">{ui("I tuoi dati")}</Label>
         <Body style={styles.small}>
-          Profilo, piano e preferenze sono salvati solo su questo telefono. Nulla viene inviato a
-          un server: quando arriveranno gli account, i dati potranno seguirti fra dispositivi e
-          la sincronizzazione sarà una tua scelta.
+          Profilo, piano e preferenze sono salvati solo su questo telefono. Nulla viene inviato a un
+          server: quando arriveranno gli account, i dati potranno seguirti fra dispositivi e la
+          sincronizzazione sarà una tua scelta.
         </Body>
-        <Button label={ui("Cancella i miei dati")} variant="secondary" icon="trash-outline" onPress={wipe} />
+        <Button
+          label={ui("Cancella i miei dati")}
+          variant="secondary"
+          icon="trash-outline"
+          onPress={wipe}
+        />
       </Card>
     </Screen>
   );
