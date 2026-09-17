@@ -63,27 +63,59 @@ export interface FotoPiatto {
 }
 
 /** Parole che non aiutano a trovare una foto: tolte, la ricerca migliora. */
+/** Minuscole, senza accenti, senza punteggiatura: per confrontare parole. */
+function semplifica(testo: string): string {
+  return testo
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const RUMORE = new Set([
   "con", "e", "di", "del", "della", "al", "alla", "in", "the", "and", "with",
   "fresco", "fresca", "fatto", "casa", "stile", "ricetta", "veloce", "leggero",
   "light", "quick", "homemade", "easy",
 ]);
 
-/** Dal nome del piatto alle due parole che contano. */
+/**
+ * Dal nome del piatto alle ricerche da provare.
+ *
+ * DUE REGOLE, E TUTTE E DUE COSTANO SANGUE
+ * ----------------------------------------
+ * 1. MAI UNA PAROLA SOLA. «Torretta di melanzane e zucchine al forno» non
+ *    trovava niente come frase intera, ripiegava su «torretta», e Commons
+ *    restituiva la foto di Torretta — il paese in provincia di Palermo. In
+ *    cima alla ricetta c'era un panorama di case su una collina. Una parola
+ *    sola non e' un piatto: e' un sostantivo, e i sostantivi italiani sono
+ *    quasi tutti anche nomi di paesi, cognomi o santi.
+ *
+ * 2. SEMPRE UNA PAROLA DI CIBO ACCANTO. Aggiungere «food» alla ricerca sposta
+ *    i risultati dal mondo verso la tavola: e' lo stesso motivo per cui
+ *    cercando «torretta food» non esce nessun panorama.
+ */
 export function terminiDiRicerca(nome: string): string[] {
-  const parole = nome
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N} ]/gu, " ")
-    .split(/\s+/)
+  const parole = semplifica(nome)
+    .split(" ")
     .filter((p) => p.length > 2 && !RUMORE.has(p));
 
-  /* Si prova prima il nome intero — «risotto ai funghi» trova il piatto
-     giusto — e solo se fallisce le prime due parole. Al contrario si
-     troverebbe una foto di funghi. */
-  const fuori = [nome.trim()];
-  if (parole.length >= 2) fuori.push(parole.slice(0, 2).join(" "));
-  if (parole.length >= 1) fuori.push(parole[0]);
-  return [...new Set(fuori)].filter(Boolean).slice(0, 3);
+  const fuori: string[] = [];
+  /* Il nome intero per primo: «risotto ai funghi» trova il piatto giusto.
+     Al contrario si troverebbe una foto di funghi. */
+  if (nome.trim()) fuori.push(`${nome.trim()} food`);
+  /* Poi le due parole che contano, ancora insieme. Due parole sono gia' una
+     descrizione — «melanzane zucchine» e' cibo — mentre una sola non lo e'. */
+  if (parole.length >= 2) fuori.push(`${parole.slice(0, 2).join(" ")} food`);
+  return [...new Set(fuori)].filter(Boolean);
+}
+
+/** Le parole del piatto che un risultato deve contenere per essere credibile. */
+export function paroleDelPiatto(nome: string): string[] {
+  return semplifica(nome)
+    .split(" ")
+    .filter((p) => p.length > 3 && !RUMORE.has(p));
 }
 
 function chiaveDi(nome: string): string {
@@ -101,6 +133,7 @@ function testoPulito(html: string): string {
 
 interface PaginaCommons {
   title?: string;
+  categories?: Array<{ title?: string }>;
   imageinfo?: Array<{
     thumburl?: string;
     url?: string;
@@ -109,13 +142,34 @@ interface PaginaCommons {
   }>;
 }
 
+/**
+ * Parole che, in una categoria di Commons, dicono «questo e' cibo».
+ *
+ * Volutamente larghe: servono a escludere paesi, monumenti e persone, non a
+ * classificare la cucina. Una foto di un piatto sta quasi sempre in almeno una
+ * categoria che contiene una di queste.
+ */
+const CATEGORIE_DI_CIBO =
+  /\b(food|foods|dish|dishes|cuisine|cooking|cookery|meal|meals|recipe|recipes|soup|soups|pasta|pizza|bread|cake|cakes|dessert|desserts|salad|salads|rice|meat|fish|cheese|vegetable|vegetables|fruit|breakfast|lunch|dinner|snack|stew|stews|sauce|sauces|drink|beverages|restaurant)\b/i;
+
+function sembraCibo(pagina: PaginaCommons): boolean {
+  return (pagina.categories ?? []).some((c) => CATEGORIE_DI_CIBO.test(c.title ?? ""));
+}
+
 async function cercaSuCommons(termine: string): Promise<FotoPiatto | null> {
   const url =
     `${COMMONS}?action=query&format=json&origin=*` +
     `&generator=search&gsrsearch=${encodeURIComponent(termine)}` +
     /* Lo spazio dei nomi 6 e' quello dei file: senza, tornano pagine di testo. */
-    `&gsrnamespace=6&gsrlimit=6` +
-    `&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=800`;
+    `&gsrnamespace=6&gsrlimit=10` +
+    /* Le CATEGORIE sono la prova che si tratta di cibo. Filtrare le parole
+       della domanda non basta: «Torretta di melanzane al forno food»
+       restituisce lo stesso TorrettaBeiPalermo.jpg, perche' Commons cerca in
+       modo generoso e «Torretta» e' il segnale piu' forte della frase.
+       Guardando invece dove sta il file, la differenza e' netta: la foto di un
+       piatto sta in «Category:Eggplant dishes», quella del paese in
+       «Category:Torretta, Sicily». */
+    `&prop=imageinfo|categories&cllimit=30&iiprop=url|extmetadata&iiurlwidth=800`;
 
   let dati: { query?: { pages?: Record<string, PaginaCommons> } };
   try {
@@ -144,6 +198,12 @@ async function cercaSuCommons(termine: string): Promise<FotoPiatto | null> {
        ricettario del Novecento: tecnicamente pertinente, praticamente una
        pagina di testo al posto di un piatto. Si riconoscono dal nome del
        file, che comincia per `page1-`, e dal titolo, che finisce in .pdf. */
+    /* LA PROVA DECISIVA. Senza, la ricetta di una torretta di melanzane si
+       ritrovava in cima il panorama di un paese siciliano — tecnicamente
+       un'immagine pertinente alla parola, praticamente un errore che si vede
+       da lontano. */
+    if (!sembraCibo(pagina)) continue;
+
     const nomeFile = indirizzo.split("/").pop() ?? "";
     if (/^page\d+-/i.test(nomeFile)) continue;
     if (/\.(pdf|djvu|tiff?|svg)$/i.test(pagina.title ?? "")) continue;
@@ -175,11 +235,14 @@ async function cercaSuCommons(termine: string): Promise<FotoPiatto | null> {
  * registra che non c'e' e non lo si richiede per un mese. Senza, ogni piatto
  * senza foto tornerebbe a bussare a Commons a ogni apertura della schermata.
  */
-export async function fotoDelPiatto(nome: string): Promise<FotoPiatto | null> {
+export async function fotoDelPiatto(nome: string, cerca?: string): Promise<FotoPiatto | null> {
   const pulito = nome.trim();
   if (pulito.length < 3) return null;
 
-  const chiave = chiaveDi(pulito);
+  /* La chiave tiene dentro anche il termine suggerito: con parole diverse si
+     trovano foto diverse, e ricordare la vecchia sotto la stessa chiave
+     vorrebbe dire non vedere mai il miglioramento. */
+  const chiave = chiaveDi(cerca ? `${pulito}::${cerca}` : pulito);
 
   if (isDbConfigured()) {
     try {
@@ -190,8 +253,30 @@ export async function fotoDelPiatto(nome: string): Promise<FotoPiatto | null> {
     }
   }
 
+  /* IL TERMINE DEL MODELLO VIENE PRIMA DI TUTTO.
+     E' l'unico che sa cos'e' il piatto: «Torretta di melanzane e zucchine al
+     forno» diventa «baked eggplant stack», e con quello la foto si trova al
+     primo colpo. Indovinarlo dal titolo funziona finche' il titolo e' il nome
+     del piatto, e si rompe appena diventa una descrizione — la ricerca
+     ripiegava sulla prima parola e restituiva Torretta, il paese in provincia
+     di Palermo.
+
+     Resta comunque una rete sotto: il modello il campo lo omette una volta su
+     tre, e le ricette che non vengono da lui non ce l'hanno affatto. */
+  const suggeriti: string[] = [];
+  if (cerca?.trim()) {
+    const c = cerca.trim();
+    suggeriti.push(c);
+    /* E una versione piu' corta: «baked eggplant stack» non trova niente,
+       «baked eggplant» si'. Tre parole descrivono bene il piatto ma sono
+       troppe per un archivio dove i file si chiamano con due. */
+    const parole = c.split(/\s+/);
+    if (parole.length > 2) suggeriti.push(parole.slice(0, 2).join(" "));
+  }
+  const termini = [...suggeriti, ...terminiDiRicerca(pulito)];
+
   let trovata: FotoPiatto | null = null;
-  for (const termine of terminiDiRicerca(pulito)) {
+  for (const termine of termini) {
     trovata = await cercaSuCommons(termine);
     if (trovata) break;
   }
@@ -225,13 +310,16 @@ export async function fotoDelPiatto(nome: string): Promise<FotoPiatto | null> {
  * A gruppi di quattro il menu' si riempie in un paio di secondi e Commons non
  * se ne accorge.
  */
-export async function fotoDiPiuPiatti(nomi: string[]): Promise<Record<string, FotoPiatto | null>> {
+export async function fotoDiPiuPiatti(
+  nomi: string[],
+  cerche: Record<string, string> = {},
+): Promise<Record<string, FotoPiatto | null>> {
   const fuori: Record<string, FotoPiatto | null> = {};
   const unici = [...new Set(nomi.map((n) => n.trim()).filter((n) => n.length >= 3))].slice(0, 30);
 
   for (let i = 0; i < unici.length; i += 4) {
     const gruppo = unici.slice(i, i + 4);
-    const esiti = await Promise.all(gruppo.map((n) => fotoDelPiatto(n)));
+    const esiti = await Promise.all(gruppo.map((n) => fotoDelPiatto(n, cerche[n])));
     gruppo.forEach((n, k) => {
       fuori[n] = esiti[k];
     });

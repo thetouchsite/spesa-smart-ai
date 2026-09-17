@@ -30,6 +30,26 @@ export const RecipeSchema = z.object({
     fat: z.number(),
   }),
   allergens: z.array(z.string()),
+  /**
+   * Con quali parole si cerca la FOTO di questo piatto, in inglese.
+   *
+   * PERCHE' LA CHIEDIAMO AL MODELLO
+   * -------------------------------
+   * Perche' e' l'unico che sa cos'e' il piatto. Indovinarlo dal titolo
+   * funziona finche' il titolo e' «risotto ai funghi» e si rompe appena
+   * diventa «Torretta di melanzane e zucchine al forno»: la ricerca non
+   * trovava la frase intera, ripiegava su «torretta», e Commons restituiva la
+   * foto di Torretta — il paese in provincia di Palermo. In cima alla ricetta
+   * c'era un panorama di case su una collina.
+   *
+   * Il modello invece sa che quel piatto e' «baked eggplant parmigiana», e con
+   * due parole giuste la foto si trova al primo colpo.
+   *
+   * IN INGLESE perche' Commons e' indicizzato in inglese: «melanzane» trova
+   * poco, «eggplant» trova tutto. E GENERICO, non letterale — descrive il
+   * PIATTO, non la ricetta: serve una foto che assomigli, non la stessa.
+   */
+  photoQuery: z.string().max(60).optional(),
 });
 export type AiRecipe = z.infer<typeof RecipeSchema>;
 

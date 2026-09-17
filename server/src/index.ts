@@ -392,16 +392,28 @@ app.get("/me", async (_body, req) => {
  * riquadri rotti in cima a ogni ricetta.
  */
 app.post("/piatto/foto", async (body) => {
-  const { nome } = parse(z.object({ nome: z.string().min(1).max(160) }), body);
-  return { foto: await fotoDelPiatto(nome) };
+  const { nome, cerca } = parse(
+    z.object({
+      nome: z.string().min(1).max(160),
+      /* Le parole con cui cercarla, quando chi chiede le ha: l'IA che ha
+         scritto la ricetta sa dire com'e' fatto il piatto meglio del suo
+         titolo. Vedi `photoQuery` in `base/schemas.ts`. */
+      cerca: z.string().max(80).optional(),
+    }),
+    body,
+  );
+  return { foto: await fotoDelPiatto(nome, cerca) };
 });
 
 app.post("/piatto/foto-molte", async (body) => {
-  const { nomi } = parse(
-    z.object({ nomi: z.array(z.string().min(1).max(160)).min(1).max(30) }),
+  const { nomi, cerche } = parse(
+    z.object({
+      nomi: z.array(z.string().min(1).max(160)).min(1).max(30),
+      cerche: z.record(z.string(), z.string().max(80)).optional(),
+    }),
     body,
   );
-  return { foto: await fotoDiPiuPiatti(nomi) };
+  return { foto: await fotoDiPiuPiatti(nomi, cerche ?? {}) };
 });
 
 /* ─────────────────────── Password: cambio e recupero ─────────────────────── */
