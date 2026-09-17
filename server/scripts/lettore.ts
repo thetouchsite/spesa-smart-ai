@@ -48,7 +48,7 @@ import {
 } from "../src/api/catalogo-fonti.js";
 import { giroContinuo } from "../src/api/prezzi-continuo.js";
 import { chiTieneIPaesi } from "../src/api/turni.js";
-import { chiStaLavorando } from "../src/api/giri.js";
+import { battitoDiAttesa, chiStaLavorando } from "../src/api/giri.js";
 import { statoMagazzino } from "../src/api/prezzi-magazzino.js";
 
 const n = (x: number) => String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -182,6 +182,14 @@ async function main() {
 
     if (liberi.length === 0) {
       console.log(`  [${ora()}] tutti i ${disponibili.length} paesi sono presi: aspetto`);
+      /* E LO SI DICE ANCHE AL PANNELLO.
+         Un lettore che aspetta non apre nessun giro, quindi non scrive nessun
+         battito: da fuori sparisce, ed e' identico a uno spento. E' successo
+         stanotte al raspberry — acceso, che faceva la cosa giusta, e
+         invisibile. `giroContinuo` lo diceva gia' per il suo caso; questo e'
+         un secondo punto d'attesa, aggiunto dopo, e si era portato dietro lo
+         stesso difetto. */
+      await battitoDiAttesa("in attesa: tutti i paesi occupati");
       await new Promise((r) => setTimeout(r, PAUSA_MS));
       continue;
     }
