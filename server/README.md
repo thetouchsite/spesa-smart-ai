@@ -55,6 +55,114 @@ scoperto da un utente.
 
 `PORT` la imposta Railway: non va dichiarata.
 
+## Il lettore prezzi su una macchina dedicata
+
+Il lettore apre le schede prodotto dei supermercati e riempie il magazzino.
+**Su Render non ci sta**: montare la coda legge e decomprime i cataloghi, ed è
+la parte che consuma di più — su un piano da mezzo giga il processo viene
+ucciso prima di aprire una pagina, e il servizio cade con un 502. Gira su
+macchine nostre: un PC, un Raspberry, quello che resta acceso.
+
+Si vede tutto dal pannello (`/pannello`) perché il battito passa dal database,
+non dal processo: basta che `MONGODB_URI` sia lo stesso.
+
+### Installazione su un Raspberry Pi
+
+Serve Node 20: quello di apt su Bookworm è il 18 e non basta.
+
+```sh
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs git
+
+cd ~
+git clone -b feat/react-native https://github.com/thetouchsite/spesa-smart-ai.git
+cd spesa-smart-ai/server
+npm ci
+chmod +x lettore.sh
+```
+
+Il `.env` **non è nel repo**: si copia da una macchina che ce l'ha già.
+
+```sh
+# dal PC che ha il .env
+scp server/.env touchsite@IP-DEL-PI:~/spesa-smart-ai/server/.env
+```
+
+Poi si tara sulla memoria che c'è. I valori buoni per un PC ammazzano un Pi
+piccolo, esattamente come fanno con Render:
+
+| RAM | `GIRO_MAX_VOCI` | `GIRO_INSIEME` | `LETTORE_PAESI` | `NODE_OPTIONS` |
+|---|---|---|---|---|
+| 8 GB | 800000 | 32 | 12 | `--max-old-space-size=4096` |
+| 4 GB | 600000 | 40 | 14 | `--max-old-space-size=2560` |
+| 2 GB | 100000 | 16 | 5 | `--max-old-space-size=1024` |
+
+E dagli un nome suo, o nel pannello compaiono due righe che si chiamano
+uguale: `NOME_MACCHINA=raspberry`.
+
+### Farlo partire da solo, e restare acceso
+
+`/etc/systemd/system/lettore.service`:
+
+```ini
+[Unit]
+Description=Lettore prezzi MealMint
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=touchsite
+WorkingDirectory=/home/touchsite/spesa-smart-ai/server
+ExecStart=/home/touchsite/spesa-smart-ai/server/lettore.sh
+Restart=always
+RestartSec=30
+Environment=NODE_OPTIONS=--max-old-space-size=2560
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now lettore
+```
+
+### I comandi di tutti i giorni
+
+```sh
+journalctl -u lettore -f          # guardalo lavorare, dal vivo
+systemctl status lettore          # come sta
+sudo systemctl restart lettore    # riavvialo
+sudo systemctl stop lettore       # fermalo DAVVERO
+```
+
+Per aggiornarlo dopo un push:
+
+```sh
+cd ~/spesa-smart-ai && git pull && cd server && npm ci
+sudo systemctl restart lettore
+```
+
+Su Windows, al posto del servizio c'è `lettore.cmd`: doppio clic, apre la sua
+finestra, e il ciclo attorno lo rialza se il processo muore.
+
+### Due cose che sembrano guasti e non lo sono
+
+**«Tutti i paesi sono presi: aspetto».** Non è fermo. I paesi si prenotano —
+un biglietto per paese sul database, che scade in tre minuti e si rinnova
+lavorando — così due lettori accesi insieme non aprono le stesse pagine, che
+sarebbe lavoro doppio e richieste doppie ai negozi veri. Quanti ne prende
+ognuno lo decide la quota: paesi totali diviso lettori vivi. Si aggiusta da
+sola quando una macchina si accende o si spegne, e non serve che nessuno
+concordi niente con nessuno.
+
+**Il pulsante «Ferma la lettura» del pannello non spegne la macchina.** Ferma
+il *giro* in corso; dopo la pausa il lettore ne comincia un altro. Per
+spegnerlo sul serio serve `systemctl stop`, ed è l'unico modo: il ciclo dello
+script e `Restart=always` di systemd lo rialzano da tutto il resto —
+catalogo finito, errore di rete, memoria esaurita, riavvio del Pi.
+
 ## Endpoint
 
 | Metodo | Percorso | Auth | Descrizione |
