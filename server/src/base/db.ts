@@ -26,6 +26,25 @@ export interface UserDoc {
   passwordHash: string;
   displayName?: string;
   createdAt: Date;
+  /**
+   * Il numero di generazione dei token di questo utente.
+   *
+   * I token durano novanta giorni — giusto, per un'app che non deve chiedere
+   * l'accesso ogni settimana. Ma senza questo campo cambiare la password NON
+   * scollegava nessuno: chi si era preso il telefono, o il token, restava
+   * dentro per tre mesi anche dopo che il legittimo proprietario aveva
+   * cambiato tutto. Cambiare password alza il numero, i token vecchi portano
+   * quello di prima e non valgono piu'.
+   *
+   * Assente vuol dire 1: gli utenti registrati prima di questo campo non vanno
+   * scollegati per un aggiornamento del codice.
+   */
+  versioneToken?: number;
+  /** Impronta del codice di recupero, mai il codice in chiaro. */
+  recuperoHash?: string;
+  recuperoScadeIl?: Date;
+  /** Quanti tentativi sbagliati: al terzo il codice muore. */
+  recuperoTentativi?: number;
 }
 
 export interface PlanDoc {

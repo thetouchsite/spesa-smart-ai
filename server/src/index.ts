@@ -39,7 +39,15 @@ import { createApp, HttpError, Pagina } from "./base/http.js";
 import { isConfigured, model, MODEL_ID } from "./app/gemini.js";
 import { fetchPageContext, rankHits, searchProvider } from "./app/search.js";
 import { cache, cacheVecchia, isDbConfigured, plans, users } from "./base/db.js";
-import { hashPassword, issueToken, requireUser, verifyPassword } from "./app/auth.js";
+import { hashPassword, issueToken, verifyPassword } from "./app/auth.js";
+import {
+  avviaRecupero,
+  cambiaPassword,
+  concludiRecupero,
+  eliminaAccount,
+  utenteDaRichiesta,
+  utentePubblico,
+} from "./api/utente.js";
 import { isShoppingConfigured, searchShopping } from "./app/shopping.js";
 import {
   type Blocco,
@@ -340,9 +348,10 @@ app.post("/auth/register", async (body) => {
     passwordHash: await hashPassword(password),
     displayName,
     createdAt: new Date(),
+    versioneToken: 1,
   };
   const { insertedId } = await col.insertOne(doc);
-  return { token: issueToken(String(insertedId)), email: normalized, displayName };
+  return { token: issueToken(String(insertedId), 1), email: normalized, displayName };
 });
 
 app.post("/auth/login", async (body) => {
@@ -356,17 +365,69 @@ app.post("/auth/login", async (body) => {
     throw new HttpError(401, "Email o password non corretti");
   }
   return {
-    token: issueToken(String(user._id)),
+    token: issueToken(String(user._id), user.versioneToken ?? 1),
     email: user.email,
     displayName: user.displayName,
   };
 });
 
 app.get("/me", async (_body, req) => {
-  const userId = requireUser(req as never);
-  const user = await (await users()).findOne({ _id: new ObjectId(userId) });
-  if (!user) throw new HttpError(404, "Utente non trovato");
-  return { email: user.email, displayName: user.displayName, createdAt: user.createdAt };
+  const { doc } = await utenteDaRichiesta(req);
+  return utentePubblico(doc);
+});
+
+/* ─────────────────────── Password: cambio e recupero ─────────────────────── */
+
+/**
+ * «Ho dimenticato la password».
+ *
+ * Risponde SEMPRE allo stesso modo, che l'indirizzo esista o no: altrimenti
+ * diventa uno strumento per scoprire chi e' iscritto, provando un elenco di
+ * indirizzi e guardando quali rispondono diversamente.
+ */
+app.post("/auth/password/dimenticata", async (body) => {
+  const { email } = parse(z.object({ email: z.string().email().max(200) }), body);
+  const esito = await avviaRecupero(email);
+  return {
+    ok: true,
+    messaggio: "Se l'indirizzo e' registrato, riceverai un codice a sei cifre.",
+    ...esito,
+  };
+});
+
+app.post("/auth/password/reimposta", async (body) => {
+  const dati = parse(
+    z.object({
+      email: z.string().email().max(200),
+      codice: z.string().regex(/^\d{6}$/, "Il codice ha sei cifre"),
+      password: z.string().min(8).max(200),
+    }),
+    body,
+  );
+  return concludiRecupero(dati.email, dati.codice, dati.password);
+});
+
+app.post("/auth/password/cambia", async (body, req) => {
+  const dati = parse(
+    z.object({
+      attuale: z.string().min(1).max(200),
+      nuova: z.string().min(8).max(200),
+    }),
+    body,
+  );
+  return cambiaPassword(req, dati.attuale, dati.nuova);
+});
+
+/**
+ * Cancellazione dell'account, dall'app.
+ *
+ * Non e' una gentilezza: Apple e Google la impongono a ogni app con
+ * registrazione, ed e' uno dei motivi di rifiuto piu' frequenti.
+ */
+app.post("/account/elimina", async (body, req) => {
+  const { password } = parse(z.object({ password: z.string().min(1).max(200) }), body);
+  const esito = await eliminaAccount(req, password);
+  return { ok: true, pianiCancellati: esito.piani };
 });
 
 /* ─────────────────────────── Piani salvati ─────────────────────────── */
@@ -381,7 +442,7 @@ const SavePlan = z.object({
 });
 
 app.get("/plans", async (_body, req) => {
-  const userId = requireUser(req as never);
+  const { id: userId } = await utenteDaRichiesta(req);
   const rows = await (await plans())
     .find({ userId })
     .sort({ createdAt: -1 })
@@ -391,7 +452,7 @@ app.get("/plans", async (_body, req) => {
 });
 
 app.post("/plans", async (body, req) => {
-  const userId = requireUser(req as never);
+  const { id: userId } = await utenteDaRichiesta(req);
   const data = parse(SavePlan, body);
   const now = new Date();
   const { insertedId } = await (await plans()).insertOne({
@@ -404,7 +465,7 @@ app.post("/plans", async (body, req) => {
 });
 
 app.post("/plans/delete", async (body, req) => {
-  const userId = requireUser(req as never);
+  const { id: userId } = await utenteDaRichiesta(req);
   const { id } = parse(z.object({ id: z.string().min(1) }), body);
   // Il filtro include userId: senza, un id indovinato cancellerebbe il piano
   // di un altro utente.
