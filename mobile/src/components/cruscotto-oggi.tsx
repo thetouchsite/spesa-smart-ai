@@ -24,7 +24,7 @@
  * avere ancora preso.
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Body, Button, Card, Ionicons, Label, Title } from "./ui";
@@ -36,7 +36,9 @@ import { fotoNota } from "../lib/recipes/foto";
 import { dayIndex, localDay } from "../lib/days";
 import { computeResults } from "../lib/results/compute-results";
 import { pricingFromOffers } from "../lib/plan-full";
-import { simboloValuta } from "../lib/format";
+import { pricePlan } from "../lib/price-data/price-engine";
+import type { PricingResult } from "../lib/price-data";
+import { deviceDefaults, simboloValuta } from "../lib/format";
 import { useI18n } from "../lib/i18n";
 import { kv } from "../lib/kv";
 import { colors, font, radius, spacing } from "../theme";
@@ -110,13 +112,59 @@ export function CruscottoOggi() {
    * anche per la home. `pricingFromOffers` e' sincrona e lavora su quello che
    * c'e' gia' in memoria: nessuna richiesta in piu' per disegnare una carta.
    */
-  const conti = useMemo(() => {
-    if (!currentPlan) return null;
-    const prezzi = planExtra?.prodotti?.length
-      ? pricingFromOffers(planExtra, currentPlan.groceryList)
-      : null;
-    return computeResults({ profile, plan: currentPlan, pricing: prezzi });
-  }, [profile, currentPlan, planExtra]);
+  /**
+   * I PREZZI SE LI DEVE ANDARE A PRENDERE ANCHE LA HOME.
+   *
+   * Prima qui si passava `pricing: null` quando le offerte non c'erano, e
+   * `computeResults` senza prezzi restituisce zero — che e' corretto e
+   * inutilizzabile: la carta annunciava «€0 a settimana» sopra un piano da
+   * tredici prodotti. Uno zero grande e arancione e' la cosa peggiore che
+   * questa schermata possa dire, perche' non sembra un dato mancante: sembra
+   * un piano che non vale niente.
+   *
+   * La schermata del piano i prezzi se li va a prendere — con le offerte se ci
+   * sono, con `pricePlan` se no — e la home deve fare lo stesso, o i due
+   * numeri tornano a divergere. E' la stessa richiesta che l'utente farebbe
+   * comunque un secondo dopo, aprendo il piano.
+   */
+  const [prezzi, setPrezzi] = useState<PricingResult | null>(null);
+  const [calcolo, setCalcolo] = useState(false);
+
+  const fallback = deviceDefaults();
+  const citta = profile.city || "";
+  const paese = profile.country || fallback.country;
+
+  useEffect(() => {
+    if (!currentPlan) return;
+    /* Le offerte del motore con ricerca hanno la precedenza e non costano
+       niente: sono gia' in memoria, la conversione e' sincrona. */
+    if (planExtra?.prodotti?.length) {
+      setPrezzi(pricingFromOffers(planExtra, currentPlan.groceryList));
+      return;
+    }
+    let vivo = true;
+    setCalcolo(true);
+    (async () => {
+      try {
+        const esito = await pricePlan(currentPlan, citta, paese);
+        if (vivo) setPrezzi(esito);
+      } catch (err) {
+        /* Senza prezzi la carta non mente: mostra il piano e dice che i
+           prezzi non ci sono, invece di scrivere zero. */
+        console.warn("[cruscotto] prezzi non disponibili:", err);
+      } finally {
+        if (vivo) setCalcolo(false);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [currentPlan, planExtra, citta, paese]);
+
+  const conti = useMemo(
+    () => (currentPlan ? computeResults({ profile, plan: currentPlan, pricing: prezzi }) : null),
+    [profile, currentPlan, prezzi],
+  );
 
   /* Il giorno di oggi dentro il piano. `getDay()` conta da domenica, i giorni
      del piano da lunedì: la rotazione allinea i due calendari. */
@@ -191,6 +239,7 @@ export function CruscottoOggi() {
           budget={conti.budget}
           sfora={conti.status === "over"}
           periodo={profile.frequency === "monthly" ? "al mese" : "a settimana"}
+          inAttesa={calcolo}
           prodotti={currentPlan.groceryList.length}
           giorni={currentPlan.mealPlan.length}
           onPress={() => router.push("/risultati")}

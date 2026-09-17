@@ -25,9 +25,21 @@
  * -------------------------
  * Non si inventa un prezzo di partenza per avere uno sconto da mostrare:
  * senza budget non c'e' risparmio da dichiarare, va grande la spesa e la
- * striscia torna a dire prodotti e giorni. Un numero che non abbiamo non
- * diventa un numero brutto, diventa una frase onesta — e' la regola di tutta
- * l'app.
+ * striscia torna a dire prodotti e giorni.
+ *
+ * E QUANDO NON C'E' NEMMENO LA SPESA
+ * ----------------------------------
+ * Non si scrive zero. Per mezz'ora questa carta ha annunciato «€0 a
+ * settimana» sopra un piano da tredici prodotti, perche' i prezzi non erano
+ * ancora arrivati e zero e' quello che torna da un conto senza ingredienti.
+ * Un numero che non abbiamo non deve diventare un numero brutto — e uno zero
+ * grande e arancione e' il peggiore di tutti, perche' non si legge come «dato
+ * mancante»: si legge come «questo piano non vale niente».
+ *
+ * Senza cifre comanda il titolo, ingrandito, e sotto restano prodotti e
+ * giorni, che sono veri comunque. Una riga dice se i prezzi stanno arrivando
+ * o se non sono arrivati: sono due cose diverse, e la seconda non va
+ * travestita da prima.
  *
  * E I NUMERI NON SE LI CALCOLA LEI
  * --------------------------------
@@ -67,6 +79,7 @@ export function CartaPiano({
   budget = 0,
   sfora = false,
   periodo = "a settimana",
+  inAttesa = false,
   prodotti,
   giorni,
   onPress,
@@ -85,6 +98,8 @@ export function CartaPiano({
   sfora?: boolean;
   /** «a settimana» o «al mese», secondo la frequenza scelta. */
   periodo?: string;
+  /** I prezzi sono in arrivo: cambia la riga in fondo, non il resto. */
+  inAttesa?: boolean;
   prodotti: number;
   giorni: number;
   onPress: () => void;
@@ -93,10 +108,12 @@ export function CartaPiano({
   const siRisparmia = !sfora && quanto > 0;
   const grande = sfora ? quanto > 0 : siRisparmia;
   const cifra = Math.round(grande ? quanto : spesa);
+  /* Nessuna cifra da mostrare: ne' risparmio ne' spesa. Vedi la nota in cima. */
+  const senzaCifre = cifra <= 0;
 
   /* Lo scontrino si mostra solo se il budget c'e': senza, il prezzo di
      partenza sarebbe inventato, e lo sconto con lui. */
-  const scontrino = budget > 0 && grande;
+  const scontrino = budget > 0 && grande && !senzaCifre;
   const percentuale = budget > 0 ? Math.round((quanto / budget) * 100) : 0;
 
   const colonne: Colonna[] = scontrino
@@ -158,7 +175,7 @@ export function CartaPiano({
         <Ionicons name="chevron-forward" size={18} color={SPENTO} />
       </View>
 
-      <Body style={stili.titolo}>
+      <Body style={[stili.titolo, senzaCifre && stili.titoloSolo]}>
         {sfora
           ? "Qualche ritocco e ci siamo."
           : siRisparmia
@@ -166,11 +183,13 @@ export function CartaPiano({
             : "La tua settimana è pronta."}
       </Body>
 
-      <View style={stili.cifra}>
-        <Body style={stili.valuta}>{valuta}</Body>
-        <Body style={stili.numero}>{cifra}</Body>
-        <Body style={stili.periodo}>{sfora ? "oltre il budget" : periodo}</Body>
-      </View>
+      {senzaCifre ? null : (
+        <View style={stili.cifra}>
+          <Body style={stili.valuta}>{valuta}</Body>
+          <Body style={stili.numero}>{cifra}</Body>
+          <Body style={stili.periodo}>{sfora ? "oltre il budget" : periodo}</Body>
+        </View>
+      )}
 
       <View style={stili.striscia}>
         {colonne.map((c) => (
@@ -197,6 +216,12 @@ export function CartaPiano({
           una riga di testo si salta. Con l'icona davanti diventano due cose da
           guardare invece che da leggere, e il numero si prende in un colpo
           d'occhio — che e' tutto quello che serve sapere di loro. */}
+      {senzaCifre ? (
+        <Body style={stili.codaTesto}>
+          {inAttesa ? "Sto calcolando i prezzi…" : "Prezzi non disponibili adesso"}
+        </Body>
+      ) : null}
+
       {scontrino ? (
         <View style={stili.coda}>
           <View style={stili.codaVoce}>
@@ -264,6 +289,8 @@ const stili = StyleSheet.create({
     color: CHIARO,
     marginTop: 6,
   },
+  /* Senza la cifra il titolo resta solo, e da solo deve reggere la carta. */
+  titoloSolo: { fontSize: 22, lineHeight: 28, marginTop: spacing.sm },
 
   cifra: { flexDirection: "row", alignItems: "flex-end", marginTop: spacing.sm, gap: 3 },
   valuta: {
