@@ -373,7 +373,7 @@ function schedaViva(g, adesso) {
   const zitto = fermo > SOSPETTO_MS;
   return \`<div class="scheda viva\${zitto ? " zitta" : ""}">
     <div class="testa">
-      <b><span class="pallino"></span>\${g.macchina}</b>
+      <b><span class="pallino"></span>\${g.macchina}</b>\${g.pid ? '<span class="targa">#' + g.pid + '</span>' : ''}
       <span class="etichetta \${zitto ? "att" : "ok"}">\${g.lavoro}</span>
       <span class="etichetta">da \${durata(corso)}</span>
       \${zitto ? '<span class="etichetta att">non risponde da ' + durata(fermo) + '</span>' : ""}
