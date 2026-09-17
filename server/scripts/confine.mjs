@@ -107,6 +107,9 @@ const PADRONI = {
      che ha permesso di tagliare l'ultimo filo verso app/. */
   "aiuti-esterni": "api",
   sinonimi: "api",
+  /* Chi legge quale paese, quando i lettori sono piu' di uno. E' una regola
+     del mestiere di raccogliere prezzi, non dell'app: sta di qua. */
+  turni: "api",
 
   // ── app ────────────────────────────────────────────────────────────
   /* Il modello e la ricerca sul web stanno di qua per una ragione precisa:

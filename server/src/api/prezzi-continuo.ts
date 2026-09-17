@@ -42,6 +42,7 @@
  */
 
 import { cataloghi } from "../base/db.js";
+import { prendiTurni, rendiTurni } from "./turni.js";
 import { prezzi as collezionePrezzi } from "../base/db.js";
 import { verifyProductPage } from "./price-page.js";
 import { GiroInCorso } from "./giri.js";
@@ -215,10 +216,30 @@ export interface EsitoGiro {
  * ferma prima e lo dice con `finito`.
  */
 export async function giroContinuo(
-  paesi: string[],
+  paesiChiesti: string[],
   minuti: number,
   onAvanzamento?: (fatte: number, conPrezzo: number) => void,
 ): Promise<EsitoGiro> {
+  /* I PAESI SI PRENOTANO, NON SI DANNO PER SCONTATI.
+     Due lettori accesi insieme — il PC di casa e Render, o due colleghi — si
+     montano quasi la stessa coda, perche' la domanda che fanno al magazzino e'
+     la stessa, e aprono le stesse pagine due volte. Il magazzino non ne
+     soffre; i negozi si', ed e' il modo piu' rapido di farsi bloccare.
+
+     Qui si prende un biglietto per paese. Chi trova occupato lavora su
+     quelli liberi, e se sono tutti occupati non legge — che e' meglio di due
+     lettori che si pestano i piedi: il lavoro totale e' lo stesso, le
+     richieste ai negozi sono la meta'. Vedi `turni.ts`. */
+  const paesi = await prendiTurni(paesiChiesti, paesiChiesti.length, minuti + 5);
+  if (paesi.length === 0) {
+    console.info("[giro] tutti i paesi sono presi da un altro lettore: salto il giro");
+    return { aperte: 0, conPrezzo: 0, saltate: 0, secondi: 0, finito: false };
+  }
+  if (paesi.length < paesiChiesti.length) {
+    const altrui = paesiChiesti.filter((p) => !paesi.includes(p));
+    console.info(`[giro] gia' presi da un altro lettore: ${altrui.join(" ")}`);
+  }
+
   const scadenza = Date.now() + minuti * 60_000;
   const inizio = Date.now();
   let aperte = 0;
@@ -371,6 +392,10 @@ export async function giroContinuo(
   if (raccolte.length > 0) await salvaPrezzi(raccolte);
 
   await giro.chiudi(giro.devoFermarmi ? "interrotto" : finito ? "catalogo finito" : "tempo scaduto");
+  /* Si rendono i biglietti appena finito, senza aspettare la scadenza: il
+     lettore successivo puo' ripartire da questi paesi subito invece che fra
+     cinquanta minuti. */
+  await rendiTurni(paesi);
 
   return {
     aperte,

@@ -242,6 +242,8 @@ export interface GiroDoc {
   tipo: "battito" | "giro";
   /** Chi sta lavorando: il nome della macchina. Due lettori insieme si vedono. */
   macchina: string;
+  /** Il numero del processo: distingue due lettori sulla STESSA macchina. */
+  pid?: number;
   /** Che lavoro e': il giro continuo, la notte, una prova a mano. */
   lavoro: string;
   inizio: Date;

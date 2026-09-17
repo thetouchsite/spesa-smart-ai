@@ -119,6 +119,19 @@ function comeSta() {
 /** Quello che un giro in corso racconta di sé. */
 export interface GiroVivo {
   macchina: string;
+  /**
+   * Il numero del processo.
+   *
+   * Sembra un dettaglio da sviluppatori e invece serve a chi guarda: due
+   * lettori accesi sulla STESSA macchina compaiono come due righe con lo
+   * stesso nome, e senza un modo di distinguerle sembra un difetto del
+   * pannello — «perche' ne vedo due?». Con il numero accanto si legge subito
+   * che sono due processi, e se ne puo' chiudere uno.
+   *
+   * Facoltativo perche' i battiti scritti prima che questo campo esistesse
+   * non ce l'hanno, e per due minuti restano in giro.
+   */
+  pid?: number;
   lavoro: string;
   inizio: Date;
   tocco: Date;
@@ -243,6 +256,7 @@ export class GiroInCorso {
           {
             tipo,
             macchina: QUESTA_MACCHINA,
+            pid: process.pid,
             lavoro: this.lavoro,
             inizio: this.inizio,
             tocco: new Date(),
