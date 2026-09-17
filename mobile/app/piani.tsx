@@ -9,6 +9,27 @@
  * registrarsi, che è il momento in cui l'utente capisce a cosa serve — dopo
  * aver visto i piani che rischia di perdere, non prima.
  *
+ * UN PIANO SALVATO SI RIAPRE
+ * ---------------------------
+ * Per mesi non si poteva: ogni riga aveva la data, la spesa, il risparmio e un
+ * cestino, e il cestino era l'unica cosa che si potesse fare a un piano
+ * salvato. Un archivio da cui si puo' solo cancellare non e' un archivio, e
+ * peggio ancora rendeva bugiarda la frase con cui si chiede l'account —
+ * «ritrovi i tuoi piani ovunque»: li ritrovavi scritti in un elenco, non li
+ * ritrovavi da usare.
+ *
+ * Riaprire un piano rimette in corso due cose: il piano e le risposte con cui
+ * era stato fatto — citta', persone, budget, stile — perche' senza quelle le
+ * porzioni e la valuta sarebbero quelle dell'ultimo piano, non di questo.
+ *
+ * I PREZZI VERI NON TORNANO INDIETRO, E VA BENE
+ * ---------------------------------------------
+ * Di un piano si salvano le ricette e le risposte, non le offerte dei negozi:
+ * quelle scadono. Un piano di tre settimane fa riaperto con i prezzi di tre
+ * settimane fa direbbe bugie con la faccia seria. Riaprendolo la lista li
+ * ricalcola, e finche' non ha finito mostra la stima — che e' dichiarata come
+ * tale, come dappertutto nell'app.
+ *
  * L'ERRORE NON SI TRAVESTE DA ELENCO VUOTO
  * ----------------------------------------
  * «Non riesco a caricarli» e «non ne hai» sono due cose diverse, e la seconda
@@ -17,7 +38,7 @@
  */
 
 import { useCallback, useState } from "react";
-import { Alert, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -34,6 +55,7 @@ import {
 } from "../src/components/ui";
 import { getPlanStore, type SavedPlan } from "../src/lib/storage";
 import { useUtente } from "../src/lib/state/utente";
+import { useSession } from "../src/lib/state/session";
 import { SessioneScaduta } from "../src/lib/api/cliente";
 import { colors, font, radius, spacing, spazioPerLaBarra } from "../src/theme";
 import { tornaIndietro } from "../src/lib/navigazione";
@@ -44,6 +66,7 @@ export default function PianiScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { stato: accesso, scaduta } = useUtente();
+  const { currentPlan, setPlan, updateProfile, profile } = useSession();
 
   const [stato, setStato] = useState<Stato>("carico");
   const [piani, setPiani] = useState<SavedPlan[]>([]);
@@ -77,6 +100,54 @@ export default function PianiScreen() {
       void carica();
     }, [carica]),
   );
+
+  /**
+   * Rimette in corso un piano salvato e porta ai risultati.
+   *
+   * Il profilo si ripristina insieme al piano: le porzioni, la valuta e la
+   * citta' con cui i conti tornano sono quelle con cui il piano era stato
+   * fatto, non quelle dell'ultima volta che si e' risposto alle domande.
+   *
+   * `planExtra` si azzera apposta — vedi la nota in cima al file: le offerte
+   * salvate non esistono, e riproporre quelle vecchie sarebbe peggio che
+   * ricalcolarle.
+   */
+  function metti(p: SavedPlan) {
+    updateProfile({
+      city: p.form.city,
+      country: p.form.country ?? profile.country,
+      household: p.form.household,
+      budget: p.form.budget,
+      currency: p.form.currency as typeof profile.currency,
+      frequency: p.form.frequency,
+      style: p.form.style,
+      allergies: p.form.allergies,
+      dislikes: p.form.dislikes,
+      zeroSpendDay: p.form.zeroSpendDay,
+    });
+    setPlan(p.plan, null);
+    /* `push` e non `replace`: la freccia indietro deve riportare all'elenco,
+       che e' da dove si e' partiti. */
+    router.push("/risultati");
+  }
+
+  function apri(p: SavedPlan) {
+    /* SI CHIEDE CONFERMA SOLO QUANDO C'E' DAVVERO QUALCOSA DA PERDERE.
+       Il piano in corso non si salva da solo — si salva premendo «Salva
+       questo piano» in fondo ai risultati — quindi aprirne un altro puo'
+       buttare via lavoro che nessuno ha messo al sicuro. Ma se un piano in
+       corso non c'e', o e' gia' questo, non c'e' niente da chiedere: una
+       domanda a cui la risposta e' sempre «si'» insegna solo a non leggere. */
+    if (!currentPlan || currentPlan === p.plan) return metti(p);
+    Alert.alert(
+      "Aprire questo piano?",
+      "Quello che hai in corso viene sostituito. Se non l'hai salvato, lo perdi.",
+      [
+        { text: "Annulla", style: "cancel" },
+        { text: "Apri", onPress: () => metti(p) },
+      ],
+    );
+  }
 
   function cancella(p: SavedPlan) {
     Alert.alert("Cancellare questo piano?", p.label, [
@@ -150,33 +221,50 @@ export default function PianiScreen() {
           </View>
         ) : (
           piani.map((p) => (
-            <Card key={p.id}>
-              <View style={styles.riga}>
-                <View style={styles.testo}>
-                  <Body style={styles.titolo}>{p.label}</Body>
-                  <Body style={styles.data}>
-                    {new Date(p.createdAt).toLocaleDateString("it-IT", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </Body>
-                  <View style={styles.numeri}>
-                    <Body style={styles.numero}>
-                      Spesa {Math.round(p.estimatedSpend)} · Risparmio {Math.round(p.savings)}
+            <Pressable
+              key={p.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Apri il piano ${p.label}`}
+              onPress={() => apri(p)}
+              style={({ pressed }) => [pressed && styles.premuto]}
+            >
+              <Card>
+                <View style={styles.riga}>
+                  <View style={styles.testo}>
+                    <Body style={styles.titolo}>{p.label}</Body>
+                    <Body style={styles.data}>
+                      {new Date(p.createdAt).toLocaleDateString("it-IT", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
                     </Body>
+                    <View style={styles.numeri}>
+                      <Body style={styles.numero}>
+                        Spesa {Math.round(p.estimatedSpend)} · Risparmio {Math.round(p.savings)}
+                      </Body>
+                    </View>
                   </View>
+                  <Button
+                    label=""
+                    nomeAccessibile={`Cancella il piano ${p.label}`}
+                    icon="trash-outline"
+                    variant="ghost"
+                    onPress={() => cancella(p)}
+                    style={styles.cestino}
+                  />
+                  {/* La freccia dice che la riga si apre. Senza, una scheda con
+                      dentro un cestino sembra una scheda con dentro un cestino
+                      — e nient'altro. */}
+                  <Ionicons
+                    name="chevron-forward"
+                    size={18}
+                    color={colors.mutedForeground}
+                    style={styles.freccia}
+                  />
                 </View>
-                <Button
-                  label=""
-                  nomeAccessibile={`Cancella il piano ${p.label}`}
-                  icon="trash-outline"
-                  variant="ghost"
-                  onPress={() => cancella(p)}
-                  style={styles.cestino}
-                />
-              </View>
-            </Card>
+              </Card>
+            </Pressable>
           ))
         )}
 
@@ -215,5 +303,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   cestino: { paddingHorizontal: spacing.sm },
+  freccia: { marginTop: spacing.sm },
+  premuto: { opacity: 0.7 },
   invito: { fontSize: font.size.sm, color: colors.mutedForeground, marginBottom: spacing.sm },
 });
