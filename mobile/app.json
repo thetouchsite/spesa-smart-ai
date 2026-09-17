@@ -44,7 +44,14 @@
         }
       ],
       "expo-asset",
-      "./plugins/percorsi-lunghi-windows"
+      "./plugins/percorsi-lunghi-windows",
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Per farti entrare senza ridigitare la password a ogni apertura."
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "http://localhost:3000",

@@ -32,6 +32,7 @@ import { resolveCountry } from "../src/lib/country";
 import { loadResolvedLocation, clearResolvedLocation } from "../src/lib/location/store";
 import { kv } from "../src/lib/kv";
 import { QuotaDetail } from "../src/components/quota-banner";
+import { SchedaAccount } from "../src/components/scheda-account";
 import { colors, font, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 import { tornaIndietro } from "../src/lib/navigazione";
@@ -87,6 +88,8 @@ export default function ImpostazioniScreen() {
         <Title>Impostazioni</Title>
         <Subtitle>{ui("Lingua dell'app, dati del tuo profilo e gestione delle informazioni.")}</Subtitle>
       </View>
+
+      <SchedaAccount />
 
       <Card>
         <Label icon="language-outline">{ui("Lingua")}</Label>

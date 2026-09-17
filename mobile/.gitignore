@@ -33,3 +33,7 @@ ios/
 
 # Il pacchetto per il browser lo produce `expo export`: si rigenera, non si versiona.
 dist-web/
+
+# File di scorta e di scarto: non devono mai finire nel repository.
+.env.locale-backup
+*.prima

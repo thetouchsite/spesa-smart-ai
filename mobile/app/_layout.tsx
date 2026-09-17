@@ -29,6 +29,7 @@ import { I18nProvider, useI18n } from "../src/lib/i18n";
 import { hydrate } from "../src/lib/kv";
 import { svegliaIlBackend } from "../src/lib/sveglia";
 import { useSession } from "../src/lib/state/session";
+import { useUtente } from "../src/lib/state/utente";
 import { colors, font, spacing } from "../src/theme";
 import { uiText } from "../src/lib/ui-strings";
 
@@ -49,6 +50,14 @@ export default function RootLayout() {
         await hydrate();
         // Ora che lo specchio è pieno, zustand può rileggere davvero.
         await useSession.persist.rehydrate();
+
+        // La sessione dell'account vive in un altro posto — la cassaforte del
+        // sistema, non AsyncStorage — e si riprende qui, prima di montare la
+        // navigazione. Farlo dopo vorrebbe dire mostrare per un istante
+        // l'app da sconosciuti anche a chi è già entrato: un lampeggio che
+        // sembra un difetto. Se il server non risponde non butta fuori
+        // nessuno: vedi `riprendi` in `state/utente.ts`.
+        await useUtente.getState().riprendi();
       } catch (err) {
         // Nemmeno un archivio corrotto deve impedire l'avvio: si riparte
         // vuoti e lo si dice, invece di mostrare una schermata bianca.

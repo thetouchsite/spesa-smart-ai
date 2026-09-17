@@ -14,7 +14,7 @@
  * Apple, ed etichette di accessibilità su ogni elemento interattivo.
  */
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -27,6 +27,7 @@ import {
   type StyleProp,
   type TextStyle,
   type ViewStyle,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -255,6 +256,9 @@ export function Button({
   loading = false,
   icon,
   style,
+  /* Un pulsante con la sola icona non ha nome per chi usa il lettore di
+     schermo: sente «pulsante» e basta. Qui si puo' dargliene uno. */
+  nomeAccessibile,
 }: {
   label: string;
   onPress: () => void;
@@ -263,6 +267,7 @@ export function Button({
   loading?: boolean;
   icon?: IconName;
   style?: StyleProp<ViewStyle>;
+  nomeAccessibile?: string;
 }) {
   const inactive = disabled || loading;
   const fg = variant === "primary" ? colors.primaryForeground : colors.primary;
@@ -286,7 +291,7 @@ export function Button({
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={label}
+        accessibilityLabel={nomeAccessibile ?? label}
         accessibilityState={{ busy: loading }}
         onPress={onPress}
         style={({ pressed }) => [styles.buttonAlone, pressed && styles.buttonPressed, style]}
@@ -306,7 +311,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={nomeAccessibile ?? label}
       accessibilityState={{ disabled: inactive, busy: loading }}
       disabled={inactive}
       onPress={onPress}
@@ -413,6 +418,85 @@ export function ListRow({
     >
       {content}
     </Pressable>
+  );
+}
+
+/**
+ * Un campo di testo.
+ *
+ * Non c'era, perche' fino a ieri l'app non chiedeva niente di scritto:
+ * l'onboarding e' fatto di scelte, non di parole. L'accesso invece vuole
+ * email, password e codici — e un campo scritto bene e' meta' della
+ * differenza fra un modulo che si compila e uno che si abbandona.
+ *
+ * L'errore sta SOTTO il campo e non in un avviso a parte: cosi' chi legge sa
+ * a quale riga si riferisce senza doverlo dedurre.
+ */
+export function Campo({
+  etichetta,
+  valore,
+  onChange,
+  segreto = false,
+  tipo = "testo",
+  errore,
+  aiuto,
+  autoFocus = false,
+  onInvio,
+}: {
+  etichetta: string;
+  valore: string;
+  onChange: (v: string) => void;
+  segreto?: boolean;
+  tipo?: "testo" | "email" | "cifre";
+  errore?: string | null;
+  aiuto?: string;
+  autoFocus?: boolean;
+  onInvio?: () => void;
+}) {
+  const [visibile, setVisibile] = useState(false);
+  const nascosto = segreto && !visibile;
+
+  return (
+    <View style={styles.campoBlocco}>
+      <Text style={styles.campoEtichetta}>{etichetta}</Text>
+      <View style={[styles.campoBordo, errore ? styles.campoBordoErrato : null]}>
+        <TextInput
+          value={valore}
+          onChangeText={onChange}
+          secureTextEntry={nascosto}
+          autoFocus={autoFocus}
+          onSubmitEditing={onInvio}
+          returnKeyType={onInvio ? "go" : "done"}
+          /* Su email e codici la maiuscola automatica e il correttore sono solo
+             un modo di far sbagliare: "Mario@" non e' l'indirizzo di nessuno. */
+          autoCapitalize={tipo === "testo" ? "sentences" : "none"}
+          autoCorrect={tipo === "testo"}
+          keyboardType={tipo === "email" ? "email-address" : tipo === "cifre" ? "number-pad" : "default"}
+          textContentType={segreto ? "password" : tipo === "email" ? "emailAddress" : "none"}
+          maxLength={tipo === "cifre" ? 6 : 200}
+          placeholderTextColor={colors.mutedForeground}
+          style={styles.campoTesto}
+        />
+        {segreto ? (
+          <Pressable
+            onPress={() => setVisibile((v) => !v)}
+            hitSlop={10}
+            accessibilityLabel={visibile ? "Nascondi la password" : "Mostra la password"}
+          >
+            <Ionicons
+              name={visibile ? "eye-off-outline" : "eye-outline"}
+              size={20}
+              color={colors.mutedForeground}
+            />
+          </Pressable>
+        ) : null}
+      </View>
+      {errore ? (
+        <Text style={styles.campoErrore}>{errore}</Text>
+      ) : aiuto ? (
+        <Text style={styles.campoAiuto}>{aiuto}</Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -564,4 +648,30 @@ const styles = StyleSheet.create({
   rowSubtitle: { fontSize: font.size.sm, color: colors.mutedForeground },
 
   pressed: { opacity: 0.75 },
+
+  campoBlocco: { gap: spacing.xs },
+  campoEtichetta: {
+    fontSize: font.size.sm,
+    fontWeight: font.weight.medium,
+    color: colors.foreground,
+  },
+  campoBordo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+  },
+  campoBordoErrato: { borderColor: colors.destructive },
+  campoTesto: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    fontSize: font.size.md,
+    color: colors.foreground,
+  },
+  campoErrore: { fontSize: font.size.sm, color: colors.destructive },
+  campoAiuto: { fontSize: font.size.sm, color: colors.mutedForeground },
 });
