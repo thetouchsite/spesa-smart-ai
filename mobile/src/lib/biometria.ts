@@ -24,6 +24,8 @@
  * risponde «no» senza sollevare eccezioni, e chi chiama ripiega sulla password.
  */
 
+import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 
@@ -79,11 +81,42 @@ export async function chiediConferma(motivo: string): Promise<boolean> {
 
 /* ────────────────────────────── La cassaforte ────────────────────────────── */
 
+/**
+ * SUL WEB LA CASSAFORTE NON C'E'.
+ *
+ * `expo-secure-store` e' Keychain su iPhone e Keystore su Android: nel browser
+ * non esiste nessuno dei due, e ogni chiamata fallisce. Il difetto non si
+ * vedeva come «manca la cassaforte» ma come una cosa molto peggiore — la
+ * sessione non sopravviveva a un ricaricamento della pagina, e chi provava
+ * l'app nel browser si ritrovava fuori a ogni F5 senza capire perche'.
+ *
+ * Nel browser si ripiega su AsyncStorage, che li' e' `localStorage`. NON e'
+ * la stessa protezione, e va detto: e' leggibile da qualunque codice che giri
+ * su quella pagina. Ma e' esattamente la protezione che ha la sessione di
+ * qualunque sito, e la versione web e' una comodita' di sviluppo — quella che
+ * va sugli store e' l'app nativa, dove la cassaforte c'e' davvero.
+ */
+const SUL_WEB = Platform.OS === "web";
+
+async function scrivi(chiave: string, valore: string): Promise<void> {
+  if (SUL_WEB) return AsyncStorage.setItem(chiave, valore);
+  await SecureStore.setItemAsync(chiave, valore, {
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+  });
+}
+
+async function leggi(chiave: string): Promise<string | null> {
+  return SUL_WEB ? AsyncStorage.getItem(chiave) : SecureStore.getItemAsync(chiave);
+}
+
+async function cancella(chiave: string): Promise<void> {
+  if (SUL_WEB) return AsyncStorage.removeItem(chiave);
+  await SecureStore.deleteItemAsync(chiave);
+}
+
 export async function salvaToken(token: string): Promise<void> {
   try {
-    await SecureStore.setItemAsync(CHIAVE_TOKEN, token, {
-      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-    });
+    await scrivi(CHIAVE_TOKEN, token);
   } catch {
     /* Cassaforte non disponibile: si resta senza sblocco rapido, non si
        blocca l'accesso. L'utente ridigitera' la password, che e' seccante ma
@@ -93,7 +126,7 @@ export async function salvaToken(token: string): Promise<void> {
 
 export async function leggiToken(): Promise<string | null> {
   try {
-    return await SecureStore.getItemAsync(CHIAVE_TOKEN);
+    return await leggi(CHIAVE_TOKEN);
   } catch {
     return null;
   }
@@ -101,7 +134,7 @@ export async function leggiToken(): Promise<string | null> {
 
 export async function dimenticaToken(): Promise<void> {
   try {
-    await SecureStore.deleteItemAsync(CHIAVE_TOKEN);
+    await cancella(CHIAVE_TOKEN);
   } catch {
     /* Se non si riesce a cancellare, il token scadra' da solo. */
   }
@@ -110,7 +143,7 @@ export async function dimenticaToken(): Promise<void> {
 /** L'utente vuole lo sblocco rapido? Di serie no: si accende apposta. */
 export async function sbloccoRapidoAcceso(): Promise<boolean> {
   try {
-    return (await SecureStore.getItemAsync(CHIAVE_SCELTA)) === "1";
+    return (await leggi(CHIAVE_SCELTA)) === "1";
   } catch {
     return false;
   }
@@ -118,8 +151,8 @@ export async function sbloccoRapidoAcceso(): Promise<boolean> {
 
 export async function impostaSbloccoRapido(acceso: boolean): Promise<void> {
   try {
-    if (acceso) await SecureStore.setItemAsync(CHIAVE_SCELTA, "1");
-    else await SecureStore.deleteItemAsync(CHIAVE_SCELTA);
+    if (acceso) await scrivi(CHIAVE_SCELTA, "1");
+    else await cancella(CHIAVE_SCELTA);
   } catch {
     /* vedi sopra */
   }
