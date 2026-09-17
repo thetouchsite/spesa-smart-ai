@@ -634,12 +634,15 @@ export function paPreparazione(nome: string): boolean {
  */
 export function paScheda(u: string): boolean {
   if (NON_E_UNA_PAGINA.test(u)) return false;
+  /* UN SEGMENTO CHE DICE «PRODOTTO» VALE PIU' DI TUTTO IL RESTO.
+     Si guarda per primo perche' parecchi negozi annidano la scheda dentro il
+     percorso del reparto — `/collections/frutta/products/mele` su Shopify — e
+     buttare via quell'indirizzo perche' contiene il nome di una categoria
+     farebbe sparire insegne intere. */
+  const dichiaraProdotto =
+    /\/(p|product|products|producto|productos|produkt|produkte|prodotto|prodotti|produit|produits|artikel|item|items|urun|proizvod|pdp|dp)\//i.test(u);
+  if (dichiaraProdotto) return true;
   if (E_UNA_VETRINA.test(u)) return false;
-  if (
-    /\/(p|product|products|producto|productos|produkt|produkte|prodotto|prodotti|produit|produits|artikel|item|items|urun|proizvod|pdp|dp)\//i.test(u)
-  ) {
-    return true;
-  }
   /* LA STESSA FORMA, SCRITTA IN TRE MODI DIVERSI.
      Un nome lungo accanto a un codice: e' come quasi tutti i negozi scrivono
      l'indirizzo di una scheda. Ma ognuno lo compone a modo suo, e chiedere una
@@ -710,7 +713,31 @@ const NON_E_UNA_PAGINA = /\/medias\/|\.(xml|jpe?g|png|gif|pdf|webp|svg|css|js|zi
  * Alcampo e Bonpreu Esclat girano sulla stessa piattaforma e hanno la stessa
  * cartella; da soli valevano 108.047 voci dichiarate.
  */
-const E_UNA_VETRINA = /\/(offers|ofertas|offerte|promociones|promozioni|folleto|volantino|angebote|promotions)\//i;
+/* SCAFFALI, NON SCHEDE.
+   Alle offerte e ai volantini si sono aggiunte le CATEGORIE, e ci e' voluto un
+   utente per accorgersene. Morrisons pubblica in sitemap sia i prodotti sia i
+   reparti, e i reparti vincevano quasi sempre: il loro indirizzo finisce per
+   `/categories/fruit-veg/salads/tomatoes/cherry-plum-tomatoes/183963`, cioe'
+   nome lungo piu' codice — la forma con cui qui sotto si riconosce una scheda.
+
+   Passavano in 995 su 32.873 voci, il 3%, e comparivano nei risultati molto
+   piu' spesso, perche' un reparto si chiama con le parole generiche che la
+   gente cerca — «cherry plum tomatoes» — mentre la scheda vera si chiama
+   «Morrisons The Best British Baby Plum Tomatoes 360g».
+
+   E rubavano il posto senza aggiungere niente: quella pagina di Morrisons
+   contiene quattro prodotti con quattro pesi e quattro prezzi (250 g a 0,77,
+   360 g a 2,15, 420 g a 1,40, 200 g a 2,00), e tutti e quattro il catalogo li
+   ha gia' come schede con il loro indirizzo. Tenere il reparto voleva dire
+   mostrarne uno solo, con un prezzo preso a caso fra i quattro.
+
+   QUI DENTRO NON CI VA «CATALOGO». Ce l'avevo messo insieme alle altre, e
+   l'Italia e' passata da 129.212 voci a 126.269: quasi tremila SCHEDE VERE
+   buttate, perche' parecchie insegne italiane tengono i prodotti sotto
+   /catalogo/. La parola descrive l'intero assortimento, non uno scaffale, e
+   non distingue niente. */
+const E_UNA_VETRINA =
+  /\/(offers|ofertas|offerte|promociones|promozioni|folleto|volantino|angebote|promotions|categories|category|categoria|categorias|categorie|kategorie|kategorien)\//i;
 
 /**
  * Le voci di UNA sola insegna.
@@ -868,6 +895,23 @@ async function costruisci(paese: string): Promise<CatalogoPaese | null> {
       let presi = 0;
       for (const s of salvate) {
         if (presi >= MAX_PER_INSEGNA || voci.length >= MAX_PER_PAESE) break;
+        /* SOLO LE VETRINE, NON TUTTO IL CONTROLLO.
+           Il magazzino conserva quello che era buono ALLORA: quando la regola
+           cambia, le righe vecchie restano dentro finche' qualcuno non ripassa
+           dai negozi. Le categorie di Morrisons sono entrate cosi' e ci
+           sarebbero rimaste un giorno intero dopo essere state escluse.
+
+           La prima versione di questa riga chiamava `paScheda` intera, e
+           l'Italia e' passata da 129.212 voci a 126.269: quasi tremila righe
+           buttate senza sapere se fossero spazzatura o prodotti buoni che
+           `paScheda` non riconosce. Il magazzino le ha accettate a suo tempo,
+           e non ho una misura che dica che sbagliava.
+
+           Quindi qui si toglie solo cio' che si sa essere uno scaffale —
+           categorie, offerte, volantini — e si lascia stare il resto. Buttare
+           quello di cui non si e' sicuri e' il contrario di quel che serve
+           adesso, che e' un dataset di cui fidarsi. */
+        if (E_UNA_VETRINA.test(s.url)) continue;
         const p = parole(s.nome);
         if (p.length === 0) continue;
         voci.push({

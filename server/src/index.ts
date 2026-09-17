@@ -89,7 +89,7 @@ import { FRESCHEZZA_MS, statoMagazzino } from "./api/prezzi-magazzino.js";
 import { statoCataloghi } from "./api/catalogo-magazzino.js";
 import { prezziDaiCataloghiIT } from "./api/catalogo-it.js";
 import { annota } from "./base/diario.js";
-import { statoVocabolario, quanteImparate } from "./api/vocabolario.js";
+import { statoVocabolario, quanteImparate, rileggiImparate } from "./api/vocabolario.js";
 import { saluteIA } from "./base/salute-ia.js";
 import { rispostaPrezziV1 } from "./api/contratto-v1.js";
 import { collegaTraduttore } from "./api/aiuti-esterni.js";
@@ -2117,5 +2117,10 @@ if (MIO_INDIRIZZO) {
   }, OGNI_MS).unref();
   console.info(`[sveglio] mi tengo sveglio da solo ogni 10 minuti (${MIO_INDIRIZZO})`);
 }
+
+/* Le parole che il dizionario ha imparato sulle macchine di prima.
+   Non si attende: se il database tarda, l'API parte lo stesso con il
+   dizionario scritto a mano, e le parole imparate arrivano un attimo dopo. */
+void rileggiImparate();
 
 app.listen(port);

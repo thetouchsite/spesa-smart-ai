@@ -310,9 +310,43 @@ export function traduciVoce(
   const fuori: string[] = [];
   const sconosciute: string[] = [];
 
+  /* UNA VOCE NOMINA UN PRODOTTO SOLO. IL RESTO E' IL NOME DELLA VARIETA'.
+     «Mele Cox's Orange Pippin» usciva tradotta «apples cox's ORANGES pippin»,
+     e da li' la ricerca inglese portava arance — Sainsbury's oranges, e anche
+     la Fanta. «Orange» li' dentro non e' un'arancia: e' un pezzo del nome
+     della varieta' di mela.
+
+     La spia e' la parola che viene PRIMA. In «Mele Cox's Orange Pippin» la
+     parola prima di «Orange» e' «Cox's», che il dizionario non conosce: un
+     cibo che spunta in mezzo a parole sconosciute, quando il prodotto e' gia'
+     stato nominato, sta dentro un nome proprio, non e' un secondo ingrediente.
+
+     Sono due condizioni insieme, e servono tutte e due. In «salsa di
+     pomodoro» e «latte di mandorla» il secondo cibo viene dopo «di», che e'
+     una parola di servizio e non una sconosciuta: quelle restano intatte. */
+  /* «DA», «PER», «FOR»: DICONO A COSA SERVE, NON CHE COS'E'.
+     «Pomodori da insalata» restituiva insalate di tonno con dentro i
+     pomodori: la ricerca dava a «insalata» lo stesso peso di «pomodori», e
+     vinceva chi aveva tutte e due le parole. Ma li' l'insalata non e' un
+     ingrediente — e' l'uso a cui i pomodori sono destinati.
+
+     Le lingue lo segnano, e l'italiano lo segna bene: «di» introduce un
+     ingrediente — «latte DI mandorla» e' fatto di mandorle — mentre «da»
+     introduce lo scopo: «pomodori DA insalata», «patate DA forno», «mele DA
+     forno». Sono due preposizioni diverse apposta, e finora venivano buttate
+     tutte e due nello stesso mucchio delle parole di servizio. */
+  const SCOPO = new Set(["da", "per", "for", "zum", "para", "pour"]);
+
+  let gia = false;          // il prodotto e' gia' stato nominato?
+  let primaSconosciuta = false; // la parola appena passata era sconosciuta?
+  let primaScopo = false;   // la parola appena passata era «da», «per», «for»…
+
   for (const p of parole) {
     // Articoli e preposizioni: si tolgono e basta.
-    if (PAROLE_DI_SERVIZIO.has(p)) continue;
+    if (PAROLE_DI_SERVIZIO.has(p)) {
+      primaScopo = SCOPO.has(p);
+      continue;
+    }
 
     /* Numeri, unita' e formati si lasciano stare: «500 g» e' uguale in ogni
        lingua, e la ricerca nel catalogo li scarta comunque. Non sono parole
@@ -329,7 +363,18 @@ export function traduciVoce(
     }
     const i = INDICE.get(p) ?? varianti(p).map((v) => INDICE.get(v)).find((x) => x !== undefined);
     if (i !== undefined) {
+      if (gia && (primaSconosciuta || primaScopo)) {
+        /* Sta dentro un nome proprio: non si traduce e non si cerca. Tenerla
+           com'e' non basterebbe — «orange» nel catalogo inglese trova le
+           arance uguale, ed e' proprio quello che si vuole evitare. */
+        primaSconosciuta = false;
+        primaScopo = false;
+        continue;
+      }
       fuori.push(CONCETTI[i][lingua]);
+      gia = true;
+      primaSconosciuta = false;
+      primaScopo = false;
       continue;
     }
 
@@ -338,13 +383,22 @@ export function traduciVoce(
     const appresa = cercaImparata(p, lingua);
     if (appresa) {
       fuori.push(appresa);
+      gia = true;
+      primaSconosciuta = false;
+      primaScopo = false;
       continue;
     }
 
     fuori.push(p);
     // Le parole corte sono articoli e preposizioni: «di», «da», «the», «of».
     // Non vale la pena spendere una chiamata per tradurle.
-    if (p.length > 3) sconosciute.push(p);
+    primaScopo = false;
+    if (p.length > 3) {
+      sconosciute.push(p);
+      primaSconosciuta = true;
+    } else {
+      primaSconosciuta = false;
+    }
   }
 
   /* «Pomodori pelati» traduce «pomodori»→tomatoes e «pelati»→chopped tomatoes,
@@ -385,6 +439,7 @@ export function statoVocabolario(): { concetti: number; parole: number; lingue: 
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDbConfigured, vocabolario } from "../base/db.js";
 
 const FILE_IMPARATE = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -404,7 +459,19 @@ try {
   // Il file non c'e' ancora: e' il caso normale la prima volta.
 }
 
-function salvaImparate(): void {
+/* IL DISCO NON BASTA, E SU RENDER NON SERVE PROPRIO A NIENTE.
+   Le parole imparate stavano solo in `diario/vocabolario-imparato.json`. In
+   locale funziona: il file resta e il dizionario cresce. In produzione no —
+   il disco di Render e' effimero, a ogni riavvio il file sparisce e il
+   dizionario riparte da zero. Cioe' proprio dove il risparmio contava, non
+   c'era: si ripagava il modello per tradurre le stesse parole, ogni volta.
+
+   Non dava errore. Il dizionario funzionava, traduceva, imparava — e
+   dimenticava. L'unico segno era la spesa del modello che non scendeva mai.
+
+   Adesso, quando c'e' un database, le parole vanno li'. Il file resta per chi
+   lavora senza Mongo: non e' un doppione, e' l'alternativa. */
+function salvaSuDisco(): void {
   try {
     mkdirSync(dirname(FILE_IMPARATE), { recursive: true });
     writeFileSync(FILE_IMPARATE, JSON.stringify(Object.fromEntries(imparate), null, 2), "utf8");
@@ -412,6 +479,57 @@ function salvaImparate(): void {
     // Se il disco non si scrive si continua lo stesso: la memoria basta per
     // oggi, e una lista della spesa non deve fallire per un file.
     console.warn("[vocabolario] parole imparate non salvate:", err);
+  }
+}
+
+function salvaImparate(nuove: Array<[string, string]>): void {
+  if (!isDbConfigured()) {
+    salvaSuDisco();
+    return;
+  }
+  /* Non si attende: chi sta aspettando una lista della spesa non deve pagare
+     una scrittura che serve alla PROSSIMA richiesta, non alla sua. Se fallisce
+     la parola resta in memoria per questa macchina, e si reimparera'. */
+  void (async () => {
+    try {
+      const col = await vocabolario();
+      await col.bulkWrite(
+        nuove.map(([chiave, tradotta]) => ({
+          updateOne: {
+            filter: { _id: chiave },
+            update: { $set: { tradotta, imparata: new Date() } },
+            upsert: true,
+          },
+        })),
+        { ordered: false },
+      );
+    } catch (err) {
+      console.warn("[vocabolario] parole imparate non salvate sul database:", err);
+    }
+  })();
+}
+
+/**
+ * Rilegge dal database quello che hanno imparato le macchine di prima.
+ *
+ * Si chiama all'avvio, una volta. Non blocca: se il database e' lento o non
+ * risponde, il dizionario scritto a mano c'e' comunque e l'API parte lo
+ * stesso — con qualche traduzione in meno, non con un errore.
+ */
+export async function rileggiImparate(): Promise<void> {
+  if (!isDbConfigured()) return;
+  try {
+    const col = await vocabolario();
+    let n = 0;
+    for await (const d of col.find({})) {
+      if (!imparate.has(d._id)) {
+        imparate.set(d._id, d.tradotta);
+        n++;
+      }
+    }
+    if (n) console.info(`[vocabolario] ${n} parole imparate rilette dal database`);
+  } catch (err) {
+    console.warn("[vocabolario] parole imparate non rilette dal database:", err);
   }
 }
 
@@ -427,14 +545,15 @@ export function impara(parola: string, lingua: Lingua, tradotta: string): void {
   const t = pulisci(tradotta);
   if (!p || !t || p === t) return;
   if (INDICE.has(p)) return; // la parte scritta a mano vince sempre
-  let nuove = 0;
+  const nuove: Array<[string, string]> = [];
   for (const v of varianti(p)) {
-    if (!imparate.has(`${v}|${lingua}`)) {
-      imparate.set(`${v}|${lingua}`, t);
-      nuove++;
+    const chiave = `${v}|${lingua}`;
+    if (!imparate.has(chiave)) {
+      imparate.set(chiave, t);
+      nuove.push([chiave, t]);
     }
   }
-  if (nuove) salvaImparate();
+  if (nuove.length) salvaImparate(nuove);
 }
 
 /** Cerca fra le parole imparate. Usata da `traduciVoce`. */
