@@ -400,10 +400,14 @@ export function paginaPannello(): string {
   .lt .fondo{position:absolute;left:0;top:0;bottom:0;background:var(--verde-velo);
     z-index:0;border-right:1px solid rgba(0,0,0,.04)}
   .lt > span{position:relative;z-index:1}
-  .lt .chi{display:flex;align-items:center;gap:6px;min-width:0}
+  .lt .chi{display:flex;align-items:flex-start;gap:6px;min-width:0}
+  .lt .chi .pallino{margin-top:5px;flex:none}
+  .lt .nomeria{min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:0 6px}
   .lt .chi b{font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;
     text-overflow:ellipsis}
   .lt .chi em{font-family:var(--mono);font-style:normal;font-size:10px;color:var(--lieve)}
+  .lt .chi u{flex-basis:100%;text-decoration:none;font-family:var(--mono);font-size:10px;
+    color:var(--lieve);line-height:1.4;word-break:break-word}
   .lt .num{font-family:var(--mono);font-size:12.5px;text-align:right;
     font-variant-numeric:tabular-nums}
   .lt .num.forte{color:var(--verde);font-weight:600}
@@ -441,6 +445,28 @@ export function paginaPannello(): string {
   .gruppo{background:var(--incavo);padding:5px 16px;font-size:10px;font-weight:700;
     letter-spacing:.07em;text-transform:uppercase;color:var(--lieve);
     border-bottom:1px solid var(--filo)}
+
+  /* IL GRAFICO NEL TEMPO.
+     Le barre dicono quanto si &egrave; letto in un giorno; questo dice se la curva
+     sale o scende, che &egrave; una domanda diversa e non si legge da quattordici
+     barre affiancate. Due tracce: quante pagine aperte e quante con prezzo —
+     la distanza fra le due &Egrave; la resa, disegnata invece che calcolata.
+     Niente librerie: &egrave; un percorso SVG, e una libreria da cento chilobyte
+     per quattordici punti sarebbe un cannone su una zanzara. */
+  .grafico{background:var(--piano);border:1px solid var(--filo);border-radius:9px;
+    padding:14px 12px 8px;margin-bottom:14px}
+  .grafico svg{display:block;width:100%;height:auto}
+  .grafico .griglia{stroke:var(--filo);stroke-width:1}
+  .grafico .etichetta{fill:var(--lieve);font-family:var(--mono);font-size:9px}
+  .grafico .area{fill:var(--verde-velo)}
+  .grafico .linea{fill:none;stroke:var(--verde);stroke-width:2;stroke-linejoin:round;
+    stroke-linecap:round}
+  .grafico .linea.seconda{stroke:var(--ambra);stroke-width:1.6;stroke-dasharray:3 3}
+  .grafico .punta{fill:var(--verde)}
+  .legenda{display:flex;gap:16px;font-size:10.5px;color:var(--lieve);margin-top:4px;
+    padding-left:4px}
+  .legenda i{display:inline-block;width:14px;height:3px;border-radius:2px;
+    vertical-align:middle;margin-right:5px}
 
   .gg{display:grid;grid-template-columns:70px 1fr 74px 96px 56px;gap:12px;align-items:center;
     padding:7px 16px;border-bottom:1px solid var(--filo)}
@@ -545,6 +571,7 @@ export function paginaPannello(): string {
     <div class="paesi" id="perpaese"></div>
 
     <h2>Giorno per giorno</h2>
+    <div class="grafico" id="grafico"></div>
     <div class="paesi" id="pergiorno"></div>
   </section>
 
@@ -598,8 +625,15 @@ function schedaViva(g, adesso) {
   const paesi = (g.paesi || []).join(" ");
   return '<div class="lt' + (zitto ? " zitta" : "") + '" title="' + paesi + '">' +
     '<i class="fondo" style="width:' + resa + '%"></i>' +
-    '<span class="chi"><span class="pallino"></span><b>' + g.macchina + '</b>' +
-      (g.pid ? '<em>#' + g.pid + '</em>' : "") + "</span>" +
+    '<span class="chi"><span class="pallino"></span>' +
+      '<span class="nomeria"><b>' + g.macchina + '</b>' +
+      (g.pid ? '<em>#' + g.pid + '</em>' : "") +
+      /* I PAESI IN CHIARO, NON NEL SUGGERIMENTO DEL MOUSE.
+         Erano nel title: si vedevano fermandoci sopra il puntatore, cio&egrave; mai.
+         &Egrave; l&rsquo;informazione che dice se due macchine si stanno pestando i piedi
+         e perch&eacute; una rende met&agrave; dell&rsquo;altra — la resa la fa il paese, non la
+         macchina. Va letta senza fare niente. */
+      '<u>' + (paesi || "&mdash;") + "</u></span></span>" +
     '<span class="num">' + n(g.aperte) + "</span>" +
     '<span class="num">' + n(g.conPrezzo) + "</span>" +
     '<span class="num forte">' + resa + "%</span>" +
@@ -870,6 +904,59 @@ async function aggiorna() {
     giorni.push({ chiave, data: x, r: perData.get(chiave) });
   }
   const NOMI = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
+
+  /* IL GRAFICO. Coordinate a mano su una tela di 900x200: con quattordici
+     punti il conto &egrave; una moltiplicazione, e qualunque libreria costerebbe
+     pi&ugrave; di tutto il pannello messo insieme. */
+  (function () {
+    const L = 46, R = 8, T = 10, B = 22, W = 900, H = 200;
+    const dentroW = W - L - R, dentroH = H - T - B;
+    const serie = giorni.map((g) => (g.r ? g.r.aperte : 0));
+    const serie2 = giorni.map((g) => (g.r ? g.r.conPrezzo : 0));
+    const max = Math.max(1, ...serie);
+    const x = (i) => L + (giorni.length === 1 ? dentroW / 2 : (i * dentroW) / (giorni.length - 1));
+    const y = (v) => T + dentroH - (v / max) * dentroH;
+
+    const punti = serie.map((v, i) => x(i) + "," + y(v)).join(" ");
+    const punti2 = serie2.map((v, i) => x(i) + "," + y(v)).join(" ");
+    const area = "M" + x(0) + "," + (T + dentroH) + " L" + punti.split(" ").join(" L") +
+      " L" + x(giorni.length - 1) + "," + (T + dentroH) + " Z";
+
+    let griglia = "";
+    for (let k = 0; k <= 2; k++) {
+      const v = (max / 2) * k;
+      const yy = y(v);
+      griglia += '<line class="griglia" x1="' + L + '" y1="' + yy + '" x2="' + (W - R) +
+        '" y2="' + yy + '"></line>' +
+        '<text class="etichetta" x="' + (L - 6) + '" y="' + (yy + 3) +
+        '" text-anchor="end">' + n(Math.round(v)) + "</text>";
+    }
+
+    let assex = "";
+    giorni.forEach((g, i) => {
+      /* Non tutte le date: con quattordici etichette si toccano. Una s&igrave; e una
+         no, e l&rsquo;ultima sempre, perch&eacute; &egrave; quella che si va a cercare. */
+      if (i % 2 !== 0 && i !== giorni.length - 1) return;
+      assex += '<text class="etichetta" x="' + x(i) + '" y="' + (H - 6) +
+        '" text-anchor="middle">' + g.data.getDate() + "</text>";
+    });
+
+    const ultimo = serie.length - 1;
+    document.getElementById("grafico").innerHTML =
+      '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" role="img" ' +
+      'aria-label="Pagine aperte al giorno, ultimi quattordici giorni">' +
+      griglia +
+      '<path class="area" d="' + area + '"></path>' +
+      '<polyline class="linea seconda" points="' + punti2 + '"></polyline>' +
+      '<polyline class="linea" points="' + punti + '"></polyline>' +
+      '<circle class="punta" cx="' + x(ultimo) + '" cy="' + y(serie[ultimo]) + '" r="3.5"></circle>' +
+      assex +
+      "</svg>" +
+      '<div class="legenda">' +
+      '<span><i style="background:var(--verde)"></i>pagine aperte</span>' +
+      '<span><i style="background:var(--ambra)"></i>con prezzo</span>' +
+      "</div>";
+  })();
   document.getElementById("pergiorno").innerHTML =
     '<div class="gg cap"><span>giorno</span><span>tempo di lettura</span><span>ore</span><span>aperte</span><span>resa</span></div>' +
     giorni.map((g, i) => {
