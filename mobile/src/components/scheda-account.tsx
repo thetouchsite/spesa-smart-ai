@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Alert, StyleSheet, Switch, View } from "react-native";
+import { StyleSheet, Switch, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Body, Button, Card, Ionicons, Label, ListRow } from "./ui";
 import { useUtente } from "../lib/state/utente";
@@ -28,6 +28,7 @@ import {
   sbloccoRapidoAcceso,
 } from "../lib/biometria";
 import { colors, font, spacing } from "../theme";
+import { confermaAzione } from "../lib/conferma";
 
 export function SchedaAccount() {
   const router = useRouter();
@@ -60,10 +61,15 @@ export function SchedaAccount() {
   }
 
   function confermaUscita() {
-    Alert.alert("Vuoi uscire?", "I piani salvati restano al sicuro sul tuo account.", [
-      { text: "Annulla", style: "cancel" },
-      { text: "Esci", style: "destructive", onPress: () => void esci() },
-    ]);
+    void (async () => {
+      const si = await confermaAzione({
+        titolo: "Vuoi uscire?",
+        testo: "I piani salvati restano al sicuro sul tuo account.",
+        conferma: "Esci",
+        distruttiva: true,
+      });
+      if (si) await esci();
+    })();
   }
 
   /* La cancellazione ha una schermata sua e non un avviso con campo dentro:

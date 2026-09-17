@@ -38,7 +38,7 @@
  */
 
 import { useCallback, useState } from "react";
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -59,6 +59,7 @@ import { useSession } from "../src/lib/state/session";
 import { SessioneScaduta } from "../src/lib/api/cliente";
 import { colors, font, radius, spacing, spazioPerLaBarra } from "../src/theme";
 import { tornaIndietro } from "../src/lib/navigazione";
+import { confermaAzione } from "../src/lib/conferma";
 
 type Stato = "carico" | "pronto" | "errore";
 
@@ -139,35 +140,35 @@ export default function PianiScreen() {
        corso non c'e', o e' gia' questo, non c'e' niente da chiedere: una
        domanda a cui la risposta e' sempre «si'» insegna solo a non leggere. */
     if (!currentPlan || currentPlan === p.plan) return metti(p);
-    Alert.alert(
-      "Aprire questo piano?",
-      "Quello che hai in corso viene sostituito. Se non l'hai salvato, lo perdi.",
-      [
-        { text: "Annulla", style: "cancel" },
-        { text: "Apri", onPress: () => metti(p) },
-      ],
-    );
+    void (async () => {
+      const si = await confermaAzione({
+        titolo: "Aprire questo piano?",
+        testo: "Quello che hai in corso viene sostituito. Se non l'hai salvato, lo perdi.",
+        conferma: "Apri",
+      });
+      if (si) metti(p);
+    })();
   }
 
   function cancella(p: SavedPlan) {
-    Alert.alert("Cancellare questo piano?", p.label, [
-      { text: "Annulla", style: "cancel" },
-      {
-        text: "Cancella",
-        style: "destructive",
-        onPress: async () => {
-          /* Si toglie subito dall'elenco e poi si chiede al server. Aspettare la
-             risposta per far sparire una riga fa sembrare l'app lenta; se il
-             server rifiuta, il ricaricamento la rimette al suo posto. */
-          setPiani((attuali) => attuali.filter((x) => x.id !== p.id));
-          try {
-            await getPlanStore().delete(p.id);
-          } catch {
-            await carica(true);
-          }
-        },
-      },
-    ]);
+    void (async () => {
+      const si = await confermaAzione({
+        titolo: "Cancellare questo piano?",
+        testo: p.label,
+        conferma: "Cancella",
+        distruttiva: true,
+      });
+      if (!si) return;
+      /* Si toglie subito dall'elenco e poi si chiede al server. Aspettare la
+         risposta per far sparire una riga fa sembrare l'app lenta; se il
+         server rifiuta, il ricaricamento la rimette al suo posto. */
+      setPiani((attuali) => attuali.filter((x) => x.id !== p.id));
+      try {
+        await getPlanStore().delete(p.id);
+      } catch {
+        await carica(true);
+      }
+    })();
   }
 
   if (stato === "carico") {
@@ -221,15 +222,21 @@ export default function PianiScreen() {
           </View>
         ) : (
           piani.map((p) => (
-            <Pressable
-              key={p.id}
-              accessibilityRole="button"
-              accessibilityLabel={`Apri il piano ${p.label}`}
-              onPress={() => apri(p)}
-              style={({ pressed }) => [pressed && styles.premuto]}
-            >
-              <Card>
-                <View style={styles.riga}>
+            /* IL PREMIBILE STA DENTRO LA SCHEDA, NON ATTORNO.
+               Avvolgere tutta la scheda sembrava piu' comodo — si apre da
+               qualunque punto — ma dentro c'e' il cestino, che e' gia' un
+               pulsante: sul web diventava un <button> dentro un <button>, che
+               l'HTML vieta e React segnala con un errore in console. Adesso
+               sono fratelli — il testo con la freccia apre, il cestino
+               cancella — e nessuno dei due sta dentro l'altro. */
+            <Card key={p.id}>
+              <View style={styles.riga}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Apri il piano ${p.label}`}
+                  onPress={() => apri(p)}
+                  style={({ pressed }) => [styles.apri, pressed && styles.premuto]}
+                >
                   <View style={styles.testo}>
                     <Body style={styles.titolo}>{p.label}</Body>
                     <Body style={styles.data}>
@@ -245,14 +252,6 @@ export default function PianiScreen() {
                       </Body>
                     </View>
                   </View>
-                  <Button
-                    label=""
-                    nomeAccessibile={`Cancella il piano ${p.label}`}
-                    icon="trash-outline"
-                    variant="ghost"
-                    onPress={() => cancella(p)}
-                    style={styles.cestino}
-                  />
                   {/* La freccia dice che la riga si apre. Senza, una scheda con
                       dentro un cestino sembra una scheda con dentro un cestino
                       — e nient'altro. */}
@@ -262,9 +261,17 @@ export default function PianiScreen() {
                     color={colors.mutedForeground}
                     style={styles.freccia}
                   />
-                </View>
-              </Card>
-            </Pressable>
+                </Pressable>
+                <Button
+                  label=""
+                  nomeAccessibile={`Cancella il piano ${p.label}`}
+                  icon="trash-outline"
+                  variant="ghost"
+                  onPress={() => cancella(p)}
+                  style={styles.cestino}
+                />
+              </View>
+            </Card>
           ))
         )}
 
@@ -302,6 +309,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
+  apri: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   cestino: { paddingHorizontal: spacing.sm },
   freccia: { marginTop: spacing.sm },
   premuto: { opacity: 0.7 },

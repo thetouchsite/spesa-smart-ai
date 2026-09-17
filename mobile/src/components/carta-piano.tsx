@@ -1,40 +1,42 @@
 /**
- * Il piano, in home, con lo stesso vestito che ha nei risultati.
+ * Il piano, in home: quanto partivi, quanto spendi, quanto resta in tasca.
  *
- * PERCHE' NON UNA CARTA VERDE QUALSIASI
- * -------------------------------------
- * Prima era un rettangolo col gradiente verde e la spesa scritta dentro:
- * corretto e dimenticabile. Il problema non era la bellezza, era che non
- * somigliava a niente. Chi la toccava finiva sulla schermata del piano, dove
- * lo stesso contenuto ha un'altra faccia — cifra arancione grande, macchie di
- * colore, la striscia dei tre numeri — e quel salto fa sembrare di essere
- * finiti altrove invece che dentro la cosa che si e' toccata.
+ * PERCHE' E' SCURA MENTRE TUTTO IL RESTO E' CHIARO
+ * ------------------------------------------------
+ * Non per fare la bella: perche' e' l'unica cosa in quella schermata che non
+ * e' un elenco. Sotto ci sono i pasti di oggi e la spesa che manca — due
+ * schede bianche con dentro delle righe — e una terza scheda bianca in cima si
+ * leggeva come la prima riga di quell'elenco. Sul fondo scuro il numero
+ * arancione e' la prima cosa che si vede entrando, che e' esattamente il suo
+ * mestiere. Ed e' lo stesso verde quasi nero della barra in basso: il nero,
+ * accanto al verde del marchio, vira al freddo e sembra di un'altra app.
  *
- * Adesso e' la versione piccola di `EroeRisparmio`. Stesso occhiello, stesso
- * serif, stesso arancione, stesse macchie sfocate: la carta in home e la
- * schermata in fondo al tocco si riconoscono come lo stesso oggetto, visto
- * prima da lontano e poi da vicino.
+ * IL CONTO SI LEGGE COME UNO SCONTRINO
+ * ------------------------------------
+ * «Risparmi 82 €» da solo non si verifica: 82 rispetto a cosa? La striscia
+ * dice da dove si parte — il budget che l'utente ha scritto lui — quanto si
+ * spende davvero, e di quanto e' la differenza in percentuale. Tre numeri che
+ * si controllano a vicenda: chi legge puo' fare la sottrazione a mente e
+ * trovarla giusta. Il prezzo di partenza e' barrato perche' e' il modo in cui
+ * si scrive un prezzo superato, ed e' gia' come la lista della spesa mostra
+ * gli sconti dei supermercati.
  *
- * QUALE NUMERO VA GRANDE
- * ----------------------
- * Il risparmio, non la spesa — quando c'e'. E' la stessa scelta dei risultati
- * ed e' la piu' importante di tutto il disegno: «68 €» dice quanto esce dal
- * portafoglio, «82 €» dice cosa ci resta dentro. La spesa non sparisce, scende
- * nella striscia insieme a prodotti e giorni.
+ * QUANDO IL BUDGET NON C'E'
+ * -------------------------
+ * Non si inventa un prezzo di partenza per avere uno sconto da mostrare:
+ * senza budget non c'e' risparmio da dichiarare, va grande la spesa e la
+ * striscia torna a dire prodotti e giorni. Un numero che non abbiamo non
+ * diventa un numero brutto, diventa una frase onesta — e' la regola di tutta
+ * l'app.
  *
  * E I NUMERI NON SE LI CALCOLA LEI
  * --------------------------------
  * Glieli passa `CruscottoOggi`, che li prende da `computeResults` — lo stesso
  * posto da cui li prende la schermata del piano. Per un giorno non e' stato
- * cosi': la carta faceva il suo conto (risparmio rispetto all'insegna piu'
- * cara) e la schermata il suo (budget meno spesa), e si leggevano due numeri
- * diversi per lo stesso piano a un tocco di distanza. Due conti giusti che
- * rispondono a due domande diverse sono peggio di un conto sbagliato: nessuno
- * dei due sembra un errore, e non si capisce a quale credere.
- *
- * Quando il risparmio non c'e' — budget non impostato, o nessun prezzo — non
- * si scrive zero: va grande la spesa e il titolo cambia. Quando invece si e'
- * sopra il budget va grande di quanto, con il titolo dei risultati.
+ * cosi': la carta faceva il suo conto e la schermata il suo, e si leggevano
+ * due numeri diversi per lo stesso piano a un tocco di distanza. Due conti
+ * giusti che rispondono a due domande diverse sono peggio di un conto
+ * sbagliato: nessuno dei due sembra un errore, e non si capisce a chi credere.
  */
 
 import { Platform, Pressable, StyleSheet, View } from "react-native";
@@ -44,10 +46,25 @@ import { colors, font, spacing } from "../theme";
 /** Il serif di sistema, come nell'eroe dei risultati. */
 const SERIF = Platform.select({ ios: "Georgia", android: "serif", default: "Georgia" });
 
+/** Lo stesso verde quasi nero della barra in basso. */
+const FONDO = "#12241B";
+const CHIARO = "#F4F7F3";
+const SPENTO = "rgba(244, 247, 243, 0.62)";
+const FILO = "rgba(244, 247, 243, 0.12)";
+
+interface Colonna {
+  testa: string;
+  valore: string;
+  icona: React.ComponentProps<typeof Ionicons>["name"];
+  barrato?: boolean;
+  acceso?: boolean;
+}
+
 export function CartaPiano({
   spesa,
   valuta,
   risparmio,
+  budget = 0,
   sfora = false,
   periodo = "a settimana",
   prodotti,
@@ -62,7 +79,9 @@ export function CartaPiano({
    * a sceglierlo — qui si disegna soltanto.
    */
   risparmio?: number | null;
-  /** Si sta spendendo piu' del budget. Cambia il titolo, non il disegno. */
+  /** Il budget scritto dall'utente: il prezzo da cui si parte. 0 = non l'ha messo. */
+  budget?: number;
+  /** Si sta spendendo piu' del budget. Cambia le parole, non il disegno. */
   sfora?: boolean;
   /** «a settimana» o «al mese», secondo la frequenza scelta. */
   periodo?: string;
@@ -72,39 +91,57 @@ export function CartaPiano({
 }) {
   const quanto = typeof risparmio === "number" ? risparmio : 0;
   const siRisparmia = !sfora && quanto > 0;
-  const mostraRisparmio = sfora ? quanto > 0 : siRisparmia;
-  const cifra = Math.round(mostraRisparmio ? quanto : spesa);
+  const grande = sfora ? quanto > 0 : siRisparmia;
+  const cifra = Math.round(grande ? quanto : spesa);
 
-  /* La striscia non ripete mai la cifra grande: se sopra c'e' il risparmio,
-     sotto c'e' la spesa; se sopra c'e' gia' la spesa, restano in due. */
-  const colonne: {
-    icona: React.ComponentProps<typeof Ionicons>["name"];
-    testa: string;
-    valore: string;
-  }[] = [
-    ...(siRisparmia
-      ? [
-          {
-            icona: "wallet-outline" as const,
-            testa: "SPESA",
-            valore: `${valuta}${Math.round(spesa)}`,
-          },
-        ]
-      : []),
-    { icona: "basket-outline", testa: "PRODOTTI", valore: String(prodotti) },
-    { icona: "calendar-outline", testa: "GIORNI", valore: String(giorni) },
-  ];
+  /* Lo scontrino si mostra solo se il budget c'e': senza, il prezzo di
+     partenza sarebbe inventato, e lo sconto con lui. */
+  const scontrino = budget > 0 && grande;
+  const percentuale = budget > 0 ? Math.round((quanto / budget) * 100) : 0;
+
+  const colonne: Colonna[] = scontrino
+    ? [
+        {
+          testa: "PARTIVI DA",
+          valore: valuta + String(Math.round(budget)),
+          icona: "wallet-outline",
+          barrato: true,
+        },
+        {
+          testa: "SPESA",
+          valore: valuta + String(Math.round(spesa)),
+          icona: "cart-outline",
+        },
+        {
+          testa: sfora ? "SOPRA DI" : "SCONTO",
+          valore: (sfora ? "+" : "−") + String(percentuale) + "%",
+          icona: sfora ? "alert-circle-outline" : "pricetag-outline",
+          acceso: true,
+        },
+      ]
+    : [
+        { testa: "PRODOTTI", valore: String(prodotti), icona: "basket-outline" },
+        { testa: "GIORNI", valore: String(giorni), icona: "calendar-outline" },
+      ];
+
+  const descrizione = sfora
+    ? "Il tuo piano: " + cifra + " " + valuta + " sopra il budget. Apri il piano"
+    : siRisparmia
+      ? "Il tuo piano: partivi da " +
+        Math.round(budget) +
+        " " +
+        valuta +
+        ", spendi " +
+        Math.round(spesa) +
+        ", risparmi " +
+        cifra +
+        ". Apri il piano"
+      : "Il tuo piano: spesa " + cifra + " " + valuta + ". Apri il piano";
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={
-        sfora
-          ? `Il tuo piano: ${cifra} ${valuta} sopra il budget. Apri il piano`
-          : siRisparmia
-            ? `Il tuo piano: risparmi ${cifra} ${valuta}, spesa ${Math.round(spesa)} ${valuta}. Apri il piano`
-            : `Il tuo piano: spesa ${cifra} ${valuta}. Apri il piano`
-      }
+      accessibilityLabel={descrizione}
       onPress={onPress}
       style={({ pressed }) => [stili.carta, pressed && stili.premuta]}
     >
@@ -118,7 +155,7 @@ export function CartaPiano({
           <Ionicons name="sparkles" size={13} color={colors.accent} />
           <Body style={stili.occhielloTesto}>IL TUO PIANO</Body>
         </View>
-        <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
+        <Ionicons name="chevron-forward" size={18} color={SPENTO} />
       </View>
 
       <Body style={stili.titolo}>
@@ -134,41 +171,64 @@ export function CartaPiano({
         <Body style={stili.numero}>{cifra}</Body>
         <Body style={stili.periodo}>{sfora ? "oltre il budget" : periodo}</Body>
       </View>
-      {siRisparmia ? <Body style={stili.nota}>rispetto al budget che hai messo</Body> : null}
 
       <View style={stili.striscia}>
         {colonne.map((c) => (
           <View key={c.testa} style={stili.colonna}>
             <View style={stili.etichettaRiga}>
-              <Ionicons name={c.icona} size={11} color={colors.mutedForeground} />
+              <Ionicons name={c.icona} size={11} color={SPENTO} />
               <Body style={stili.etichetta}>{c.testa}</Body>
             </View>
-            <Body style={stili.valore}>{c.valore}</Body>
+            <Body
+              style={[
+                stili.valore,
+                c.barrato && stili.valoreBarrato,
+                c.acceso && stili.valoreAcceso,
+              ]}
+            >
+              {c.valore}
+            </Body>
           </View>
         ))}
       </View>
+
+      {/* PRODOTTI E GIORNI CON LA LORO ICONA.
+          Erano una riga di testo minuto sotto il conto, e a quella dimensione
+          una riga di testo si salta. Con l'icona davanti diventano due cose da
+          guardare invece che da leggere, e il numero si prende in un colpo
+          d'occhio — che e' tutto quello che serve sapere di loro. */}
+      {scontrino ? (
+        <View style={stili.coda}>
+          <View style={stili.codaVoce}>
+            <Ionicons name="basket-outline" size={13} color={SPENTO} />
+            <Body style={stili.codaTesto}>{prodotti} prodotti</Body>
+          </View>
+          <View style={stili.codaVoce}>
+            <Ionicons name="calendar-outline" size={13} color={SPENTO} />
+            <Body style={stili.codaTesto}>{giorni} giorni</Body>
+          </View>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
 
 const stili = StyleSheet.create({
   carta: {
-    backgroundColor: colors.card,
+    backgroundColor: FONDO,
     borderRadius: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
     padding: spacing.lg,
     overflow: "hidden",
-    shadowColor: "#1D2A37",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 4,
+    shadowColor: "#0A160F",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.28,
+    shadowRadius: 22,
+    elevation: 6,
   },
-  premuta: { opacity: 0.85 },
+  premuta: { opacity: 0.88 },
 
   /* React Native non ha la sfocatura senza una libreria nativa: sono cerchi
-     enormi a opacita' bassa, che da lontano fanno lo stesso effetto. */
+     grandi a opacita' bassa, che da lontano fanno lo stesso effetto. */
   macchia: { position: "absolute", borderRadius: 999 },
   macchiaAlta: {
     width: 150,
@@ -176,15 +236,15 @@ const stili = StyleSheet.create({
     right: -54,
     top: -60,
     backgroundColor: colors.accent,
-    opacity: 0.1,
+    opacity: 0.16,
   },
   macchiaBassa: {
     width: 130,
     height: 130,
     left: -46,
     bottom: -52,
-    backgroundColor: colors.primary,
-    opacity: 0.06,
+    backgroundColor: colors.primaryGlow,
+    opacity: 0.22,
   },
 
   testa: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -193,7 +253,7 @@ const stili = StyleSheet.create({
     fontSize: 11,
     fontWeight: font.weight.semibold,
     letterSpacing: 1.4,
-    color: colors.mutedForeground,
+    color: SPENTO,
   },
 
   titolo: {
@@ -201,7 +261,7 @@ const stili = StyleSheet.create({
     fontSize: 17,
     fontWeight: font.weight.bold,
     lineHeight: 22,
-    color: colors.foreground,
+    color: CHIARO,
     marginTop: 6,
   },
 
@@ -224,26 +284,41 @@ const stili = StyleSheet.create({
   periodo: {
     fontSize: font.size.sm,
     fontWeight: font.weight.semibold,
-    color: colors.mutedForeground,
+    color: SPENTO,
     marginBottom: 6,
     marginLeft: 2,
   },
-  nota: { fontSize: font.size.xs, color: colors.mutedForeground, marginTop: 2 },
 
-  striscia: { flexDirection: "row", gap: spacing.md, marginTop: spacing.md },
+  striscia: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    /* Un filo chiarissimo stacca il conto dalla cifra: sono due cose diverse,
+       una e' l'annuncio e l'altra la prova. */
+    borderTopWidth: 1,
+    borderTopColor: FILO,
+  },
   colonna: { flex: 1 },
   etichettaRiga: { flexDirection: "row", alignItems: "center", gap: 4 },
   etichetta: {
     fontSize: 10,
     fontWeight: font.weight.semibold,
     letterSpacing: 0.6,
-    color: colors.mutedForeground,
+    color: SPENTO,
   },
   valore: {
     fontFamily: SERIF,
     fontSize: 16,
     fontWeight: font.weight.bold,
-    color: colors.foreground,
+    color: CHIARO,
     marginTop: 3,
   },
+  /* Barrato, come i prezzi superati nella lista della spesa. */
+  valoreBarrato: { color: SPENTO, textDecorationLine: "line-through" },
+  valoreAcceso: { color: colors.accent },
+
+  coda: { flexDirection: "row", gap: spacing.lg, marginTop: spacing.sm },
+  codaVoce: { flexDirection: "row", alignItems: "center", gap: 5 },
+  codaTesto: { fontSize: font.size.xs, color: SPENTO },
 });

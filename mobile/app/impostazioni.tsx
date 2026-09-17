@@ -11,7 +11,7 @@
  */
 
 import { useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
   Body,
@@ -31,6 +31,7 @@ import { useSession } from "../src/lib/state/session";
 import { resolveCountry } from "../src/lib/country";
 import { loadResolvedLocation, clearResolvedLocation } from "../src/lib/location/store";
 import { kv } from "../src/lib/kv";
+import { confermaAzione } from "../src/lib/conferma";
 import { QuotaDetail } from "../src/components/quota-banner";
 import { SchedaAccount } from "../src/components/scheda-account";
 import { colors, font, spacing } from "../src/theme";
@@ -60,24 +61,21 @@ export default function ImpostazioniScreen() {
    * app con registrazione — oggi non c'è account, ma i dati sì.
    */
   function wipe() {
-    Alert.alert(
-      "Cancellare i tuoi dati?",
-      "Verranno rimossi il profilo, il piano salvato e le preferenze da questo telefono. L'operazione non si può annullare.",
-      [
-        { text: "Annulla", style: "cancel" },
-        {
-          text: "Cancella",
-          style: "destructive",
-          onPress: () => {
-            resetProfile();
-            setPlan(null);
-            clearResolvedLocation();
-            kv.clearPrefix("");
-            router.replace("/");
-          },
-        },
-      ],
-    );
+    void (async () => {
+      const si = await confermaAzione({
+        titolo: "Cancellare i tuoi dati?",
+        testo:
+          "Verranno rimossi il profilo, il piano salvato e le preferenze da questo telefono. L'operazione non si può annullare.",
+        conferma: "Cancella",
+        distruttiva: true,
+      });
+      if (!si) return;
+      resetProfile();
+      setPlan(null);
+      clearResolvedLocation();
+      kv.clearPrefix("");
+      router.replace("/");
+    })();
   }
 
   return (

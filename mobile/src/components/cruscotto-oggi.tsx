@@ -188,6 +188,7 @@ export function CruscottoOggi() {
           spesa={conti.estimatedSpend}
           valuta={simboloValuta(profile.currency, language)}
           risparmio={conti.status === "over" ? conti.overBudgetAmount : conti.savings}
+          budget={conti.budget}
           sfora={conti.status === "over"}
           periodo={profile.frequency === "monthly" ? "al mese" : "a settimana"}
           prodotti={currentPlan.groceryList.length}
