@@ -346,15 +346,98 @@ export function paginaPannello(): string {
   /* Le rotte. Una riga per rotta, raggruppate per primo pezzo del percorso:
      e' l'ordine in cui il server e' organizzato davvero, e mette vicine le
      cose che si toccano insieme. */
+  /* IL TOTALE, IN CIMA.
+     Le schede dicono cosa fa ogni macchina, e va bene per capire chi e'
+     fermo. Ma la domanda che uno si fa aprendo il pannello e' «quanto stiamo
+     macinando», e quella risposta non c'era: bisognava sommare a mente
+     quattro ritmi. Il totale e' il numero che conta, le singole macchine sono
+     il dettaglio. */
+  /* UNA RIGA PER LETTORE.
+     Le schede erano leggibili con una macchina e diventavano un muro con
+     quattro: centodieci punti a testa, e il magazzino finiva sotto la piega.
+     Qui ogni lettore &egrave; una riga, la resa &egrave; il riempimento chiaro dietro i
+     numeri invece di una barra a parte, e i paesi in mano stanno nel
+     suggerimento del mouse — si guardano di rado e occupavano una riga. */
+  /* LA BARRA DELLE VISTE.
+     Tre viste e non tre pagine: i dati arrivano tutti nella stessa risposta —
+     una sola — e ricaricarli per cambiare sezione sarebbe tre volte il lavoro
+     per gli stessi numeri. L&rsquo;indirizzo cambia lo stesso (#raccolta), quindi
+     una vista si pu&ograve; mandare a qualcuno per collegamento. */
+  h2.stretto{margin-top:4px}
+  .cima{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;
+    gap:14px;margin-bottom:18px}
+  .cima h1{margin:0}
+  .cima .quando{margin:2px 0 0}
+  .viste{display:flex;gap:2px;background:var(--incavo);padding:3px;border-radius:8px}
+  .viste a{text-decoration:none;font-size:12.5px;font-weight:600;color:var(--tenue);
+    padding:6px 14px;border-radius:6px;white-space:nowrap}
+  .viste a:hover{color:var(--inchiostro)}
+  .viste a.acceso{background:var(--piano);color:var(--verde);
+    box-shadow:0 1px 2px rgba(0,0,0,.06)}
+
+  .titolo-riga{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;
+    gap:10px}
+  .scelta-vista{display:flex;gap:2px;background:var(--incavo);padding:3px;border-radius:7px}
+  .scelta-vista button{font:inherit;font-size:11.5px;font-weight:600;color:var(--tenue);
+    background:none;border:0;padding:5px 11px;border-radius:5px;cursor:pointer}
+  .scelta-vista button.acceso{background:var(--piano);color:var(--verde);
+    box-shadow:0 1px 2px rgba(0,0,0,.06)}
+
+  .intro{font-size:12.5px;color:var(--lieve);margin:-8px 0 12px;max-width:70ch;line-height:1.5}
+  .intro code{font-family:var(--mono);font-size:11.5px;background:var(--incavo);
+    padding:1px 5px;border-radius:3px}
+
+  .lettori{background:var(--piano);border:1px solid var(--filo);border-radius:9px;overflow:hidden;
+    margin-bottom:14px}
+  .lt{position:relative;display:grid;
+    grid-template-columns:minmax(120px,1.4fr) 76px 84px 52px 62px 96px 52px auto;
+    gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--filo)}
+  .lt:last-child{border-bottom:none}
+  .lt.cap{background:var(--incavo);font-size:9.5px;font-weight:700;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--lieve)}
+  .lt.cap span{text-align:right}
+  .lt.cap span:first-child{text-align:left}
+  .lt .fondo{position:absolute;left:0;top:0;bottom:0;background:var(--verde-velo);
+    z-index:0;border-right:1px solid rgba(0,0,0,.04)}
+  .lt > span{position:relative;z-index:1}
+  .lt .chi{display:flex;align-items:center;gap:6px;min-width:0}
+  .lt .chi b{font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis}
+  .lt .chi em{font-family:var(--mono);font-style:normal;font-size:10px;color:var(--lieve)}
+  .lt .num{font-family:var(--mono);font-size:12.5px;text-align:right;
+    font-variant-numeric:tabular-nums}
+  .lt .num.forte{color:var(--verde);font-weight:600}
+  .lt .num.tenue{color:var(--lieve)}
+  .lt.zitta .fondo{background:var(--ambra-velo)}
+  .lt.zitta .num.forte{color:var(--ambra)}
+
+  .adesso{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;
+    background:var(--filo);border:1px solid var(--filo);border-radius:9px;overflow:hidden;
+    margin-bottom:18px}
+  .adesso div{background:var(--piano);padding:11px 14px}
+  .adesso span{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--lieve);margin-bottom:2px}
+  .adesso b{font-family:var(--mono);font-size:19px;font-weight:600;
+    font-variant-numeric:tabular-nums}
+  .adesso b.forte{color:var(--verde)}
+  .adesso b.spenta{color:var(--lieve)}
+
+  /* Le rotte del prodotto: poche, con scritto cosa fanno. Vedi la nota nel
+     disegno per il motivo di mostrarne sei invece di quarantuno. */
   .rt{display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:center;
     padding:6px 16px;border-bottom:1px solid var(--filo)}
   .rt:last-child{border-bottom:none}
   .rt .met{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.06em;
     text-align:center;padding:2px 0;border-radius:3px;background:var(--incavo);color:var(--lieve)}
   .rt .met.post{background:var(--verde-velo);color:var(--verde)}
-  .rt .via{font-family:var(--mono);font-size:12.5px;color:var(--tenue)}
+  .rt .via{font-family:var(--mono);font-size:12.5px;color:var(--tenue);min-width:0}
+  .rt .via em{display:block;font-style:normal;font-size:11.5px;
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    color:var(--lieve);margin-top:2px;line-height:1.4}
   .rt .chiave{font-family:var(--mono);font-size:10px;color:var(--ambra);
     background:var(--ambra-velo);padding:2px 7px;border-radius:3px}
+  .gruppo.frase{text-transform:none;font-weight:400;letter-spacing:0;font-size:11.5px;
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--lieve)}
   .gruppo{background:var(--incavo);padding:5px 16px;font-size:10px;font-weight:700;
     letter-spacing:.07em;text-transform:uppercase;color:var(--lieve);
     border-bottom:1px solid var(--filo)}
@@ -413,34 +496,67 @@ export function paginaPannello(): string {
 </style></head>
 <body>
 <div class="foglio">
-  <h1>Pannello</h1>
-  <p class="quando" id="quando">carico&hellip;</p>
+  <div class="cima">
+    <div>
+      <h1>Centrale</h1>
+      <p class="quando" id="quando">carico&hellip;</p>
+    </div>
+    <nav class="viste">
+      <a href="#operativa" data-vista="operativa">Operativa</a>
+      <a href="#raccolta" data-vista="raccolta">Raccolta</a>
+      <a href="#api" data-vista="api">API</a>
+    </nav>
+  </div>
 
-  <h2>Chi sta lavorando</h2>
-  <div id="vivi"><p class="vuoto">carico&hellip;</p></div>
+  <div id="adesso" class="adesso"></div>
+
+  <!-- CHI STA LAVORANDO NON STA IN NESSUNA VISTA: STA SOPRA TUTTE.
+       E' l'unica cosa che si guarda mentre si fa altro — si apre la raccolta
+       per capire dove spingere, e intanto si vuole vedere se una macchina si
+       e' fermata. Metterlo dentro una scheda vorrebbe dire scoprire un lettore
+       morto solo tornando indietro. -->
+  <h2 class="stretto">Chi sta lavorando</h2>
+  <div class="lettori" id="vivi"><p class="vuoto">carico&hellip;</p></div>
   <div class="comandi">
     <button id="avvia" type="button" class="primario">Avvia la lettura qui</button>
     <button id="ferma" type="button">Ferma la lettura</button>
     <span id="esito"></span>
   </div>
 
-  <h2>I magazzini</h2>
-  <div class="cifre" id="magazzini"></div>
+  <section data-vista="operativa">
+    <h2>I magazzini</h2>
+    <div class="cifre" id="magazzini"></div>
 
-  <h2>Spazio su Mongo</h2>
-  <div id="spazio"></div>
+    <h2>Spazio su Mongo</h2>
+    <div id="spazio"></div>
 
-  <h2>Paese per paese</h2>
-  <div class="paesi" id="perpaese"></div>
+    <h2>Gli ultimi giri</h2>
+    <div id="passati"></div>
+  </section>
 
-  <h2>Le API esposte</h2>
-  <div class="paesi" id="rotte"></div>
+  <section data-vista="raccolta" hidden>
+    <div class="titolo-riga">
+      <h2>Copertura</h2>
+      <div class="scelta-vista" id="scelta-copertura">
+        <button type="button" data-per="paese" class="acceso">per paese</button>
+        <button type="button" data-per="insegna">per insegna</button>
+      </div>
+    </div>
+    <div class="paesi" id="perpaese"></div>
 
-  <h2>Giorno per giorno</h2>
-  <div class="paesi" id="pergiorno"></div>
+    <h2>Giorno per giorno</h2>
+    <div class="paesi" id="pergiorno"></div>
+  </section>
 
-  <h2>Gli ultimi giri</h2>
-  <div id="passati"></div>
+  <section data-vista="api" hidden>
+    <h2>Le API del prodotto</h2>
+    <p class="intro" id="apiIntro"></p>
+    <div class="paesi" id="rotte"></div>
+
+    <h2>Dove arriviamo</h2>
+    <p class="intro">Quello che <code>/v1/copertura</code> risponde a chi chiede, paese per paese.</p>
+    <div class="paesi" id="coperturaApi"></div>
+  </section>
 
   <p class="pie" id="pie"></p>
 </div>
@@ -471,34 +587,27 @@ const SOSPETTO_MS = 15000;
 function schedaViva(g, adesso) {
   const corso = new Date(adesso) - new Date(g.inizio);
   const fermo = new Date(adesso) - new Date(g.tocco);
-  const ritmo = corso > 0 ? (g.aperte / (corso / 1000)) : 0;
+  const ritmo = corso > 0 ? g.aperte / (corso / 1000) : 0;
   const resa = g.aperte > 0 ? Math.round((g.conPrezzo / g.aperte) * 100) : 0;
   /* Un lettore ucciso non fa in tempo a dire che sta morendo: la sua riga resta
-     li' fino a che il silenzio non e' abbastanza lungo da essere una risposta.
+     li&rsquo; fino a che il silenzio non &egrave; abbastanza lungo da essere una risposta.
      Nel frattempo va detto che non risponde, altrimenti per due minuti un morto
      ha lo stesso aspetto di uno che lavora. */
   const zitto = fermo > SOSPETTO_MS;
-  return \`<div class="scheda viva\${zitto ? " zitta" : ""}">
-    <div class="testa">
-      <b><span class="pallino"></span>\${g.macchina}</b>\${g.pid ? '<span class="targa">#' + g.pid + '</span>' : ''}
-      <span class="etichetta \${zitto ? "att" : "ok"}">\${g.lavoro}</span>
-      <span class="etichetta">da \${durata(corso)}</span>
-      \${zitto ? '<span class="etichetta att">non risponde da ' + durata(fermo) + '</span>' : ""}
-    </div>
-    <div class="righe">
-      <div><span>aperte</span><b>\${n(g.aperte)}</b></div>
-      <div><span>con prezzo</span><b>\${n(g.conPrezzo)}</b></div>
-      <div><span>resa</span><b>\${resa}%</b></div>
-      <div><span>ritmo</span><b>\${ritmo.toFixed(1)}/s</b></div>
-      <div><span>ultimo colpo</span><b>\${ora(g.tocco)}</b></div>
-    </div>
-    <div class="barra"><i style="width:\${resa}%"></i></div>
-    <div class="coda">
-      <span>RAM <b>\${g.ramTotaleMb ? n(g.ramUsataMb) + "/" + n(g.ramTotaleMb) + " MB" : "&mdash;"}</b></span>
-      <span>carico <b>\${g.carico ? g.carico.toFixed(2) : "&mdash;"}</b></span>
-      <span>accesa da <b>\${g.accesaDaSec ? durata(g.accesaDaSec * 1000) : "&mdash;"}</b></span>
-    </div>
-  </div>\`;
+  const ram = g.ramTotaleMb ? n(g.ramUsataMb) + "/" + n(g.ramTotaleMb) : "&mdash;";
+  const paesi = (g.paesi || []).join(" ");
+  return '<div class="lt' + (zitto ? " zitta" : "") + '" title="' + paesi + '">' +
+    '<i class="fondo" style="width:' + resa + '%"></i>' +
+    '<span class="chi"><span class="pallino"></span><b>' + g.macchina + '</b>' +
+      (g.pid ? '<em>#' + g.pid + '</em>' : "") + "</span>" +
+    '<span class="num">' + n(g.aperte) + "</span>" +
+    '<span class="num">' + n(g.conPrezzo) + "</span>" +
+    '<span class="num forte">' + resa + "%</span>" +
+    '<span class="num">' + ritmo.toFixed(1) + "/s</span>" +
+    '<span class="num tenue">' + ram + "</span>" +
+    '<span class="num tenue">' + durata(corso) + "</span>" +
+    (zitto ? '<span class="etichetta att">zitto da ' + durata(fermo) + "</span>" : '<span></span>') +
+    "</div>";
 }
 
 function schedaPassata(g) {
@@ -521,6 +630,10 @@ function schedaPassata(g) {
   </div>\`;
 }
 
+/* L&rsquo;ultima risposta, tenuta da parte: il selettore della copertura deve
+   poter ridisegnare senza rifare la richiesta. */
+let datiUltimi = {};
+
 async function aggiorna() {
   let d;
   try {
@@ -530,11 +643,19 @@ async function aggiorna() {
     return;
   }
 
+  datiUltimi = d;
+
   document.getElementById("quando").textContent =
     "aggiornato alle " + ora(d.adesso) + " · si rinfresca da solo ogni 5 secondi";
 
+  /* L&rsquo;INTESTAZIONE UNA VOLTA SOLA.
+     Prima ogni scheda ripeteva le stesse cinque etichette — aperte, con
+     prezzo, resa, ritmo, ultimo colpo — e con quattro macchine accese erano
+     venti parole scritte per dire cinque cose. In una tabella le etichette
+     stanno in cima e sotto ci sono solo i numeri, che &egrave; anche il modo in cui
+     si confrontano fra loro: incolonnati. */
   document.getElementById("vivi").innerHTML = d.vivi.length
-    ? d.vivi.map((g) => schedaViva(g, d.adesso)).join("")
+    ? '<div class="lt cap"><span></span><span>aperte</span><span>con prezzo</span><span>resa</span><span>ritmo</span><span>RAM MB</span><span>da</span><span></span></div>' + d.vivi.map((g) => schedaViva(g, d.adesso)).join("")
     : '<p class="vuoto">Nessun lettore sta lavorando in questo momento.</p>';
 
   const p = d.prezzi, c = d.cataloghi;
@@ -572,56 +693,144 @@ async function aggiorna() {
   /* Paese per paese. La quota e' prezzi freschi su link conosciuti: dice quanto
      di quel paese l'app puo' servire senza aprire una pagina mentre uno
      aspetta, che e' il punto di tutto il magazzino. */
-  const pp = d.paesi || [];
-  document.getElementById("perpaese").innerHTML = pp.length
-    ? '<div class="pr cap"><span></span><span>paese</span><span>copertura</span><span>link</span><span>prezzi</span><span>quota</span></div>' +
-      pp.map((r) => {
+  /* LA COPERTURA, PER PAESE O PER INSEGNA.
+     «L&rsquo;Italia sta al 26%» non dice cosa fare: l&rsquo;Italia sono ventotto insegne,
+     e quel ventisei &egrave; la media fra chi pubblica tutto e chi non pubblica
+     niente. Il lavoro da fare sta sempre in una delle due, mai nella media —
+     per questo il selettore, e per questo il dettaglio &egrave; ordinato per
+     quanti link ha, non per quanto &egrave; bravo: in cima sta chi ha pi&ugrave; da dare.
+
+     Le barre sono la copertura, non i link: due colonne di numeri raccontano
+     quanto, la barra racconta quanto MANCA, che &egrave; la domanda vera. */
+  let perCosa = "paese";
+
+  function disegnaCopertura() {
+    const righe = perCosa === "paese" ? (datiUltimi.paesi || []) : (datiUltimi.insegne || []);
+    const dove = document.getElementById("perpaese");
+    if (!righe.length) {
+      dove.innerHTML = '<div class="pr"><span></span><span class="nome"><b>&mdash;</b></span>' +
+        '<span>i conti si rifanno una volta al minuto: il primo arriva a momenti</span>' +
+        '<span></span><span></span><span></span></div>';
+      return;
+    }
+    const capo = perCosa === "paese" ? "paese" : "insegna";
+    dove.innerHTML =
+      '<div class="pr cap"><span></span><span>' + capo + '</span><span>copertura</span>' +
+      '<span>link</span><span>prezzi</span><span>quota</span></div>' +
+      righe.slice(0, 60).map((r) => {
         const q = Math.round(r.copertura * 100);
         const classe = q === 0 ? "zero" : q < 25 ? "bassa" : "";
-        return \`<div class="pr">
-          <img class="bnd" alt="" loading="lazy" src="https://flagcdn.com/20x15/\${r.paese.toLowerCase()}.png">
-          <span class="nome"><b>\${nomePaese(r.paese)}</b><i>\${r.paese}</i></span>
-          <span class="barra"><i style="width:\${q}%"></i></span>
-          <span class="num">\${n(r.link)}</span>
-          <span class="num">\${n(r.prezzi)}</span>
-          <span class="qta \${classe}">\${q}%</span>
-        </div>\`;
-      }).join("")
-    : '<div class="pr"><span></span><span class="nome"><b>&mdash;</b></span><span>i conti per paese si fanno una volta al minuto: il primo arriva a momenti</span><span></span><span></span><span></span></div>';
-
-  /* LE API ESPOSTE.
-     L'elenco lo genera il server dal registro da cui passano le richieste
-     vere, quindi non puo' raccontare rotte che non esistono ne' dimenticarne
-     una nuova. Qui si raggruppano per primo pezzo del percorso e si segna
-     quali vogliono una chiave: quello e' l'unico dato che un elenco di
-     percorsi da solo non direbbe, ed e' il primo che si va a cercare.
-
-     Le rotte si vedono comunque guardando le richieste dell'app: elencarle
-     non regala niente a nessuno. Quello che NON si mostra e' cosa accettano e
-     cosa rispondono. */
-  const rotte = d.rotte || [];
-  const CHIAVE = ["/v1/", "/pannello/avvia", "/pannello/ferma"];
-  const perGruppo = new Map();
-  for (const r of rotte) {
-    const via = r.split(" ")[1] || "/";
-    const g = via === "/" ? "/" : "/" + (via.split("/")[1] || "");
-    if (!perGruppo.has(g)) perGruppo.set(g, []);
-    perGruppo.get(g).push(r);
+        const iso = (r.paese || "").toLowerCase();
+        const titolo = perCosa === "paese" ? nomePaese(r.paese) : r.insegna;
+        const sotto = perCosa === "paese" ? r.paese : r.paese;
+        return '<div class="pr">' +
+          '<img class="bnd" alt="" loading="lazy" src="https://flagcdn.com/20x15/' + iso + '.png">' +
+          '<span class="nome"><b>' + titolo + '</b><i>' + sotto + '</i></span>' +
+          '<span class="barra"><i style="width:' + q + '%"></i></span>' +
+          '<span class="num">' + n(r.link) + '</span>' +
+          '<span class="num">' + n(r.prezzi) + '</span>' +
+          '<span class="qta ' + classe + '">' + q + '%</span>' +
+        '</div>';
+      }).join("");
   }
-  document.getElementById("rotte").innerHTML = rotte.length
-    ? [...perGruppo.entries()]
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([g, righe]) =>
-          '<div class="gruppo">' + g + " &middot; " + righe.length + "</div>" +
-          righe.map((r) => {
-            const met = r.split(" ")[0];
-            const via = r.split(" ")[1];
-            const serve = CHIAVE.some((c) => via.startsWith(c));
-            return '<div class="rt"><span class="met ' + met.toLowerCase() + '">' + met +
-              '</span><span class="via">' + via + '</span>' +
-              (serve ? '<span class="chiave">chiave</span>' : '<span></span>') + '</div>';
-          }).join(""),
-        ).join("")
+
+  for (const b of document.querySelectorAll("#scelta-copertura button")) {
+    b.addEventListener("click", () => {
+      perCosa = b.dataset.per;
+      for (const x of document.querySelectorAll("#scelta-copertura button")) {
+        x.classList.toggle("acceso", x === b);
+      }
+      disegnaCopertura();
+    });
+  }
+
+  disegnaCopertura();
+
+  /* DOVE ARRIVIAMO, nella vista delle API: &egrave; la stessa tabella dei paesi ma
+     senza i link interni — a chi valuta l&rsquo;API interessa quanti prezzi ci sono
+     e che quota del catalogo coprono, non quante pagine dobbiamo ancora
+     aprire noi. */
+  const perApi = (datiUltimi.paesi || []).filter((r) => r.prezzi > 0);
+  document.getElementById("coperturaApi").innerHTML = perApi.length
+    ? '<div class="pr cap"><span></span><span>paese</span><span>copertura</span>' +
+      '<span>prodotti</span><span>con prezzo</span><span>quota</span></div>' +
+      perApi.map((r) => {
+        const q = Math.round(r.copertura * 100);
+        const classe = q === 0 ? "zero" : q < 25 ? "bassa" : "";
+        return '<div class="pr">' +
+          '<img class="bnd" alt="" loading="lazy" src="https://flagcdn.com/20x15/' +
+            (r.paese || "").toLowerCase() + '.png">' +
+          '<span class="nome"><b>' + nomePaese(r.paese) + '</b><i>' + r.paese + '</i></span>' +
+          '<span class="barra"><i style="width:' + q + '%"></i></span>' +
+          '<span class="num">' + n(r.link) + '</span>' +
+          '<span class="num">' + n(r.prezzi) + '</span>' +
+          '<span class="qta ' + classe + '">' + q + '%</span>' +
+        '</div>';
+      }).join("")
+    : '<div class="pr"><span></span><span class="nome"><b>&mdash;</b></span><span>i conti arrivano a momenti</span><span></span><span></span><span></span></div>';
+
+  document.getElementById("apiIntro").innerHTML =
+    'Sono le sole rotte pubblicate: quello che un cliente compra. Vogliono tutte una chiave ' +
+    'nell&rsquo;intestazione <code>X-Api-Key</code>. Le altre ' + ((d.rotte || []).length - 6) +
+    ' rotte del server sono l&rsquo;app — accesso, piani, ricette, questo pannello — e non sono parte ' +
+    'del prodotto.';
+
+  /* IL TOTALE.  /* IL TOTALE. Il ritmo si somma; la resa no — si rifa' sul totale, o una
+     macchina lentissima al 100% falserebbe la media di tutte. */
+  const vv = d.vivi || [];
+  const ritmoTot = vv.reduce((t, g) => {
+    const sec = Math.max(1, (new Date(g.tocco) - new Date(g.inizio)) / 1000);
+    return t + g.aperte / sec;
+  }, 0);
+  const aperteTot = vv.reduce((t, g) => t + (g.aperte || 0), 0);
+  const conPrezzoTot = vv.reduce((t, g) => t + (g.conPrezzo || 0), 0);
+  const resaTot = aperteTot > 0 ? Math.round((conPrezzoTot / aperteTot) * 100) : 0;
+  const paesiPresi = new Set();
+  for (const g of vv) for (const p of g.paesi || []) paesiPresi.add(p);
+
+  document.getElementById("adesso").innerHTML =
+    '<div><span>lettori accesi</span><b class="' + (vv.length ? "forte" : "spenta") + '">' +
+      vv.length + '</b></div>' +
+    '<div><span>ritmo totale</span><b class="' + (ritmoTot > 0 ? "forte" : "spenta") + '">' +
+      ritmoTot.toFixed(1) + '/s</b></div>' +
+    '<div><span>aperte adesso</span><b>' + n(aperteTot) + '</b></div>' +
+    '<div><span>resa</span><b>' + resaTot + '%</b></div>' +
+    '<div><span>paesi in lavorazione</span><b>' + paesiPresi.size + '</b></div>';
+
+  /* LE API ESPOSTE — SOLO QUELLE CHE SONO IL PRODOTTO.
+     Il registro ne conta quarantuno, ma trentacinque sono l&rsquo;app: login,
+     piani, ricette, il pannello stesso. Metterle tutte qui dentro trasforma
+     la sezione in un elenco di cose interne, e chi la guarda per capire
+     «cosa vendiamo» non lo capisce pi&ugrave;. Il prodotto sono le sei sotto
+     /v1, ed &egrave; la stessa linea che il build fa rispettare fra api/ e app/.
+     Il resto si dice in una riga, col numero, perch&eacute; saperlo serve.
+
+     Accanto a ognuna c&rsquo;&egrave; cosa fa: un elenco di percorsi senza descrizioni
+     non &egrave; documentazione, e questo pannello lo guarda anche chi l&rsquo;API la
+     sta valutando. */
+  const COSA_FANNO = {
+    "POST /v1/offerte": "I prezzi di una lista della spesa, confrontati fra le insegne del paese. &Egrave; il cuore del prodotto.",
+    "POST /v1/prezzi": "Lo stesso di sopra, col nome di prima. Un&rsquo;API non spegne un indirizzo gi&agrave; pubblicato.",
+    "POST /v1/prodotti": "Cerca un prodotto nel catalogo di un paese: insegna, nome e link alla scheda.",
+    "POST /v1/negozi": "I punti vendita di un paese, o di una sola citt&agrave;.",
+    "GET /v1/copertura": "Cosa copriamo paese per paese, anche quando &egrave; brutto. Chi valuta deve saperlo prima.",
+    "GET /v1/stato": "Se il servizio &egrave; in piedi e quanto ha in magazzino.",
+  };
+  const rotte = d.rotte || [];
+  const delProdotto = rotte.filter((r) => r.split(" ")[1].startsWith("/v1/"));
+  const interne = rotte.length - delProdotto.length;
+
+  document.getElementById("rotte").innerHTML = delProdotto.length
+    ? delProdotto.map((r) => {
+        const met = r.split(" ")[0];
+        const via = r.split(" ")[1];
+        return '<div class="rt"><span class="met ' + met.toLowerCase() + '">' + met +
+          '</span><span class="via">' + via +
+          '<em>' + (COSA_FANNO[r] || "") + '</em></span>' +
+          '<span class="chiave">chiave</span></div>';
+      }).join("") +
+      '<div class="gruppo frase">pi&ugrave; ' + interne +
+      ' rotte interne dell&rsquo;app, non pubblicate: accesso, piani, ricette, questo pannello</div>'
     : '<div class="rt"><span></span><span class="via">nessuna rotta registrata</span><span></span></div>';
 
   /* GIORNO PER GIORNO.
@@ -717,6 +926,22 @@ async function comanda(rotta, bottone) {
   }
   bottone.disabled = false;
 }
+
+/* LE VISTE.
+   Si sceglie dall&rsquo;indirizzo, cos&igrave; il ricaricamento automatico ogni cinque
+   secondi non riporta alla prima: senza, chi guarda la raccolta si vedrebbe
+   sbattuto sull&rsquo;operativa a ogni giro. */
+function mostraVista(quale) {
+  const q = quale || "operativa";
+  for (const sez of document.querySelectorAll("section[data-vista]")) {
+    sez.hidden = sez.dataset.vista !== q;
+  }
+  for (const a of document.querySelectorAll(".viste a")) {
+    a.classList.toggle("acceso", a.dataset.vista === q);
+  }
+}
+mostraVista((location.hash || "#operativa").slice(1));
+window.addEventListener("hashchange", () => mostraVista(location.hash.slice(1)));
 
 document.getElementById("avvia").addEventListener("click", (e) => comanda("/pannello/avvia", e.currentTarget));
 document.getElementById("ferma").addEventListener("click", (e) => comanda("/pannello/ferma", e.currentTarget));
