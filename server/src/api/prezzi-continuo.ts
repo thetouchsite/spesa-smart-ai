@@ -53,7 +53,15 @@ import {
   type PrezzoSalvato,
 } from "./prezzi-magazzino.js";
 import { tutteLeFonti } from "./catalogo-fonti.js";
-import { gunzipSync } from "node:zlib";
+import { gunzip } from "node:zlib";
+import { promisify } from "node:util";
+
+/* Decomprimere in modo SINCRONO congela tutto il processo finche' non ha
+   finito: niente battito, niente risposta al pannello, niente. Su Render sono
+   stati due minuti di silenzio con zero pagine aperte, e da fuori sembrava
+   morto invece che occupato. La versione asincrona fa lo stesso lavoro su un
+   altro filo, e il servizio resta vivo mentre lo fa. */
+const decomprimi = promisify(gunzip);
 
 /**
  * Quante pagine insieme.
@@ -170,11 +178,21 @@ async function leggiCatalogo(paese: string, insegna: string): Promise<Array<{ ur
   const doc = await (await cataloghi()).findOne({ _id: `${paese}|${insegna}` });
   if (!doc?.dati) return [];
   try {
-    const testo = gunzipSync(Buffer.from(doc.dati.buffer)).toString("utf8");
+    const testo = (await decomprimi(Buffer.from(doc.dati.buffer))).toString("utf8");
     const fuori: Array<{ url: string; nome: string }> = [];
-    for (const riga of testo.split("\n")) {
-      const t = riga.indexOf("\t");
-      if (t > 0) fuori.push({ url: riga.slice(0, t), nome: riga.slice(t + 1) });
+    /* Si scorre il testo a mano invece di `split("\n")`: quello costruisce un
+       array di duecentomila stringhe che esiste solo per essere buttato riga
+       dopo riga, e per un attimo la sua memoria si somma a quella del testo E a
+       quella degli oggetti. Su mezzo giga quell'attimo e' l'uccisione. */
+    let da = 0;
+    while (da < testo.length) {
+      let fine = testo.indexOf("\n", da);
+      if (fine === -1) fine = testo.length;
+      const t = testo.indexOf("\t", da);
+      if (t > da && t < fine) {
+        fuori.push({ url: testo.slice(da, t), nome: testo.slice(t + 1, fine) });
+      }
+      da = fine + 1;
     }
     return fuori;
   } catch {
