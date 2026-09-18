@@ -53,6 +53,7 @@
 import { hostname } from "node:os";
 import type { Collection } from "mongodb";
 import { getDb, isDbConfigured } from "../base/db.js";
+import { chiStaLavorando } from "./giri.js";
 
 export interface TurnoDoc {
   /** `turno-ES`. Uno per paese: e' l'unicita' che fa da lucchetto. */
@@ -176,11 +177,56 @@ export async function chiTieneIPaesi(): Promise<Map<string, string>> {
   return mappa;
 }
 
-/** Chi ha in mano cosa, adesso. Per il pannello. */
+/**
+ * Dopo quanto un biglietto di un lettore SENZA BATTITO vale come libero.
+ *
+ * Cinque minuti e non due: fra il «parti» e la prima pagina c'e' il montaggio
+ * della coda, che su un catalogo grosso dura minuti e non manda battiti. Con
+ * la soglia dei vivi — due minuti — si finirebbe per soffiare i paesi a un
+ * lettore che sta lavorando davvero, e due macchine aprirebbero le stesse
+ * pagine: esattamente il guaio che i biglietti esistono per evitare.
+ */
+const SENZA_BATTITO_MS = 5 * 60_000;
+
+/**
+ * Chi ha in mano cosa, adesso.
+ *
+ * UN BIGLIETTO DI UN MORTO NON VALE
+ * ---------------------------------
+ * La scadenza da sola non basta. Un lettore con il codice vecchio prendeva i
+ * paesi per cinquanta minuti senza rinnovarli: se muore — o se qualcuno chiude
+ * la finestra — quei paesi restano bloccati fino alla scadenza, e chi si
+ * accende nel frattempo non trova niente da fare. Visto stanotte: undici paesi
+ * fermi in mano a una macchina spenta, e un Raspberry acceso che aspettava.
+ *
+ * Il rimedio non e' accorciare ancora la scadenza — piu' e' corta, piu' spesso
+ * si rischia di soffiare il lavoro a chi sta montando una coda lunga. E' che
+ * un biglietto vale solo se chi lo tiene da' segno di vita. La prova di essere
+ * vivi si da' continuando a darla, come per il battito.
+ */
 export async function turniInCorso(): Promise<TurnoDoc[]> {
   if (!isDbConfigured()) return [];
   try {
-    return await (await turni()).find({ scade: { $gt: new Date() } }).toArray();
+    const validi = await (await turni()).find({ scade: { $gt: new Date() } }).toArray();
+    if (validi.length === 0) return [];
+
+    const vivi = new Set((await chiStaLavorando()).map((v) => v.macchina));
+    const limite = Date.now() - SENZA_BATTITO_MS;
+    const buoni = validi.filter(
+      (t) => vivi.has(t.macchina) || new Date(t.preso).getTime() > limite,
+    );
+
+    /* I biglietti dei morti si tolgono, non si ignorano soltanto: se restassero
+       li', ogni lettore rifarebbe questo conto ogni venti secondi per sempre. */
+    const morti = validi.filter((t) => !buoni.includes(t));
+    if (morti.length > 0) {
+      await (await turni()).deleteMany({ _id: { $in: morti.map((t) => t._id) } });
+      console.info(
+        `[turni] liberati ${morti.length} paesi di lettori senza battito: ` +
+          morti.map((t) => t.paese).join(" "),
+      );
+    }
+    return buoni;
   } catch {
     return [];
   }
