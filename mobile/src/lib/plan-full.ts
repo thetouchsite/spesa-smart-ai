@@ -162,8 +162,6 @@ type ServerResponse = Omit<MenuResponse, "meta"> &
     meta: PlanMeta;
   };
 
-
-
 /* ══════════════════════════════════════════════════════════════════════════
    DA /v1/prezzi ALLA FORMA CHE QUESTA APP CONOSCE
 
@@ -636,7 +634,35 @@ export class ProdottiInsufficientiError extends Error {
 /** Quale strada ha prodotto il piano che si sta guardando. */
 export type Flusso = "menu-prima" | "spesa-prima";
 
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+/**
+ * Il tempo e' finito prima della risposta.
+ *
+ * PERCHE' UN ERRORE SUO E NON UN `Error` QUALSIASI
+ * ------------------------------------------------
+ * Perche' e' l'unico guasto che l'utente puo' risolvere da solo, semplicemente
+ * riprovando — e ha una causa precisa che vale la pena dirgli: il backend
+ * gratuito va in letargo, e la prima richiesta dopo il risveglio ci mette
+ * quasi un minuto. La seconda e' immediata.
+ *
+ * Finche' era un `Error` con dentro una frase, la schermata non poteva
+ * distinguerlo da «il modello e' esploso» o «non c'e' rete», e mostrava la
+ * stessa riga per tutti e tre: «Non siamo riusciti a creare il piano.
+ * Riprova.» Vera, inutile, e impossibile da riportare a chi deve aggiustare —
+ * un collega che prova l'app e torna dicendo «non ha generato nulla» non e'
+ * distratto: non ha avuto niente da leggere.
+ */
+export class TempoScaduto extends Error {
+  constructor(
+    /** Quale passo: «il menù», «i prezzi». Finisce nel messaggio a schermo. */
+    readonly passo: string,
+    readonly ms: number,
+  ) {
+    super(`tempo scaduto dopo ${ms} ms mentre aspettavo ${passo}`);
+    this.name = "TempoScaduto";
+  }
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number, passo = "il server"): Promise<T> {
   /* L'ERRORE DI CHI PERDE LA CORSA VA ASCOLTATO LO STESSO.
      `Promise.race` decide chi arriva primo, ma l'altra promessa continua a
      vivere: quando la richiesta scade anche per conto suo — `AbortSignal` la
@@ -651,7 +677,7 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 
   let timer: ReturnType<typeof setTimeout>;
   const scadenza = new Promise<T>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`tempo scaduto dopo ${ms} ms`)), ms);
+    timer = setTimeout(() => reject(new TempoScaduto(passo, ms)), ms);
   });
 
   // E il timer si spegne appena la risposta arriva, altrimenti resta acceso
@@ -762,6 +788,7 @@ async function menuPrima(
       MENU_TIMEOUT_MS,
     ),
     MENU_TIMEOUT_MS,
+    "il menù",
   );
 
   if (!menu?.menu?.length || !menu?.lista?.length) {
@@ -785,6 +812,7 @@ async function menuPrima(
         PRICES_TIMEOUT_MS,
       ).then((r) => daV1(r, currency)),
       PRICES_TIMEOUT_MS,
+      "i prezzi",
     );
   } catch (err) {
     // Il piano resta utile senza prezzi: meglio di una schermata di errore.
@@ -839,7 +867,6 @@ async function menuPrima(
     },
   };
 }
-
 
 /* ─────────── Dal motore con ricerca alla forma che l'app conosce ─────────── */
 
@@ -914,7 +941,6 @@ export function pricingFromOffers(
   };
 }
 
-
 /**
  * STRADA 2 — prezzi, poi menù.
  *
@@ -950,6 +976,7 @@ async function spesaPrima(
       MENU_TIMEOUT_MS,
     ),
     MENU_TIMEOUT_MS,
+    "il menù",
   );
 
   if (!lista?.lista?.length) throw new Error("il motore ha risposto senza lista");
@@ -966,6 +993,7 @@ async function spesaPrima(
         PRICES_TIMEOUT_MS,
       ).then((r) => daV1(r, currency)),
       PRICES_TIMEOUT_MS,
+      "i prezzi",
     );
   } catch (err) {
     console.info("[prezzi] non disponibili:", (err as Error).message);
@@ -999,9 +1027,7 @@ async function spesaPrima(
     .filter((p) =>
       p.offerte.some(
         (o) =>
-          o.verifica === "verificato" ||
-          o.verifica === "pagina-ok" ||
-          o.verifica === "bloccato",
+          o.verifica === "verificato" || o.verifica === "pagina-ok" || o.verifica === "bloccato",
       ),
     )
     .map((p) => p.prodotto);
@@ -1037,6 +1063,7 @@ async function spesaPrima(
       MENU_TIMEOUT_MS,
     ),
     MENU_TIMEOUT_MS,
+    "il menù",
   );
 
   if (!menu?.menu?.length) throw new Error("il motore ha risposto senza menù");
@@ -1062,8 +1089,7 @@ async function spesaPrima(
       motorePrezzi: prices?.meta.motorePrezzi ?? "nessuno",
       fontePrezzi: prices?.meta.fontePrezzi,
       flusso: "spesa-prima",
-      secondi:
-        lista.meta.secondiMenu + (prices?.meta.secondiPrezzi ?? 0) + menu.meta.secondiMenu,
+      secondi: lista.meta.secondiMenu + (prices?.meta.secondiPrezzi ?? 0) + menu.meta.secondiMenu,
       secondiPrezzi: prices?.meta.secondiPrezzi ?? 0,
       ricerche: prices?.meta.ricerche ?? 0,
       ricercaEffettuata: prices?.meta.ricercaEffettuata ?? false,

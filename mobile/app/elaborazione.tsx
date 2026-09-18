@@ -18,7 +18,7 @@ import { useRouter } from "expo-router";
 import { Body, Button, Loading, Screen, Subtitle, Title } from "../src/components/ui";
 import { useSession } from "../src/lib/state/session";
 import { fetchPlan, type ContentSource } from "../src/lib/content";
-import { ProdottiInsufficientiError } from "../src/lib/plan-full";
+import { ProdottiInsufficientiError, TempoScaduto } from "../src/lib/plan-full";
 import { LoaderPiano } from "../src/components/loader-piano";
 import { deviceDefaults } from "../src/lib/format";
 import { useI18n } from "../src/lib/i18n";
@@ -33,6 +33,39 @@ const BEATS = [
   "Controllo che stia nel budget…",
   "Ci siamo quasi…",
 ];
+
+/**
+ * Perche' non e' venuto fuori il piano, detto a chi guarda.
+ *
+ * PRIMA ERA UNA FRASE SOLA PER TUTTO
+ * ----------------------------------
+ * «Non siamo riusciti a creare il piano. Riprova.» valeva per il server
+ * addormentato, per la rete assente, per il modello in errore e per il
+ * tempo scaduto. Vera sempre, utile mai: chi provava l'app tornava dicendo
+ * «non ha generato niente», che non e' distrazione — non aveva avuto niente
+ * da leggere, e noi non avevamo niente da cercare.
+ *
+ * Le tre cause si distinguono gia' nel codice: `TempoScaduto` ha un nome suo,
+ * la rete assente la dichiara `post()` con il suo messaggio, e tutto il resto
+ * e' il server che ha risposto male. Bastava chiederglielo.
+ *
+ * E OGNUNA DICE COSA FARE
+ * -----------------------
+ * Non «riprova» a caso: il backend gratuito va in letargo e la prima
+ * richiesta dopo il risveglio ci mette quasi un minuto, la seconda e'
+ * immediata. Chi lo sa riprova e funziona; chi non lo sa chiude l'app e
+ * racconta che non va.
+ */
+function spiega(err: unknown): string {
+  if (err instanceof TempoScaduto) {
+    return `Il server ci ha messo troppo a preparare ${err.passo}. La prima richiesta dopo un periodo di inattività può richiedere fino a un minuto: riprova, la seconda volta è immediata.`;
+  }
+  const testo = err instanceof Error ? err.message : String(err);
+  if (/rete|connession|network|fetch|Failed to fetch/i.test(testo)) {
+    return "Non riesco a raggiungere il server. Controlla la connessione e riprova.";
+  }
+  return "Il server non è riuscito a creare il piano. Riprova fra un momento.";
+}
 
 export default function ElaborazioneScreen() {
   /** Testo nella lingua scelta dall'utente. */
@@ -112,7 +145,7 @@ export default function ElaborazioneScreen() {
       }
       console.warn("[elaborazione] generazione fallita:", err);
       setStatus("error", String(err));
-      setError("Non siamo riusciti a creare il piano. Riprova.");
+      setError(spiega(err));
     }
   }
 
@@ -125,7 +158,9 @@ export default function ElaborazioneScreen() {
               in un dizionario, e un frammento come "A" non si traduce in
               nessuna lingua. I numeri restano fuori, che sono uguali ovunque. */}
           <Subtitle>
-            {ui("Qui i negozi online pubblicano troppo poco per costruire una settimana di pasti. Preferiamo dirtelo, invece di proporti un piano che non potresti comprare.")}
+            {ui(
+              "Qui i negozi online pubblicano troppo poco per costruire una settimana di pasti. Preferiamo dirtelo, invece di proporti un piano che non potresti comprare.",
+            )}
           </Subtitle>
           <Body style={styles.conto}>
             {pochi.citta} · {pochi.trovati}/{pochi.cercati}{" "}
