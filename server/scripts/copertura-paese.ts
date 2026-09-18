@@ -102,15 +102,10 @@ if (provatiTot > 0) {
        sia perfetto, ma perche' i fallimenti non erano contati. Dirlo e'
        l'unica cosa onesta: un 100% compiaciuto su un dato monco e' peggio di
        nessun dato. */
-    console.log(
-      "ATTENZIONE: nessuna scheda risulta «senza prezzo», e non vuol dire che
-" +
-        "non ce ne siano. Gli scarti si registrano solo da oggi: finche' i lettori
-" +
-        "non hanno rifatto un giro completo, la percentuale qui sotto e' gonfiata,
-" +
-        "perche' i fallimenti di ieri non erano contati da nessuna parte.",
-    );
+    console.log("ATTENZIONE: nessuna scheda risulta «senza prezzo», e non vuol dire");
+    console.log("che non ce ne siano. Gli scarti si registrano solo da oggi: finche' i");
+    console.log("lettori non hanno rifatto un giro completo, la percentuale qui sotto");
+    console.log("e' gonfiata, perche' i fallimenti di ieri non li contava nessuno.");
     console.log("");
   }
   console.log(
