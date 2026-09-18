@@ -105,6 +105,40 @@ export interface Messaggio {
  * dietro l'operazione principale. Chi vuole sapere com'e' finita guarda il
  * valore restituito.
  */
+async function perSmtp(m: Messaggio): Promise<void> {
+  await apriTrasporto().sendMail({
+    from: MITTENTE,
+    to: m.a,
+    subject: m.oggetto,
+    text: m.testo,
+    html: m.html,
+  });
+}
+
+async function perResend(m: Messaggio): Promise<void> {
+  const risposta = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: MITTENTE,
+      to: [m.a],
+      subject: m.oggetto,
+      text: m.testo,
+      html: m.html,
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!risposta.ok) {
+    /* Il corpo dell'errore di Resend dice cose utili — dominio non
+       verificato, mittente non autorizzato — e senza si resta con un numero. */
+    const dettaglio = await risposta.text().catch(() => "");
+    throw new Error(`Resend ha risposto ${risposta.status} ${dettaglio.slice(0, 200)}`);
+  }
+}
+
 export async function spedisci(m: Messaggio): Promise<{ spedita: boolean; come: ComeSpedito }> {
   const come = comeSiSpedisce();
 
@@ -124,30 +158,33 @@ export async function spedisci(m: Messaggio): Promise<{ spedita: boolean; come: 
 
   try {
     if (come === "smtp") {
-      await apriTrasporto().sendMail({
-        from: MITTENTE,
-        to: m.a,
-        subject: m.oggetto,
-        text: m.testo,
-        html: m.html,
-      });
+      try {
+        await perSmtp(m);
+      } catch (guasto) {
+        /* SMTP CADUTO: SE C'E' RESEND, SI PASSA DI LA'.
+           Non e' zelo: e' il guasto che ci e' costato una mattinata. Su Render
+           — e su quasi tutti i servizi gestiti — le porte SMTP in uscita sono
+           chiuse, per non farsi usare dagli spammer. Le credenziali erano
+           giuste, il server di posta rispondeva benissimo da casa, e dal
+           servizio in produzione ogni invio moriva con «Connection timeout»
+           dopo dieci secondi. Nessuno riceveva il codice di recupero, e da
+           fuori era indistinguibile da una password sbagliata.
+
+           `comeSiSpedisce` preferisce SMTP quando c'e', ed e' giusto: e'
+           gratis e non passa da terzi. Ma preferire non vuol dire ostinarsi.
+           Se la strada preferita e' chiusa e ce n'e' un'altra configurata, si
+           prende quella invece di lasciare l'utente senza email. */
+        if (!RESEND_KEY) throw guasto;
+        console.warn(
+          `[posta] SMTP non raggiungibile (${guasto instanceof Error ? guasto.message : guasto}); ` +
+            "ripiego su Resend. Se succede sempre, togli le variabili SMTP_* da questo ambiente.",
+        );
+        await perResend(m);
+        console.info(`[posta] inviata a ${m.a} via resend (ripiego)`);
+        return { spedita: true, come: "resend" };
+      }
     } else {
-      const risposta = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${RESEND_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: MITTENTE,
-          to: [m.a],
-          subject: m.oggetto,
-          text: m.testo,
-          html: m.html,
-        }),
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!risposta.ok) throw new Error(`Resend ha risposto ${risposta.status}`);
+      await perResend(m);
     }
     /* L'INDIRIZZO SI', L'OGGETTO NO. Sembra innocuo e non lo e': l'oggetto
        dell'email di recupero CONTIENE il codice — ci sta apposta, perche' si
