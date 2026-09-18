@@ -56,7 +56,27 @@ const arg = (nome: string) =>
   process.argv.includes(nome) ? process.argv[process.argv.indexOf(nome) + 1] : undefined;
 
 const MINUTI = Number(arg("--minuti") ?? process.env.LETTORE_MINUTI ?? 30);
-const QUANTI_PAESI = Number(arg("--paesi") ?? process.env.LETTORE_PAESI ?? 6);
+/**
+ * Quanti paesi per giro.
+ *
+ * DUE, E NON DODICI
+ * -----------------
+ * Con dodici paesi in mano un lettore ne sfiora tanti e non ne finisce
+ * nessuno: ogni giro prende le prime duemila schede di ogni insegna, e con
+ * sessanta insegne in coda il tempo finisce prima di aver fatto un passo vero
+ * da nessuna parte. Con due, la coda e' piccola, si svuota, e il giro dopo
+ * riparte da dove era arrivato: l'Italia la fa uno solo, tutta, e quando ha
+ * finito passa ad altro.
+ *
+ * E i paesi non restano scoperti: sono i biglietti a distribuirli, e chi
+ * finisce ne prende altri. Due per volta non vuol dire due in tutto.
+ *
+ * La concorrenza si adatta da sola: con poche insegne in coda `giroContinuo`
+ * abbassa le pagine in parallelo, perche' il tetto che conta e' quante
+ * richieste arrivano al SINGOLO negozio, non quante ne regge la nostra
+ * macchina.
+ */
+const QUANTI_PAESI = Number(arg("--paesi") ?? process.env.LETTORE_PAESI ?? 2);
 const SOLO = (arg("--solo") ?? "")
   .split(",")
   .map((p) => p.trim().toUpperCase())

@@ -74,6 +74,13 @@ const decomprimi = promisify(gunzip);
  * diversi — e ognuno ne riceve una alla volta, cioe' meno di prima.
  */
 const INSIEME = Number(process.env.GIRO_INSIEME ?? 16);
+/**
+ * Quante richieste insieme allo STESSO negozio, al massimo.
+ *
+ * E' il numero che decide se siamo ospiti o un assedio, e non dipende da
+ * quanto e' potente la nostra macchina: dipende da quanto regge la loro.
+ */
+const PER_CATENA = Number(process.env.GIRO_PER_CATENA_INSIEME ?? 4);
 /** Una pausa fra una pagina e l'altra: siamo ospiti, anche alle tre di notte. */
 const PAUSA_MS = 120;
 /** Ogni quante righe si salva. Se il giro si ferma a meta', quel che e' fatto resta. */
@@ -428,7 +435,26 @@ export async function giroContinuo(
       }
     };
 
-    await Promise.all(Array.from({ length: Math.min(INSIEME, coda.length) }, lavoratore));
+    /* QUANTI LAVORATORI: NON PIU' DI QUATTRO PER NEGOZIO.
+       `INSIEME` e' il tetto della macchina — quanto puo' reggere lei. Ma la
+       cortesia non si misura in pagine al secondo: si misura in richieste al
+       minuto AL SINGOLO NEGOZIO, ed e' quella che fa scattare i blocchi.
+
+       Finche' la coda alternava dodici paesi il conto tornava da solo:
+       quaranta richieste sparse su sessanta catene fanno meno di una a testa.
+       Ma con due soli paesi in coda le catene sono cinque o sei, e le stesse
+       quaranta richieste diventano sette per negozio — lo stesso lavoro,
+       otto volte piu' pesante per chi lo subisce.
+
+       Quattro per catena e' il numero che regge: abbastanza da non aspettare
+       un negozio lento, poco abbastanza da restare un visitatore e non un
+       assedio. */
+    const catene = new Set(coda.map((c) => c.insegna)).size;
+    const quanti = Math.max(1, Math.min(INSIEME, catene * PER_CATENA, coda.length));
+    if (quanti < INSIEME) {
+      console.info(`[giro] ${catene} catene in coda: ${quanti} pagine insieme invece di ${INSIEME}`);
+    }
+    await Promise.all(Array.from({ length: quanti }, lavoratore));
     if (raccolte.length > 0) await salvaPrezzi(raccolte.splice(0, raccolte.length));
   }
 
