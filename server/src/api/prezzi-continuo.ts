@@ -383,6 +383,21 @@ export async function giroContinuo(
        insegna non costa niente. I numeri restano a zero, ed e' giusto: zero
        pagine aperte e' la verita'. La riga pero' resta verde. */
     giro.segna(aperte, conPrezzo, saltate);
+    /* E SI RINNOVA ANCHE IL BIGLIETTO, PER LO STESSO MOTIVO.
+       L'affitto dura tre minuti e si rinnova lavorando; ma montare la coda di
+       un paese grosso ne dura di piu', e in quei minuti non si apre nessuna
+       pagina — quindi il rinnovo non arrivava mai. Il biglietto scadeva, il
+       paese tornava libero, e un'altra macchina poteva prenderselo mentre
+       questa ci stava gia' lavorando: il doppio lavoro che i biglietti
+       esistono per evitare, causato dal meccanismo stesso.
+
+       Visto sul lettore dedicato all'Italia: sparito dai vivi dopo due
+       minuti, Italia di nuovo fra i paesi liberi, e il processo che
+       continuava a montare la sua coda. */
+    if (Date.now() - ultimoRinnovo > 60_000) {
+      ultimoRinnovo = Date.now();
+      void rinnovaTurni(paesi, VALIDITA_MIN);
+    }
     paeseDi.set(f.insegna, f.paese);
     mazzi.push(
       daFare.slice(0, MAX_PER_INSEGNA_A_GIRO).map((x) => ({ ...x, insegna: f.insegna })),
