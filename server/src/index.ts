@@ -49,6 +49,7 @@ import {
   utentePubblico,
 } from "./app/utente.js";
 import { registraPush, dimenticaPush } from "./app/notifiche.js";
+import { postaConfigurata, comeSiSpedisce } from "./app/posta.js";
 import { fotoDelPiatto, fotoDiPiuPiatti } from "./app/foto-piatti.js";
 import { isShoppingConfigured, searchShopping } from "./app/shopping.js";
 import {
@@ -319,6 +320,16 @@ app.get("/health", async () => ({
      un'informazione vera, a differenza di un «si» ottimista. */
   ia: saluteIA(),
   aiConfigured: isConfigured(),
+  /* LA POSTA, DICHIARATA.
+     Un'email di recupero che non arriva ha tre cause — variabili mancanti,
+     credenziali rifiutate, messaggio finito nello spam — e da fuori erano
+     indistinguibili: il server risponde «se l'indirizzo e' registrato riceverai
+     un codice» in tutti e tre i casi, che e' giusto (non si dice a uno
+     sconosciuto quali indirizzi esistono) ma non aiuta chi deve aggiustare.
+     Almeno la prima causa adesso si legge, e si esclude in due secondi invece
+     che aprendo il pannello di Render. */
+  postaConfigurata: postaConfigurata(),
+  postaVia: comeSiSpedisce(),
   dbConfigured: isDbConfigured(),
   shoppingConfigured: isShoppingConfigured(),
   searchProvider: searchProvider().id,
