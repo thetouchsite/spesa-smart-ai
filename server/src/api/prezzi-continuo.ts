@@ -43,6 +43,7 @@
 
 import { cataloghi } from "../base/db.js";
 import { prendiTurni, rendiTurni, rinnovaTurni } from "./turni.js";
+import { scartiDi, segnaScarti } from "./scarti.js";
 import { prezzi as collezionePrezzi } from "../base/db.js";
 import { verifyProductPage } from "./price-page.js";
 import { GiroInCorso, battitoDiAttesa } from "./giri.js";
@@ -252,6 +253,11 @@ export async function giroContinuo(
   const scadenza = Date.now() + minuti * 60_000;
   const inizio = Date.now();
   let ultimoRinnovo = Date.now();
+  /* Le schede senza prezzo di questo giro, per insegna. Si salvano alla fine
+     e non una per una: l'elenco si riscrive intero ogni volta, e farlo a ogni
+     pagina vorrebbe dire riscrivere due megabyte per ogni scheda vuota. */
+  const senzaPrezzo = new Map<string, string[]>();
+  const paeseDi = new Map<string, string>();
   let aperte = 0;
   let conPrezzo = 0;
   let saltate = 0;
@@ -339,12 +345,25 @@ export async function giroContinuo(
       gia.set(f.insegna, sue);
     }
 
-    const daFare = tutti.filter((x) => !sue.has(improntaUrl(x.url)));
+    /* SI SALTANO ANCHE LE SCHEDE CHE IL PREZZO NON CE L'HANNO.
+       Il magazzino ricorda solo i successi: una scheda aperta che non espone
+       il prezzo non lascia nessuna riga, quindi non risulta mai fresca e
+       viene riaperta a ogni giro, per sempre. Misurato su una giornata: dieci
+       milioni e mezzo di pagine aperte, quattro e otto con un prezzo — cinque
+       milioni e mezzo di aperture a vuoto, ripetute all'infinito.
+
+       Gli scarti scadono dopo trenta giorni, quindi un negozio che cambia
+       sito viene comunque riprovato. Vedi `scarti.ts`. */
+    const scartate = await scartiDi(f.insegna, f.paese);
+    const daFare = tutti.filter(
+      (x) => !sue.has(improntaUrl(x.url)) && !scartate.has(improntaUrl(x.url)),
+    );
     saltate += tutti.length - daFare.length;
     if (daFare.length === 0) continue;
     /* Solo la sua quota: senza questo tetto la coda terrebbe in memoria un
        milione e ottocentomila voci. Il resto alla prossima passata — quel che
        manca si ritrova, perche' il confronto e' sempre col magazzino. */
+    paeseDi.set(f.insegna, f.paese);
     mazzi.push(
       daFare.slice(0, MAX_PER_INSEGNA_A_GIRO).map((x) => ({ ...x, insegna: f.insegna })),
     );
@@ -386,6 +405,13 @@ export async function giroContinuo(
           visto: new Date(),
         });
         if (v.page?.current != null) conPrezzo++;
+        /* Nessun prezzo: si annota, cosi' non si riapre per trenta giorni.
+           Si tiene per insegna perche' l'elenco si salva per insegna. */
+        else {
+          const per = senzaPrezzo.get(c.insegna) ?? [];
+          per.push(improntaUrl(c.url));
+          senzaPrezzo.set(c.insegna, per);
+        }
         if (raccolte.length >= BLOCCO) await salvaPrezzi(raccolte.splice(0, raccolte.length));
         if (aperte % 50 === 0) {
           onAvanzamento?.(aperte, conPrezzo);
@@ -407,6 +433,16 @@ export async function giroContinuo(
   }
 
   if (raccolte.length > 0) await salvaPrezzi(raccolte);
+
+  /* Gli scarti si salvano prima di chiudere: se il giro e' stato interrotto,
+     quel che si e' imparato resta comunque. */
+  for (const [insegna, impronte] of senzaPrezzo) {
+    await segnaScarti(insegna, paeseDi.get(insegna) ?? "", impronte);
+  }
+  if (senzaPrezzo.size > 0) {
+    const quante = [...senzaPrezzo.values()].reduce((t, x) => t + x.length, 0);
+    console.info(`[giro] segnate ${quante} schede senza prezzo: non si riaprono per 30 giorni`);
+  }
 
   await giro.chiudi(giro.devoFermarmi ? "interrotto" : finito ? "catalogo finito" : "tempo scaduto");
   /* Si rendono i biglietti appena finito, senza aspettare la scadenza: il
