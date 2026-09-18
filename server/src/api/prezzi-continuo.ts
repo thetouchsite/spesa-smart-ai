@@ -370,6 +370,19 @@ export async function giroContinuo(
     /* Solo la sua quota: senza questo tetto la coda terrebbe in memoria un
        milione e ottocentomila voci. Il resto alla prossima passata — quel che
        manca si ritrova, perche' il confronto e' sempre col magazzino. */
+    /* UN BATTITO ANCHE MENTRE SI MONTA LA CODA.
+       Chiedere al magazzino quali schede sono gia' fresche costa una domanda
+       per insegna, e su un paese grosso sono ventiquattro domande che tornano
+       centomila identificativi: minuti, non secondi. In quei minuti non si
+       apre nessuna pagina, quindi con il battito legato alle pagine il lettore
+       spariva dai vivi e diventava ambra — «zitto da 48s» — proprio mentre
+       stava lavorando. Chi guardava il pannello lo dava per morto e lo
+       riavviava, buttando via il lavoro fatto.
+
+       `segna` scrive al massimo ogni cinque secondi, quindi chiamarla a ogni
+       insegna non costa niente. I numeri restano a zero, ed e' giusto: zero
+       pagine aperte e' la verita'. La riga pero' resta verde. */
+    giro.segna(aperte, conPrezzo, saltate);
     paeseDi.set(f.insegna, f.paese);
     mazzi.push(
       daFare.slice(0, MAX_PER_INSEGNA_A_GIRO).map((x) => ({ ...x, insegna: f.insegna })),

@@ -120,12 +120,31 @@ function ora(): string {
  * I conti per paese ci sono gia' — il pannello li usa, e si rifanno una volta
  * al minuto — quindi qui costano una lettura dalla memoria.
  */
-function restaDaFare(): Map<string, number> {
-  const m = new Map<string, number>();
-  for (const r of contiPesanti().paesi) {
-    m.set(r.paese, Math.max(0, r.link - r.prezzi));
+async function restaDaFare(): Promise<Map<string, number>> {
+  /* I CONTI SI ASPETTANO, LA PRIMA VOLTA.
+     `contiPesanti` risponde con quel che ha in memoria e ricalcola in
+     sottofondo: giusto per una pagina web, che non deve mai aspettare. Ma un
+     processo appena avviato la memoria ce l'ha vuota, e senza aspettare
+     leggerebbe zero per ogni paese — cioe' «non c'e' niente da fare
+     dappertutto», che e' il contrario della verita' e manda il primo giro
+     nel posto sbagliato. Si e' visto subito: «chiedo IT (0 schede da
+     provare)» con centottantamila schede ancora da guardare.
+
+     Qualche secondo di attesa una volta sola, all'avvio, e poi il valore e'
+     in memoria per tutti i giri successivi. */
+  for (let tentativo = 0; tentativo < 12; tentativo++) {
+    const conti = contiPesanti();
+    if (conti.presiIl && conti.paesi.length > 0) {
+      const m = new Map<string, number>();
+      for (const r of conti.paesi) m.set(r.paese, Math.max(0, r.link - r.prezzi));
+      return m;
+    }
+    await new Promise((r) => setTimeout(r, 2000));
   }
-  return m;
+  /* Se dopo ventiquattro secondi non sono pronti si va avanti lo stesso:
+     meglio leggere nell'ordine sbagliato che non leggere. */
+  console.log(`  [${ora()}] i conti per paese non sono ancora pronti: ordine non ottimale`);
+  return new Map();
 }
 
 function paesiCheRendono(): string[] {
@@ -207,7 +226,7 @@ async function main() {
        Chi non ne ha resta in fondo: non si esclude, perche' fra tre giorni le
        sue schede scadranno e torneranno da rileggere, e un paese escluso per
        sempre e' un pezzo di catalogo che muore in silenzio. */
-    const resta = restaDaFare();
+    const resta = await restaDaFare();
     const conLavoro = liberi.filter((p) => (resta.get(p) ?? 0) > 0);
     const daCui = (conLavoro.length > 0 ? conLavoro : liberi.length > 0 ? liberi : disponibili)
       .slice()
@@ -250,10 +269,15 @@ async function main() {
     /* «chiedo» e non l'elenco secco: i paesi si prenotano, e se un altro
        lettore ne ha gia' in mano qualcuno questo giro ne lavorera' meno di
        quelli scritti qui. Il giro stesso lo dice nella riga dopo. */
-    const daFare = scelti.reduce((t, p) => t + (resta.get(p) ?? 0), 0);
+    /* Se i conti non ci sono si tace il numero invece di scrivere zero: uno
+       zero inventato si legge come «non c'e' niente da fare», ed e' la cosa
+       che fa spegnere un lettore che invece stava per lavorare. */
+    const noti = scelti.filter((p) => resta.has(p));
+    const daFare = noti.reduce((t, p) => t + (resta.get(p) ?? 0), 0);
+    const quante = noti.length === scelti.length ? `${n(daFare)} schede da provare` : "conto in corso";
     console.log(
       `  [${ora()}] giro ${giro}: chiedo ${scelti.join(" ")}` +
-        ` (${n(daFare)} schede da provare · ${quantiLettori} lettori, quota ${quota})`,
+        ` (${quante} · ${quantiLettori} lettori, quota ${quota})`,
     );
     try {
       const e = await giroContinuo(scelti, MINUTI, (fatte, con) => {
