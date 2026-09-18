@@ -48,6 +48,7 @@ import {
 } from "../src/api/catalogo-fonti.js";
 import { giroContinuo } from "../src/api/prezzi-continuo.js";
 import { chiTieneIPaesi } from "../src/api/turni.js";
+import { contiPesanti } from "../src/api/statistiche.js";
 import { battitoDiAttesa, chiStaLavorando } from "../src/api/giri.js";
 import { statoMagazzino } from "../src/api/prezzi-magazzino.js";
 
@@ -100,6 +101,33 @@ function ora(): string {
  * sapendo gia' che non avrebbero dato niente, e ogni pagina buttata e'
  * comunque una richiesta fatta a un negozio vero.
  */
+/**
+ * Quanto resta da provare, paese per paese.
+ *
+ * PERCHE' NON BASTA LA RESA
+ * -------------------------
+ * `paesiCheRendono` mette in cima chi da' piu' prezzi per pagina aperta, ed e'
+ * il criterio giusto per decidere DOVE conviene lavorare. Non dice pero' se li'
+ * c'e' ancora qualcosa da fare: un paese con resa altissima e catalogo gia'
+ * tutto letto e' il posto peggiore dove andare, perche' si prende il biglietto,
+ * si monta la coda, e si scopre che non c'e' niente.
+ *
+ * Visto dal vero: «giro 1: chiedo SE AR — 0 aperte, 8.947 gia' fresche, 6s».
+ * Corretto, e completamente inutile: sei secondi di lavoro per non fare
+ * niente, mentre altrove restavano centinaia di migliaia di schede mai
+ * provate.
+ *
+ * I conti per paese ci sono gia' — il pannello li usa, e si rifanno una volta
+ * al minuto — quindi qui costano una lettura dalla memoria.
+ */
+function restaDaFare(): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const r of contiPesanti().paesi) {
+    m.set(r.paese, Math.max(0, r.link - r.prezzi));
+  }
+  return m;
+}
+
 function paesiCheRendono(): string[] {
   const punteggio = new Map<string, number>();
   for (const f of tutteLeFonti()) {
@@ -142,9 +170,8 @@ async function main() {
   console.log("  si ferma con Ctrl+C, o dal pulsante «ferma» del pannello.");
   console.log("");
 
-  /* Si riparte da dove si era arrivati: senza, i primi sei paesi verrebbero
-     letti per sempre e gli altri non li vedrebbe mai nessuno. */
-  let da = 0;
+  /* La rotazione non serve piu': l'ordine lo decide quanto resta da fare in
+     ogni paese, e un paese finito scende in fondo da solo. */
   let giro = 0;
   let apertesTotali = 0;
   let conPrezzoTotali = 0;
@@ -175,7 +202,16 @@ async function main() {
        arriva secondo si tiene il resto. */
     const tenuti = await chiTieneIPaesi();
     const liberi = disponibili.filter((p) => !tenuti.has(p));
-    const daCui = liberi.length > 0 ? liberi : disponibili;
+
+    /* FRA I LIBERI, PRIMA QUELLI CHE HANNO ANCORA SCHEDE DA PROVARE.
+       Chi non ne ha resta in fondo: non si esclude, perche' fra tre giorni le
+       sue schede scadranno e torneranno da rileggere, e un paese escluso per
+       sempre e' un pezzo di catalogo che muore in silenzio. */
+    const resta = restaDaFare();
+    const conLavoro = liberi.filter((p) => (resta.get(p) ?? 0) > 0);
+    const daCui = (conLavoro.length > 0 ? conLavoro : liberi.length > 0 ? liberi : disponibili)
+      .slice()
+      .sort((a, b) => (resta.get(b) ?? 0) - (resta.get(a) ?? 0));
 
     /* QUANTI NE PUO' PRENDERE UNO SOLO.
        Senza un tetto, il primo lettore acceso si prende quattordici paesi e
@@ -194,10 +230,7 @@ async function main() {
     const quanti = Math.min(QUANTI_PAESI, quota, daCui.length);
 
     const scelti: string[] = [];
-    for (let i = 0; i < quanti; i++) {
-      scelti.push(daCui[(da + i) % daCui.length]);
-    }
-    da = (da + scelti.length) % Math.max(1, daCui.length);
+    for (let i = 0; i < quanti; i++) scelti.push(daCui[i]);
     giro++;
 
     if (liberi.length === 0) {
@@ -217,9 +250,10 @@ async function main() {
     /* «chiedo» e non l'elenco secco: i paesi si prenotano, e se un altro
        lettore ne ha gia' in mano qualcuno questo giro ne lavorera' meno di
        quelli scritti qui. Il giro stesso lo dice nella riga dopo. */
+    const daFare = scelti.reduce((t, p) => t + (resta.get(p) ?? 0), 0);
     console.log(
       `  [${ora()}] giro ${giro}: chiedo ${scelti.join(" ")}` +
-        ` (${quantiLettori} lettori, quota ${quota})`,
+        ` (${n(daFare)} schede da provare · ${quantiLettori} lettori, quota ${quota})`,
     );
     try {
       const e = await giroContinuo(scelti, MINUTI, (fatte, con) => {
