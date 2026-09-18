@@ -33,7 +33,7 @@ import { chiStaLavorando, giriPassati, lavoroPerGiorno } from "./giri.js";
 import { comandi, isDbConfigured } from "../base/db.js";
 import { rotteMontate } from "../base/http.js";
 import { giroContinuo } from "./prezzi-continuo.js";
-import { chiTieneIPaesi } from "./turni.js";
+import { chiTieneIPaesi, turniInCorso } from "./turni.js";
 import { assicuraFonti, tutteLeFonti } from "./catalogo-fonti.js";
 import { contiPesanti } from "./statistiche.js";
 import { statoMagazzino } from "./prezzi-magazzino.js";
@@ -42,12 +42,13 @@ import { statoCatalogo } from "./catalogo.js";
 import { statoFonti, paesiConCatalogo } from "./catalogo-fonti.js";
 
 export async function datiPannello() {
-  const [vivi, passati, perGiorno, prezzi, cataloghi] = await Promise.all([
+  const [vivi, passati, perGiorno, prezzi, cataloghi, turni] = await Promise.all([
     chiStaLavorando(),
     giriPassati(10),
     lavoroPerGiorno(14),
     statoMagazzino(),
     statoCataloghi(),
+    turniInCorso(),
   ]);
   return {
     adesso: new Date().toISOString(),
@@ -58,6 +59,13 @@ export async function datiPannello() {
     cataloghi,
     memoria: statoCatalogo(),
     rotte: rotteMontate(),
+    /* CHI LEGGE COSA, E COSA NON LEGGE NESSUNO.
+       E' la domanda operativa numero uno da quando i paesi si prenotano: «il
+       Raspberry non lavora, perche'?». La risposta non era nel pannello —
+       bisognava aprire un terminale e interrogare il database, e l'ho fatto
+       tre volte in una notte. Adesso e' una riga qui. */
+    turni: turni.map((t) => ({ paese: t.paese, macchina: t.macchina })),
+    paesiTotali: paesiConCatalogo(),
     fonti: statoFonti(),
     /* `quantiPaesi` e non `paesi`: i conti pesanti portano gia' un `paesi` che
        e' l'elenco riga per riga, e due campi con lo stesso nome fanno sparire
@@ -453,6 +461,19 @@ export function paginaPannello(): string {
      la distanza fra le due &Egrave; la resa, disegnata invece che calcolata.
      Niente librerie: &egrave; un percorso SVG, e una libreria da cento chilobyte
      per quattordici punti sarebbe un cannone su una zanzara. */
+  /* CHI LEGGE COSA. Una riga per macchina, i paesi come pastiglie: si contano
+     a occhio e si vede subito se qualcuno ne tiene il doppio degli altri. */
+  .tn{display:grid;grid-template-columns:minmax(120px,180px) 34px 1fr;gap:12px;
+    align-items:start;padding:9px 16px;border-bottom:1px solid var(--filo)}
+  .tn:last-child{border-bottom:none}
+  .tn .chi{font-weight:600;font-size:12.5px;word-break:break-word}
+  .tn .quanti{font-family:var(--mono);font-size:12.5px;color:var(--lieve);text-align:right}
+  .tn .sigle{display:flex;flex-wrap:wrap;gap:4px}
+  .tn .sigle span{font-family:var(--mono);font-size:10.5px;padding:2px 6px;border-radius:3px;
+    background:var(--verde-velo);color:var(--verde)}
+  .tn.liberi .chi{color:var(--lieve);font-weight:400}
+  .tn.liberi .sigle span{background:var(--incavo);color:var(--lieve)}
+
   .grafico{background:var(--piano);border:1px solid var(--filo);border-radius:9px;
     padding:14px 12px 8px;margin-bottom:14px}
   .grafico svg{display:block;width:100%;height:auto}
@@ -550,6 +571,9 @@ export function paginaPannello(): string {
   </div>
 
   <section data-vista="operativa">
+    <h2>Chi legge cosa</h2>
+    <div class="paesi" id="turni"></div>
+
     <h2>I magazzini</h2>
     <div class="cifre" id="magazzini"></div>
 
@@ -727,6 +751,38 @@ async function aggiorna() {
   /* Paese per paese. La quota e' prezzi freschi su link conosciuti: dice quanto
      di quel paese l'app puo' servire senza aprire una pagina mentre uno
      aspetta, che e' il punto di tutto il magazzino. */
+  /* CHI LEGGE COSA.
+     I paesi liberi in fondo, spenti: un paese libero non e' un problema — c&rsquo;&egrave;
+     sempre qualcuno che ne lascia mentre cambia giro — ma DIECI paesi liberi
+     con quattro lettori accesi vuol dire che qualcosa non gira, e quella &egrave; la
+     riga che lo dice senza doverla cercare. */
+  const turni = d.turni || [];
+  const tenutiDa = new Map();
+  for (const t of turni) {
+    if (!tenutiDa.has(t.macchina)) tenutiDa.set(t.macchina, []);
+    tenutiDa.get(t.macchina).push(t.paese);
+  }
+  const presi = new Set(turni.map((t) => t.paese));
+  const liberi = (d.paesiTotali || []).filter((p) => !presi.has(p)).sort();
+
+  const pastiglie = (elenco) =>
+    '<span class="sigle">' + elenco.sort().map((p) => "<span>" + p + "</span>").join("") + "</span>";
+
+  document.getElementById("turni").innerHTML =
+    ([...tenutiDa.entries()]
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(([macchina, paesi]) =>
+        '<div class="tn"><span class="chi">' + macchina + '</span>' +
+        '<span class="quanti">' + paesi.length + '</span>' + pastiglie(paesi) + "</div>",
+      )
+      .join("") || '<div class="tn"><span class="chi">nessuno</span><span class="quanti">0</span>' +
+        '<span class="sigle"></span></div>') +
+    (liberi.length
+      ? '<div class="tn liberi"><span class="chi">liberi</span>' +
+        '<span class="quanti">' + liberi.length + '</span>' + pastiglie(liberi) + "</div>"
+      : '<div class="tn liberi"><span class="chi">liberi</span><span class="quanti">0</span>' +
+        '<span class="sigle"><span>tutti al lavoro</span></span></div>');
+
   /* LA COPERTURA, PER PAESE O PER INSEGNA.
      «L&rsquo;Italia sta al 26%» non dice cosa fare: l&rsquo;Italia sono ventotto insegne,
      e quel ventisei &egrave; la media fra chi pubblica tutto e chi non pubblica
