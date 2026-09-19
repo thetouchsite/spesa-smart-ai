@@ -79,27 +79,35 @@ const CAMPIONE = 20;
  * un elenco largo provato dalla macchina che uno stretto scelto a mano.
  */
 const CANDIDATI: Record<string, Array<{ nome: string; dominio: string }>> = {
+  /* L'ITALIA E' UN CASO DIFFICILE, E VALE LA PENA SAPERE PERCHE'.
+     Il primo giro ha trovato una sola insegna su venti, e non era un difetto
+     dello script: «despar.it» dichiara `sitemap.xml` e `sitemap_stores.xml` —
+     pagine e punti vendita, nessun prodotto. Tante catene italiane sono
+     consorzi di negozi indipendenti: il sito nazionale racconta l'azienda e i
+     volantini, e la spesa online, quando c'e', sta su un dominio suo o non
+     esiste affatto. Per questo qui ci sono i NEGOZI ONLINE dove si conoscono,
+     non le sedi. */
   IT: [
-    { nome: "Despar", dominio: "www.despar.it" },
-    { nome: "Crai", dominio: "www.craishop.it" },
-    { nome: "Famila", dominio: "spesaonline.famila.it" },
-    { nome: "MD", dominio: "www.mdspa.it" },
-    { nome: "Todis", dominio: "www.todis.it" },
-    { nome: "Penny Italia", dominio: "www.penny.it" },
-    { nome: "In's Mercato", dominio: "www.insmercato.it" },
-    { nome: "Il Gigante", dominio: "spesaonline.ilgigante.net" },
-    { nome: "Tosano", dominio: "www.tosanospesaonline.it" },
-    { nome: "Metro Italia", dominio: "www.metro.it" },
-    { nome: "Emisfero", dominio: "www.emisfero.it" },
-    { nome: "Deco", dominio: "www.decoitalia.it" },
-    { nome: "Sigma", dominio: "www.supermercatisigma.it" },
-    { nome: "Iper La Grande i", dominio: "www.iper.it" },
+    { nome: "Sole365", dominio: "www.sole365.it" },
+    { nome: "Il Gigante", dominio: "www.ilgigante.net" },
+    { nome: "Famila", dominio: "www.famila.it" },
+    { nome: "Migross", dominio: "www.migross.it" },
+    { nome: "Tosano", dominio: "www.tosanocerea.it" },
+    { nome: "Deco Supermercati", dominio: "www.decosupermercati.it" },
+    { nome: "Crai", dominio: "www.craiweb.it" },
+    { nome: "Sisa", dominio: "www.sisa.it" },
+    { nome: "Gulliver", dominio: "www.gulliver.it" },
+    { nome: "Tigota", dominio: "www.tigota.it" },
+    { nome: "Acqua e Sapone", dominio: "www.acquaesapone.it" },
     { nome: "Risparmio Casa", dominio: "www.risparmiocasa.com" },
-    { nome: "Gulliver", dominio: "www.gulliverspesaonline.it" },
-    { nome: "Dok", dominio: "www.dokspesaonline.it" },
-    { nome: "Rossetto", dominio: "www.rossettospesaonline.it" },
+    { nome: "Arcaplanet", dominio: "www.arcaplanet.it" },
+    { nome: "Bofrost", dominio: "www.bofrost.it" },
+    { nome: "Penny Italia", dominio: "www.penny.it" },
+    { nome: "Despar", dominio: "www.despar.it" },
+    { nome: "Todis", dominio: "www.todis.it" },
+    { nome: "MD", dominio: "www.mdspa.it" },
+    { nome: "In's Mercato", dominio: "www.insmercato.it" },
     { nome: "Everli", dominio: "www.everli.com" },
-    { nome: "Ipercoop", dominio: "www.ipercoop.it" },
   ],
   ES: [
     { nome: "Eroski", dominio: "supermercado.eroski.es" },
@@ -171,6 +179,28 @@ const SA_DI_PRODOTTI = /(product|produkt|producto|prodott|artikel|item|shop|cata
  * identico a uno che non ha catalogo, e non torna piu' indietro.
  */
 const RADICI_DA_PROVARE = 6;
+
+/**
+ * I posti dove un negozio tiene la spesa online, quando non e' sul sito
+ * principale.
+ *
+ * PERCHE' NON BASTA IL DOMINIO CHE GLI DAI.
+ * Il primo giro sull'Italia ha dato undici «nessuna sitemap trovata» su venti,
+ * e la colpa non era dei negozi: erano i domini, scritti a memoria. In Italia
+ * il sito dell'insegna e il suo negozio online quasi mai stanno insieme —
+ * «despar.it» racconta l'azienda, la spesa sta da un'altra parte. Chiedere
+ * l'indirizzo esatto per ogni catena vorrebbe dire saperlo gia'; provare le
+ * cinque forme consuete costa cinque richieste e le trova da solo.
+ */
+const DAVANTI = ["", "spesaonline.", "shop.", "store.", "ecommerce.", "spesa."];
+
+/** Gli indirizzi da provare per un'insegna, dal piu' probabile al meno. */
+function formeDelDominio(dominio: string): string[] {
+  const nudo = dominio.replace(/^(www|shop|store|spesa|spesaonline|ecommerce)\./, "");
+  const forme = [dominio, `www.${nudo}`];
+  for (const d of DAVANTI) forme.push(`${d}${nudo}`);
+  return [...new Set(forme)];
+}
 
 /** Le radici da cui puo' partire il catalogo, in ordine di quanto promettono. */
 async function radiciPossibili(dominio: string): Promise<string[]> {
@@ -283,9 +313,17 @@ for (const c of lista) {
     continue;
   }
 
-  const radici = await radiciPossibili(c.dominio);
+  let radici: string[] = [];
+  let dominioVero = c.dominio;
+  for (const forma of formeDelDominio(c.dominio)) {
+    radici = await radiciPossibili(forma);
+    if (radici.length > 0) {
+      dominioVero = forma;
+      break;
+    }
+  }
   if (radici.length === 0) {
-    console.log(`${eti} nessuna sitemap trovata su ${c.dominio}`);
+    console.log(`${eti} nessuna sitemap, provate ${formeDelDominio(c.dominio).length} forme di ${c.dominio}`);
     continue;
   }
 
@@ -306,7 +344,7 @@ for (const c of lista) {
       const prova = await daUnaFonte({
         paese,
         insegna: c.nome,
-        dominio: c.dominio,
+        dominio: dominioVero,
         sitemap: radice,
         resa: 1,
         stimati: 0,
@@ -359,7 +397,7 @@ for (const c of lista) {
       (via.assente ? " · robots.txt assente" : ""),
   );
 
-  if (resa > 0) promosse.push({ nome: c.nome, dominio: c.dominio, sitemap, link: voci.length, resa });
+  if (resa > 0) promosse.push({ nome: c.nome, dominio: dominioVero, sitemap, link: voci.length, resa });
   else rese.push({ nome: c.nome, link: voci.length });
 }
 
