@@ -77,9 +77,29 @@ async function main() {
   /* Nella forma stretta la riga porta il NUMERO dell'insegna, non il nome:
      `c` invece di `insegna`, `p` invece di `prezzo`, `t` invece di `visto`.
      Ottanta megabyte di differenza su cinque milioni di righe. */
-  const docPrezzi = (await (await prezzi())
-    .find({}, { projection: { _id: 1, p: 1, c: 1, t: 1 } })
-    .toArray()) as Array<{ p: number | null; c: number; t?: Date }>;
+  /* IL CONTO LO FA MONGO, NON QUESTO COMPUTER.
+     Prima si tiravano giu' tutte le righe dei prezzi - novecentotrentottomila,
+     e domani cinque milioni - per poi contarle qui. Su Atlas vuol dire portarsi
+     l'intera collezione attraverso la rete: lo script ci metteva piu' di otto
+     minuti e finiva ammazzato dal tempo massimo, lasciando il cruscotto fermo
+     alla settimana prima senza che nessuno se ne accorgesse.
+
+     Raggruppare per insegna e per freschezza e' esattamente il lavoro per cui
+     un database esiste. Tornano indietro un centinaio di righe invece di un
+     milione, e il tempo passa da minuti a un paio di secondi. */
+  const soglia = new Date(Date.now() - FRESCHEZZA_MS);
+  const perInsegna = (await (await prezzi())
+    .aggregate([
+      { $match: { t: { $gte: soglia } } },
+      {
+        $group: {
+          _id: "$c",
+          quante: { $sum: 1 },
+          conCifra: { $sum: { $cond: [{ $ne: ["$p", null] }, 1, 0] } },
+        },
+      },
+    ])
+    .toArray()) as Array<{ _id: number; quante: number; conCifra: number }>;
 
   const { fonti: collezioneFonti } = await import("../src/base/db.js");
   const paeseDelNumero = new Map<number, string>();
@@ -123,14 +143,14 @@ async function main() {
     }
   }
 
-  for (const d of docPrezzi) {
-    const p = paeseDelNumero.get(d.c);
+  /* La freschezza l'ha gia' decisa il `$match` di sopra: qui arrivano solo
+     righe fresche, gia' contate per insegna. */
+  for (const d of perInsegna) {
+    const p = paeseDelNumero.get(d._id);
     if (!p) continue;
-    const fresco = d.t && ora - new Date(d.t).getTime() < FRESCHEZZA_MS;
-    if (!fresco) continue;
     const r = riga(p);
-    r.prezzi++;
-    if (d.p != null) r.prezziConCifra++;
+    r.prezzi += d.quante;
+    r.prezziConCifra += d.conCifra;
   }
 
   const righe = [...perPaese.values()].filter((r) => r.link > 0 || r.prezzi > 0);
