@@ -29,62 +29,7 @@
 
 import { gunzipSync } from "node:zlib";
 import { cataloghi, fonti } from "../src/base/db.js";
-
-interface Regola {
-  tipo: "allow" | "disallow";
-  schema: string;
-}
-
-function leggiRegole(testo: string): Regola[] {
-  const regole: Regola[] = [];
-  let dentro = false;
-  for (const grezza of testo.split("\n")) {
-    const riga = grezza.replace(/#.*$/, "").trim();
-    if (!riga) continue;
-    const i = riga.indexOf(":");
-    if (i < 0) continue;
-    const campo = riga.slice(0, i).trim().toLowerCase();
-    const valore = riga.slice(i + 1).trim();
-
-    if (campo === "user-agent") {
-      /* Piu' `User-agent` di fila condividono lo stesso blocco di regole. */
-      dentro = valore === "*";
-      continue;
-    }
-    if (!dentro) continue;
-    if (campo === "allow") regole.push({ tipo: "allow", schema: valore });
-    if (campo === "disallow") regole.push({ tipo: "disallow", schema: valore });
-  }
-  return regole;
-}
-
-function combacia(schema: string, percorso: string): boolean {
-  if (schema === "") return false;
-  const ancorato = schema.endsWith("$");
-  const s = ancorato ? schema.slice(0, -1) : schema;
-  const pezzi = s.split("*").map((p) => p.replace(/[.+?^${}()|[\]\\]/g, "\\$&"));
-  const re = new RegExp("^" + pezzi.join(".*") + (ancorato ? "$" : ""));
-  return re.test(percorso);
-}
-
-function permesso(regole: Regola[], percorso: string): { ok: boolean; regola: string } {
-  let vincente: Regola | null = null;
-  for (const r of regole) {
-    if (!combacia(r.schema, percorso)) continue;
-    if (!vincente) {
-      vincente = r;
-      continue;
-    }
-    const piuLunga = r.schema.length > vincente.schema.length;
-    const pariMaPermette = r.schema.length === vincente.schema.length && r.tipo === "allow";
-    if (piuLunga || pariMaPermette) vincente = r;
-  }
-  if (!vincente) return { ok: true, regola: "nessuna regola combacia" };
-  return {
-    ok: vincente.tipo === "allow",
-    regola: `${vincente.tipo === "allow" ? "Allow" : "Disallow"}: ${vincente.schema}`,
-  };
-}
+import { leggiRegole, permesso } from "../src/base/robots.js";
 
 const chiesti = process.argv.slice(2);
 const col = await cataloghi();

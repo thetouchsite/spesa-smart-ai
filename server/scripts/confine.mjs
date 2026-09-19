@@ -148,6 +148,7 @@ const PADRONI = {
   db: "base",
   http: "base",
   diario: "base",
+  robots: "base",
   quota: "base",
   interruttore: "base",
   schemas: "base",

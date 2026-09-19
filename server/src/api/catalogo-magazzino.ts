@@ -45,7 +45,7 @@
 
 import { gunzipSync, gzipSync } from "node:zlib";
 import { Binary } from "mongodb";
-import { cataloghi as collezioneCataloghi, isDbConfigured } from "../base/db.js";
+import { cataloghi as collezioneCataloghi, fonti, isDbConfigured } from "../base/db.js";
 import { conInterruttore, statoInterruttore } from "../base/interruttore.js";
 
 /** Una voce come sta nel pacchetto: indirizzo e nome, niente altro. */
@@ -165,30 +165,111 @@ export async function salvaCatalogo(
   );
 }
 
-/** Cosa c'e' in magazzino, per paese: serve allo stato e alle prove. */
+/**
+ * Cosa c'e' in magazzino: serve allo stato, al pannello e alle prove.
+ *
+ * TRE MUCCHI, NON UNO.
+ * Il conto era uno solo — tutti i cataloghi sommati — e diceva due milioni di
+ * link. Ma dentro c'erano tre cose che non si possono sommare senza mentire:
+ *
+ *   LEGGIBILI  insegne vive. Questo e' il lavoro che si puo' fare.
+ *   ESCLUSI    insegne che ci hanno detto di no — il robots.txt di Tigros,
+ *              l'accesso obbligatorio di CoopShop. Non sono «da fare piu'
+ *              tardi»: sono da non fare mai, e tenerli nel totale fa sembrare
+ *              in arretrato una raccolta che e' invece quasi finita.
+ *   ORFANI     cataloghi di insegne che nelle fonti non esistono piu'. Il
+ *              lettore cerca il catalogo col nome della fonte, quindi a questi
+ *              non ci arriva nessuno.
+ *
+ * Il danno di sommarli non era il numero grosso in se': era che la copertura
+ * non poteva salire. L'Italia risultava al 40% mentre il 96% delle schede
+ * leggibili era gia' stato letto. Un denominatore sbagliato e' peggio di
+ * nessun conto, perche' sembra una misura.
+ */
 export async function statoCataloghi(): Promise<{
   /** `aperto` = il database non risponde e abbiamo smesso di chiederglielo. */
   interruttore: "chiuso" | "aperto";
   attivo: boolean;
+  /** Insegne VIVE con un catalogo. Non i cataloghi in archivio. */
   insegne: number;
+  /** Link delle sole insegne vive: quelli su cui la copertura si misura. */
   prodotti: number;
   paesi: string[];
+  /** Quel che resta fuori, detto invece che nascosto nel totale. */
+  esclusi: { insegne: number; prodotti: number };
+  orfani: { insegne: number; prodotti: number };
 }> {
-  if (!isDbConfigured()) return { interruttore: "chiuso" as const, attivo: false, insegne: 0, prodotti: 0, paesi: [] };
+  const vuoto = {
+    interruttore: "chiuso" as const,
+    attivo: false,
+    insegne: 0,
+    prodotti: 0,
+    paesi: [],
+    esclusi: { insegne: 0, prodotti: 0 },
+    orfani: { insegne: 0, prodotti: 0 },
+  };
+  if (!isDbConfigured()) return vuoto;
 
   return nonOltre(
     async () => {
+      const elenco = (await (await fonti())
+        .find({})
+        .project({ insegna: 1, esclusa: 1 })
+        .toArray()) as Array<{ insegna?: string; esclusa?: string }>;
+      const vive = new Set<string>();
+      const escluse = new Set<string>();
+      for (const f of elenco) {
+        const nome = String(f.insegna ?? "");
+        if (f.esclusa) escluse.add(nome);
+        else vive.add(nome);
+      }
+
       const righe = await (await collezioneCataloghi())
-        .find({}, { projection: { paese: 1, prodotti: 1 } })
+        .find({}, { projection: { paese: 1, insegna: 1, prodotti: 1 } })
         .toArray();
+
+      let insegne = 0;
+      let prodotti = 0;
+      const esclusi = { insegne: 0, prodotti: 0 };
+      const orfani = { insegne: 0, prodotti: 0 };
+      const paesi = new Set<string>();
+
+      for (const r of righe) {
+        const nome = String((r as { insegna?: string }).insegna ?? "");
+        const quanti = Number((r as { prodotti?: number }).prodotti ?? 0);
+        if (vive.has(nome)) {
+          insegne++;
+          prodotti += quanti;
+          /* I paesi si contano sulle sole insegne vive: un paese presente solo
+             con una catena esclusa non e' un paese che copriamo. */
+          if (r.paese) paesi.add(String(r.paese));
+        } else if (escluse.has(nome)) {
+          esclusi.insegne++;
+          esclusi.prodotti += quanti;
+        } else {
+          orfani.insegne++;
+          orfani.prodotti += quanti;
+        }
+      }
+
       return {
         interruttore: statoInterruttore("magazzino-catalogo"),
         attivo: true,
-        insegne: righe.length,
-        prodotti: righe.reduce((n, r) => n + (r.prodotti ?? 0), 0),
-        paesi: [...new Set(righe.map((r) => r.paese))].sort(),
+        insegne,
+        prodotti,
+        paesi: [...paesi].sort(),
+        esclusi,
+        orfani,
       };
     },
-    { interruttore: "aperto" as const, attivo: true, insegne: -1, prodotti: -1, paesi: [] },
+    {
+      interruttore: "aperto" as const,
+      attivo: true,
+      insegne: -1,
+      prodotti: -1,
+      paesi: [],
+      esclusi: { insegne: 0, prodotti: 0 },
+      orfani: { insegne: 0, prodotti: 0 },
+    },
   );
 }

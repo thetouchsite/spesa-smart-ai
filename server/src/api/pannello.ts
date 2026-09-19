@@ -278,6 +278,7 @@ export function paginaPannello(): string {
 
   .cifre{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));
     gap:1px;background:var(--filo);border:1px solid var(--filo);border-radius:9px;overflow:hidden}
+    .fuori{margin:.4rem 0 0;font-size:.78rem;color:#6b7280;line-height:1.5}
   .cifre div{background:var(--piano);padding:13px 15px}
   .cifre b{display:block;font-size:23px;font-weight:700;letter-spacing:-.02em;
     font-variant-numeric:tabular-nums}
@@ -576,6 +577,7 @@ export function paginaPannello(): string {
 
     <h2>I magazzini</h2>
     <div class="cifre" id="magazzini"></div>
+    <p class="fuori" id="fuori"></p>
 
     <h2>Spazio su Mongo</h2>
     <div id="spazio"></div>
@@ -718,13 +720,36 @@ async function aggiorna() {
 
   const p = d.prezzi, c = d.cataloghi;
   const quota = p.righe > 0 ? Math.round((p.fresche / p.righe) * 100) : 0;
+  /* LA DOMANDA VERA DEL PANNELLO, che prima bisognava fare a mente:
+     di quel che c'e' da leggere, quanto abbiamo letto? Sopra stavano il
+     numeratore e il denominatore, uno accanto all'altro, e nessuno li
+     divideva. */
+  const copertura = c.prodotti > 0 ? Math.round((p.righe / c.prodotti) * 100) : 0;
   document.getElementById("magazzini").innerHTML = \`
-    <div class="v"><b>\${n(c.prodotti)}</b><span>link in catalogo</span></div>
-    <div><b>\${n(c.insegne)}</b><span>insegne</span></div>
+    <div><b>\${n(c.prodotti)}</b><span>indirizzi da aprire</span></div>
+    <div class="v"><b>\${n(p.righe)}</b><span>prezzi raccolti</span></div>
+    <div class="\${copertura >= 60 ? "v" : ""}"><b>\${copertura}%</b><span>catalogo coperto</span></div>
+    <div><b>\${n(c.insegne)}</b><span>insegne vive</span></div>
     <div><b>\${n(d.quantiPaesi)}</b><span>paesi</span></div>
-    <div class="\${p.fresche > 0 ? "v" : "r"}"><b>\${n(p.fresche)}</b><span>prezzi freschi</span></div>
-    <div><b>\${n(p.righe)}</b><span>righe in magazzino</span></div>
-    <div><b>\${quota}%</b><span>ancora validi</span></div>\`;
+    <div class="\${p.fresche > 0 ? "v" : "r"}"><b>\${quota}%</b><span>prezzi ancora validi</span></div>\`;
+
+  /* QUEL CHE RESTA FUORI SI DICE, NON SI NASCONDE NEL TOTALE.
+     Il riquadro diceva due milioni di link: dentro c'erano 223.740 indirizzi
+     di catene che ci hanno detto di no — il robots.txt di Tigros, l'accesso
+     obbligatorio di CoopShop — e 53.362 di cataloghi che nessuna fonte cerca
+     piu'. Sommati agli altri facevano sembrare in arretrato una raccolta quasi
+     finita. Tolti dal conto e scritti qui sotto, il totale torna a misurare il
+     lavoro che si puo' davvero fare. */
+  const fuori = document.getElementById("fuori");
+  if (fuori) {
+    const e = c.esclusi || { insegne: 0, prodotti: 0 };
+    const o = c.orfani || { insegne: 0, prodotti: 0 };
+    fuori.innerHTML = (e.prodotti || o.prodotti)
+      ? \`fuori dal conto: <b>\${n(e.prodotti)}</b> indirizzi di \${e.insegne} insegne escluse
+         (robots.txt o accesso obbligatorio, non si leggono)\` +
+        (o.prodotti ? \` · <b>\${n(o.prodotti)}</b> di \${o.insegne} cataloghi che nessuna fonte cerca piu'\` : "")
+      : "";
+  }
 
   /* Lo spazio. La barra e' l'unica cosa che dice quando il progetto si ferma:
      riempito il piano, il magazzino smette di crescere e non c'e' codice che
