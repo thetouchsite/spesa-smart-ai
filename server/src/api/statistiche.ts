@@ -119,6 +119,23 @@ async function ricalcola(): Promise<void> {
 
 async function contaPerPaese(): Promise<{ paesi: RigaPaese[]; insegne: RigaInsegna[] }> {
   /* I link: dal campo `prodotti`, non dai blocchi compressi. */
+  /* SI CONTANO SOLO LE INSEGNE CHE QUALCUNO LEGGE.
+     Il conto comprendeva tutti i cataloghi, anche quelli delle insegne
+     escluse — CoopShop vuole l'accesso per mostrare il prezzo, Tigros lo vieta
+     nel robots.txt — e quelli rimasti orfani, di insegne che nelle fonti non
+     esistono piu'. Seicentomila link su due milioni e trecentomila: un quarto
+     del catalogo che nessuno leggera' mai.
+
+     Il danno non e' il numero grosso: e' che la copertura non poteva salire.
+     L'Italia risultava ferma al 40% mentre il 96% delle schede leggibili era
+     gia' stato letto, e chi guardava il pannello concludeva che la raccolta
+     non andava avanti. Un denominatore sbagliato e' peggio di nessun conto,
+     perche' sembra una misura. */
+  const attive = new Set<string>();
+  for (const f of await (await fonti()).find({ esclusa: { $exists: false } }).project({ insegna: 1 }).toArray()) {
+    attive.add(String((f as { insegna?: string }).insegna ?? ""));
+  }
+
   const link = new Map<string, { link: number; insegne: number }>();
   /* Gli stessi documenti, letti una volta sola, servono a due conti: il totale
      del paese e il dettaglio per insegna. Farne due passate vorrebbe dire due
@@ -132,6 +149,7 @@ async function contaPerPaese(): Promise<{ paesi: RigaPaese[]; insegne: RigaInseg
     const insegna = String((c as { insegna?: string }).insegna ?? "");
     const quanti = Number((c as { prodotti?: number }).prodotti ?? 0);
     if (!paese) continue;
+    if (!attive.has(insegna)) continue;
     const g = link.get(paese) ?? { link: 0, insegne: 0 };
     link.set(paese, { link: g.link + quanti, insegne: g.insegne + 1 });
     if (insegna) linkInsegna.set(insegna, { insegna, paese, link: quanti });
