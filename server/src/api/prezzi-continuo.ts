@@ -517,9 +517,21 @@ export async function giroContinuo(
           });
         }
         if (v.page?.current != null) conPrezzo++;
-        /* Nessun prezzo: si annota, cosi' non si riapre per trenta giorni.
-           Si tiene per insegna perche' l'elenco si salva per insegna. */
-        else {
+        /* NIENTE PREZZO E' UNA RISPOSTA; UN RIFIUTO NON LO E'.
+           Si annota fra gli scarti solo quando la pagina si e' APERTA e il
+           prezzo non c'era: quello e' un fatto sul negozio, vale trenta giorni
+           e risparmia milioni di aperture inutili.
+
+           Un 403 o un 202 invece non dicono niente sul prezzo, dicono che in
+           quel momento non ci hanno voluti. Trattarli allo stesso modo ha
+           congelato il danno peggiore di questa raccolta: martellate le
+           insegne spagnole, i loro rifiuti sono finiti fra gli scarti, e
+           centosettantamila pagine di Naturitas, Alcampo e Bonpreu sono
+           diventate irraggiungibili per un mese - dopo che il prezzo che
+           avevano ce l'eravamo gia' fatto scrivere sopra.
+
+           Un rifiuto si riprova al giro dopo, magari piu' piano. */
+        else if (v.status === "verificato" || v.status === "pagina-ok") {
           const per = senzaPrezzo.get(c.insegna) ?? [];
           per.push(improntaUrl(c.url));
           senzaPrezzo.set(c.insegna, per);
