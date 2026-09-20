@@ -25,6 +25,8 @@
  * scritto tutte e due — se le ha messe entrambe, intendeva permettere.
  */
 
+import { INTESTAZIONE_BROWSER } from "./intestazione.js";
+
 export interface Regola {
   tipo: "allow" | "disallow";
   schema: string;
@@ -98,8 +100,21 @@ export function robotsDi(origine: string): Promise<Robots> {
   if (c) return c;
   const p = (async (): Promise<Robots> => {
     try {
+      /* CI PRESENTIAMO COME UN BROWSER ANCHE QUI, E NON E' UN PARADOSSO.
+         Dichiaravamo «MealMintBot» proprio a questo file, per correttezza. Ma
+         i siti grossi bloccano le richieste che si annunciano come programma,
+         e bloccano anche questa: Albert Heijn, Jumbo, Sainsbury's, Rewe,
+         Kaufland e Waitrose rispondevano in modo che il loro robots.txt
+         risultasse ASSENTE. Da li' la caccia concludeva «nessuna sitemap» e
+         scartava l'insegna — i sei piu' grossi d'Europa, persi per il modo in
+         cui chiedevamo il permesso.
+
+         L'esito era il contrario del fine: non leggendo le regole non le
+         rispettavamo meglio, le ignoravamo. Adesso il file si legge come si
+         legge qualsiasi altra pagina, e quel che dice si applica: e' li' che
+         sta il rispetto, non nel nome che diciamo per chiederlo. */
       const r = await fetch(`${origine}/robots.txt`, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; MealMintBot/1.0)" },
+        headers: INTESTAZIONE_BROWSER,
         signal: AbortSignal.timeout(15_000),
       });
       if (!r.ok) return { regole: [], sitemap: [], assente: true };
