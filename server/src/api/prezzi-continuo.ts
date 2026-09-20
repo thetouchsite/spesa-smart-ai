@@ -242,61 +242,71 @@ function sulDisco(paese: string, insegna: string): string {
 }
 
 async function leggiCatalogo(paese: string, insegna: string): Promise<Array<{ url: string; nome: string }>> {
-  const base = sulDisco(paese, insegna);
+  /* UN CATALOGO PUO' ESSERE SPEZZATO IN PIU' PEZZI.
+     Mongo ammette sedici megabyte per documento e Carrefour Emirati ne occupa
+     di piu': i cataloghi grossi si salvano come `PAESE|Insegna` piu' `#2`,
+     `#3`... Il primo dice quanti sono; chi legge li rimette insieme. I
+     cataloghi vecchi non hanno quel campo e valgono per uno, quindi
+     continuano a funzionare senza sapere niente di tutto questo. */
+  const col = await cataloghi();
+  const capo = (await col.findOne(
+    { _id: `${paese}|${insegna}` },
+    { projection: { aggiornato: 1, pezzi: 1 } },
+  )) as { aggiornato?: Date; pezzi?: number } | null;
+  if (!capo) return [];
 
-  /* Prima si chiede al database SOLO la data, che pesa niente: serve a sapere
-     se quel che abbiamo sul disco vale ancora. */
-  const meta = (await (await cataloghi())
-    .findOne({ _id: `${paese}|${insegna}` }, { projection: { aggiornato: 1 } })) as {
-    aggiornato?: Date;
-  } | null;
-  if (!meta) return [];
-  const quando = meta.aggiornato ? new Date(meta.aggiornato).getTime() : 0;
+  const quanti = Math.max(1, Number(capo.pezzi) || 1);
+  const quando = capo.aggiornato ? new Date(capo.aggiornato).getTime() : 0;
+  const fuori: Array<{ url: string; nome: string }> = [];
 
-  let dati: Buffer | null = null;
-  try {
-    if (existsSync(`${base}.gz`) && Number(readFileSync(`${base}.quando`, "utf8")) === quando) {
-      dati = readFileSync(`${base}.gz`);
-    }
-  } catch {
-    /* Cache illeggibile: si riscarica, che e' esattamente il ripiego giusto. */
-  }
+  for (let i = 0; i < quanti; i++) {
+    const id = i === 0 ? `${paese}|${insegna}` : `${paese}|${insegna}#${i + 1}`;
+    const base = `${sulDisco(paese, insegna)}${i === 0 ? "" : "-" + (i + 1)}`;
 
-  if (!dati) {
-    const doc = await (await cataloghi()).findOne({ _id: `${paese}|${insegna}` });
-    if (!doc?.dati) return [];
-    dati = Buffer.from(doc.dati.buffer);
+    let dati: Buffer | null = null;
     try {
-      mkdirSync(CACHE, { recursive: true });
-      writeFileSync(`${base}.gz`, dati);
-      writeFileSync(`${base}.quando`, String(quando));
+      if (existsSync(base + ".gz") && Number(readFileSync(base + ".quando", "utf8")) === quando) {
+        dati = readFileSync(base + ".gz");
+      }
     } catch {
-      /* Senza disco si va avanti lo stesso: piu' lenti, non rotti. */
+      /* Cache illeggibile: si riscarica, che e' il ripiego giusto. */
+    }
+
+    if (!dati) {
+      const doc = (await col.findOne({ _id: id })) as { dati?: { buffer: Buffer } } | null;
+      if (!doc?.dati) continue;
+      dati = Buffer.from(doc.dati.buffer);
+      try {
+        mkdirSync(CACHE, { recursive: true });
+        writeFileSync(base + ".gz", dati);
+        writeFileSync(base + ".quando", String(quando));
+      } catch {
+        /* Senza disco si va avanti lo stesso: piu' lenti, non rotti. */
+      }
+    }
+
+    try {
+      const testo = (await decomprimi(dati)).toString("utf8");
+      /* Si scorre il testo a mano invece di split: quello costruisce un array
+         di duecentomila stringhe che esiste solo per essere buttato riga dopo
+         riga, e per un attimo la sua memoria si somma a quella del testo E a
+         quella degli oggetti. */
+      let da = 0;
+      while (da < testo.length) {
+        let capolinea = testo.indexOf(String.fromCharCode(10), da);
+        if (capolinea === -1) capolinea = testo.length;
+        const t = testo.indexOf(String.fromCharCode(9), da);
+        if (t > da && t < capolinea) {
+          fuori.push({ url: testo.slice(da, t), nome: testo.slice(t + 1, capolinea) });
+        }
+        da = capolinea + 1;
+      }
+    } catch {
+      /* Un pezzo rovinato non deve far perdere gli altri. */
     }
   }
 
-  const doc = { dati: { buffer: dati } };
-  try {
-    const testo = (await decomprimi(Buffer.from(doc.dati.buffer))).toString("utf8");
-    const fuori: Array<{ url: string; nome: string }> = [];
-    /* Si scorre il testo a mano invece di `split("\n")`: quello costruisce un
-       array di duecentomila stringhe che esiste solo per essere buttato riga
-       dopo riga, e per un attimo la sua memoria si somma a quella del testo E a
-       quella degli oggetti. Su mezzo giga quell'attimo e' l'uccisione. */
-    let da = 0;
-    while (da < testo.length) {
-      let fine = testo.indexOf("\n", da);
-      if (fine === -1) fine = testo.length;
-      const t = testo.indexOf("\t", da);
-      if (t > da && t < fine) {
-        fuori.push({ url: testo.slice(da, t), nome: testo.slice(t + 1, fine) });
-      }
-      da = fine + 1;
-    }
-    return fuori;
-  } catch {
-    return [];
-  }
+  return fuori;
 }
 
 export interface EsitoGiro {

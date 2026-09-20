@@ -109,17 +109,27 @@ export async function catalogoSalvato(
 
   return nonOltre(
     async () => {
-      const doc = await (await collezioneCataloghi()).findOne({
-        _id: `${paese}|${insegna}`,
-      });
-      if (!doc) return null;
-      if (Date.now() - doc.aggiornato.getTime() > VALIDITA_MS) return null;
-      try {
-        return scompatta(Buffer.from(doc.dati.buffer));
-      } catch {
-        // Pacchetto rovinato: meglio riscaricare che servire spazzatura.
-        return null;
+      const col = await collezioneCataloghi();
+      const capo = await col.findOne({ _id: `${paese}|${insegna}` });
+      if (!capo) return null;
+      if (Date.now() - capo.aggiornato.getTime() > VALIDITA_MS) return null;
+
+      /* I cataloghi troppo grossi per un documento stanno in piu' pezzi: il
+         primo dice quanti sono, gli altri si chiamano `#2`, `#3`... Quelli
+         vecchi non hanno il campo e valgono per uno. */
+      const quanti = Math.max(1, Number((capo as { pezzi?: number }).pezzi) || 1);
+      const fuori: VoceSalvata[] = [];
+      for (let i = 0; i < quanti; i++) {
+        const doc =
+          i === 0 ? capo : await col.findOne({ _id: `${paese}|${insegna}#${i + 1}` });
+        if (!doc?.dati) continue;
+        try {
+          fuori.push(...scompatta(Buffer.from(doc.dati.buffer)));
+        } catch {
+          // Pacchetto rovinato: gli altri pezzi si tengono lo stesso.
+        }
       }
+      return fuori.length > 0 ? fuori : null;
     },
     null,
   );
@@ -148,28 +158,64 @@ export async function salvaCatalogo(
      troppo grosso — quello non e' un guasto passeggero, e' un no definitivo
      che chi chiama deve sentire. Un fallimento travestito da successo e'
      peggio di un errore: nessuno lo va a cercare. */
-  if (dati.length > 15_000_000) {
-    throw new Error(
-      `pacchetto da ${(dati.length / 1048576).toFixed(1)} MB: oltre i 16 MB che Mongo ammette per documento`,
-    );
-  }
+  /* SE NON CI STA IN UN DOCUMENTO, SI SPEZZA IN PIU' PEZZI.
+     Mongo ammette sedici megabyte per documento, e Carrefour Emirati ne
+     occupa di piu': ottocentomila indirizzi che per un giorno sono rimasti
+     sul disco perche' non c'era dove metterli. All'ottantacinque per cento di
+     resa sono seicentottantamila prodotti — piu' di quanti ne manchino al
+     traguardo.
+
+     Un catalogo grosso diventa `PAESE|Insegna` piu' `PAESE|Insegna#2`, `#3`…
+     Il primo pezzo tiene il nome di sempre, cosi' tutto quel che cerca un
+     catalogo per nome continua a trovarlo, e porta il conto totale; chi legge
+     segue i pezzi successivi finche' ci sono. I vecchi cataloghi, che pezzi
+     non ne hanno, funzionano esattamente come prima.
+
+     Si spezza a DIECI megabyte e non a quindici: il margine serve perche' il
+     documento porta anche il nome, il paese e le date, e perche' un pacchetto
+     che cresce fra una raccolta e l'altra non deve far fallire tutto per
+     cinquantamila byte. */
+  const PEZZO = 10_000_000;
 
   await nonOltre(
     async () => {
-      await (await collezioneCataloghi()).updateOne(
-        { _id: `${paese}|${insegna}` },
-        {
-          $set: {
-            paese,
-            insegna,
-            prodotti: voci.length,
-            // Il driver vuole un Binary, non un Buffer nudo.
-            dati: new Binary(dati),
-            aggiornato: new Date(),
+      const col = await collezioneCataloghi();
+
+      /* Quanti pezzi servono: si divide l'elenco in parti che, compresse,
+         stiano sotto il tetto. Si conta sulle VOCI e non sui byte perche' e'
+         quello che si puo' tagliare — la compressione poi fa quel che fa, e il
+         rapporto e' abbastanza stabile da starci dentro con questo margine. */
+      const quanti = Math.max(1, Math.ceil(dati.length / PEZZO));
+      const perPezzo = Math.ceil(voci.length / quanti);
+
+      for (let i = 0; i < quanti; i++) {
+        const fetta = voci.slice(i * perPezzo, (i + 1) * perPezzo);
+        if (fetta.length === 0) continue;
+        await col.updateOne(
+          { _id: i === 0 ? `${paese}|${insegna}` : `${paese}|${insegna}#${i + 1}` },
+          {
+            $set: {
+              paese,
+              insegna,
+              /* Il conto sta tutto sul primo pezzo: e' quello che i totali
+                 sommano, e sommarlo anche dagli altri lo conterebbe due volte. */
+              prodotti: i === 0 ? voci.length : 0,
+              pezzi: i === 0 ? quanti : undefined,
+              // Il driver vuole un Binary, non un Buffer nudo.
+              dati: new Binary(impacchetta(fetta)),
+              aggiornato: new Date(),
+            },
           },
-        },
-        { upsert: true },
-      );
+          { upsert: true },
+        );
+      }
+
+      /* I pezzi di una raccolta precedente piu' lunga: se oggi il catalogo si
+         e' accorciato, quelli restano li' a raccontare prodotti che non ci
+         sono piu'. */
+      for (let i = quanti; i < quanti + 8; i++) {
+        await col.deleteOne({ _id: `${paese}|${insegna}#${i + 1}` } as never);
+      }
       return undefined;
     },
     undefined,
