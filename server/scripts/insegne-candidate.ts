@@ -444,3 +444,135 @@ for (const [paese, elenco] of Object.entries(FUORI_EUROPA)) {
     ...elenco.filter((x) => !visti.has(x.dominio.toLowerCase())),
   ];
 }
+
+/**
+ * Il quarto giro: America Latina, Golfo, Sud-est asiatico.
+ *
+ * Dopo i primi tre giri l'Europa occidentale e' spremuta — sei insegne ogni
+ * quarantanove candidati — mentre il Brasile, il Messico e gli Emirati, provati
+ * per la prima volta, hanno dato otto insegne su otto e quattrocentomila
+ * indirizzi. Carrefour UAE da sola ne ha portati duecentocinquantamila.
+ *
+ * Il criterio per continuare e' quello: si va dove non abbiamo ancora guardato,
+ * non dove abbiamo gia' guardato meglio.
+ */
+const ALTRI_MERCATI: Record<string, Candidato[]> = {
+  BR: [
+    { nome: "Carrefour Mercado", dominio: "mercado.carrefour.com.br" },
+    { nome: "Sonda", dominio: "www.sondadelivery.com.br" },
+    { nome: "Oba Hortifruti", dominio: "www.obahortifruti.com.br" },
+    { nome: "Supermercado Now", dominio: "www.supermercadonow.com.br" },
+    { nome: "Bistek", dominio: "www.bistek.com.br" },
+    { nome: "Giassi", dominio: "www.giassi.com.br" },
+    { nome: "Coop BR", dominio: "www.coopsp.com.br" },
+  ],
+  AR: [
+    { nome: "Coto", dominio: "www.cotodigital3.com.ar" },
+    { nome: "Disco", dominio: "www.disco.com.ar" },
+    { nome: "Jumbo AR", dominio: "www.jumbo.com.ar" },
+    { nome: "Vea", dominio: "www.vea.com.ar" },
+    { nome: "La Anonima", dominio: "supermercado.laanonimaonline.com" },
+  ],
+  CL: [
+    { nome: "Jumbo CL", dominio: "www.jumbo.cl" },
+    { nome: "Lider", dominio: "www.lider.cl" },
+    { nome: "Santa Isabel", dominio: "www.santaisabel.cl" },
+    { nome: "Unimarc", dominio: "www.unimarc.cl" },
+    { nome: "Tottus", dominio: "www.tottus.cl" },
+  ],
+  CO: [
+    { nome: "Exito", dominio: "www.exito.com" },
+    { nome: "Carulla", dominio: "www.carulla.com" },
+    { nome: "Jumbo CO", dominio: "www.tiendasjumbo.co" },
+    { nome: "Olimpica", dominio: "www.olimpica.com" },
+    { nome: "Makro CO", dominio: "tienda.makro.com.co" },
+  ],
+  PE: [
+    { nome: "Wong", dominio: "www.wong.pe" },
+    { nome: "Plaza Vea", dominio: "www.plazavea.com.pe" },
+    { nome: "Metro Peru", dominio: "www.metro.pe" },
+    { nome: "Tottus Peru", dominio: "www.tottus.com.pe" },
+  ],
+  MX: [
+    { nome: "Superama", dominio: "super.walmart.com.mx" },
+    { nome: "HEB Mexico", dominio: "www.heb.com.mx" },
+    { nome: "Fresko", dominio: "www.lacomer.com.mx" },
+    { nome: "Merco", dominio: "www.merco.mx" },
+  ],
+  TH: [
+    { nome: "Tops", dominio: "www.tops.co.th" },
+    { nome: "Big C", dominio: "www.bigc.co.th" },
+    { nome: "Makro Thailand", dominio: "www.makro.pro" },
+  ],
+  MY: [
+    { nome: "Tesco Malaysia", dominio: "eshop.lotuss.com.my" },
+    { nome: "Jaya Grocer", dominio: "www.jayagrocer.com" },
+    { nome: "Village Grocer", dominio: "villagegrocer.com.my" },
+  ],
+  SG: [
+    { nome: "FairPrice", dominio: "www.fairprice.com.sg" },
+    { nome: "Cold Storage", dominio: "coldstorage.com.sg" },
+    { nome: "Giant SG", dominio: "giant.sg" },
+    { nome: "RedMart", dominio: "redmart.lazada.sg" },
+  ],
+  ID: [
+    { nome: "Sayurbox", dominio: "www.sayurbox.com" },
+    { nome: "Segari", dominio: "segari.id" },
+    { nome: "TipTop", dominio: "www.tiptop.co.id" },
+  ],
+  PH: [
+    { nome: "Landers", dominio: "www.landers.ph" },
+    { nome: "Robinsons", dominio: "www.robinsonssupermarket.com.ph" },
+    { nome: "Metromart", dominio: "www.metromart.com" },
+  ],
+  VN: [
+    { nome: "Bach Hoa Xanh", dominio: "www.bachhoaxanh.com" },
+    { nome: "Winmart", dominio: "winmart.vn" },
+    { nome: "Co.opmart", dominio: "cooponline.vn" },
+  ],
+  SA: [
+    { nome: "Panda", dominio: "www.panda.com.sa" },
+    { nome: "Danube", dominio: "www.danube.sa" },
+    { nome: "Carrefour KSA", dominio: "www.carrefourksa.com" },
+    { nome: "Tamimi", dominio: "shop.tamimimarkets.com" },
+  ],
+  EG: [
+    { nome: "Carrefour Egypt", dominio: "www.carrefouregypt.com" },
+    { nome: "Gourmet Egypt", dominio: "www.gourmetegypt.com" },
+  ],
+  QA: [
+    { nome: "Carrefour Qatar", dominio: "www.carrefourqatar.com" },
+    { nome: "Lulu Qatar", dominio: "www.luluhypermarket.com" },
+  ],
+  KW: [
+    { nome: "Carrefour Kuwait", dominio: "www.carrefourkuwait.com" },
+    { nome: "Sultan Center", dominio: "sultancenter.com" },
+  ],
+  MA: [
+    { nome: "Marjane", dominio: "www.marjane.ma" },
+    { nome: "Carrefour Maroc", dominio: "www.carrefour.ma" },
+  ],
+  TR: [
+    { nome: "Getir", dominio: "getir.com" },
+    { nome: "Macrocenter", dominio: "www.macrocenter.com.tr" },
+    { nome: "Metro Turkiye", dominio: "www.metro-tr.com" },
+  ],
+  PL: [
+    { nome: "Zabka Jush", dominio: "www.zabkajush.pl" },
+    { nome: "Stokrotka", dominio: "www.stokrotka.pl" },
+    { nome: "Piotr i Pawel", dominio: "www.piotripawel.pl" },
+  ],
+  UA: [
+    { nome: "Metro Ukraine", dominio: "metro.zakaz.ua" },
+    { nome: "Auchan Ukraine", dominio: "auchan.zakaz.ua" },
+    { nome: "Varus", dominio: "varus.zakaz.ua" },
+  ],
+};
+
+for (const [paese, elenco] of Object.entries(ALTRI_MERCATI)) {
+  const visti = new Set((CANDIDATI[paese] ?? []).map((x) => x.dominio.toLowerCase()));
+  CANDIDATI[paese] = [
+    ...(CANDIDATI[paese] ?? []),
+    ...elenco.filter((x) => !visti.has(x.dominio.toLowerCase())),
+  ];
+}
