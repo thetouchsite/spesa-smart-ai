@@ -340,6 +340,28 @@ export async function giroContinuo(
   paesiChiesti: string[],
   minuti: number,
   onAvanzamento?: (fatte: number, conPrezzo: number) => void,
+  /**
+   * Solo queste insegne, e allora il biglietto e' per INSEGNA, non per paese.
+   *
+   * PERCHE' ESISTE
+   * --------------
+   * Il biglietto per paese serve a non aprire le stesse pagine due volte, ed
+   * e' la regola giusta quando due lettori leggono lo stesso elenco. Ma
+   * quell'elenco lo si legge una volta all'avvio: un lettore acceso ieri non
+   * sa che oggi sono state aggiunte Todis, Despar e Xtrawine — e intanto,
+   * tenendo il biglietto dell'Italia, impedisce a chiunque altro di leggerle.
+   *
+   * Misurato il 21 settembre: due Raspberry tenevano Italia ed Emirati per
+   * ore; l'Italia e' rimasta a 102.181 prodotti e Xtrawine, 104.961 indirizzi
+   * mai aperti, non e' stata toccata. Il lucchetto proteggeva dei negozi che
+   * nessuno stava visitando.
+   *
+   * Con un elenco di insegne il biglietto diventa `IT|Xtrawine`: chi legge
+   * quell'insegna la blocca per se', e chi tiene `IT` continua col suo lavoro
+   * senza che i due si incontrino. E' piu' fine, non piu' permissivo — due
+   * lettori sulla STESSA insegna si escludono esattamente come prima.
+   */
+  soloInsegne?: string[],
 ): Promise<EsitoGiro> {
   /* I PAESI SI PRENOTANO, NON SI DANNO PER SCONTATI.
      Due lettori accesi insieme — il PC di casa e Render, o due colleghi — si
@@ -355,7 +377,19 @@ export async function giroContinuo(
      per tutta la durata del giro vorrebbe dire che una finestra chiusa col
      mouse blocca quei paesi per quasi un'ora. */
   const VALIDITA_MIN = 3;
-  const paesi = await prendiTurni(paesiChiesti, paesiChiesti.length, VALIDITA_MIN);
+  /* Il biglietto e' per paese, o per insegna se e' stato chiesto un elenco:
+     vedi `soloInsegne`. Quel che segue lavora comunque per paese — cambia solo
+     il nome del lucchetto. */
+  const perInsegna = (soloInsegne ?? []).filter((x) => x.trim().length > 0);
+  const chiesti =
+    perInsegna.length > 0
+      ? paesiChiesti.flatMap((pa) => perInsegna.map((ins) => `${pa}|${ins}`))
+      : paesiChiesti;
+  const biglietti = await prendiTurni(chiesti, chiesti.length, VALIDITA_MIN);
+  const paesi =
+    perInsegna.length > 0
+      ? [...new Set(biglietti.map((b) => b.split("|")[0]))]
+      : biglietti;
   if (paesi.length === 0) {
     console.info("[giro] tutti i paesi sono presi da un altro lettore: salto il giro");
     /* E lo si scrive anche sul pannello: un lettore acceso che si ritira non
@@ -365,8 +399,8 @@ export async function giroContinuo(
     await battitoDiAttesa("in attesa: tutti i paesi occupati");
     return { aperte: 0, conPrezzo: 0, saltate: 0, secondi: 0, finito: false };
   }
-  if (paesi.length < paesiChiesti.length) {
-    const altrui = paesiChiesti.filter((p) => !paesi.includes(p));
+  if (biglietti.length < chiesti.length) {
+    const altrui = chiesti.filter((p) => !biglietti.includes(p));
     console.info(`[giro] gia' presi da un altro lettore: ${altrui.join(" ")}`);
   }
 
@@ -411,7 +445,12 @@ export async function giroContinuo(
      E l'ordine della coda tiene insieme le due cose che servono: si alternano i
      PAESI, cosi' crescono tutti insieme invece che uno alla volta, e dentro
      ogni paese si parte dall'insegna piu' generosa. */
-  const insegneTutte = tutteLeFonti().filter((f) => paesi.includes(f.paese) && f.resa > 0);
+  const insegneTutte = tutteLeFonti().filter(
+    (f) =>
+      paesi.includes(f.paese) &&
+      f.resa > 0 &&
+      (perInsegna.length === 0 || biglietti.includes(`${f.paese}|${f.insegna}`)),
+  );
   const perPaese = new Map<string, typeof insegneTutte>();
   for (const f of insegneTutte) {
     const sue = perPaese.get(f.paese) ?? [];
@@ -550,7 +589,7 @@ export async function giroContinuo(
        continuava a montare la sua coda. */
     if (Date.now() - ultimoRinnovo > 60_000) {
       ultimoRinnovo = Date.now();
-      void rinnovaTurni(paesi, VALIDITA_MIN);
+      void rinnovaTurni(biglietti, VALIDITA_MIN);
     }
     paeseDi.set(f.insegna, f.paese);
     mazzi.push(
@@ -671,7 +710,7 @@ export async function giroContinuo(
              cinque secondi, per trentuno paesi. */
           if (Date.now() - ultimoRinnovo > 60_000) {
             ultimoRinnovo = Date.now();
-            void rinnovaTurni(paesi, VALIDITA_MIN);
+            void rinnovaTurni(biglietti, VALIDITA_MIN);
           }
         }
         await attendi(PAUSA_MS);
@@ -717,7 +756,7 @@ export async function giroContinuo(
   /* Si rendono i biglietti appena finito, senza aspettare la scadenza: il
      lettore successivo puo' ripartire da questi paesi subito invece che fra
      cinquanta minuti. */
-  await rendiTurni(paesi);
+  await rendiTurni(biglietti);
 
   return {
     aperte,

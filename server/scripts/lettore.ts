@@ -107,6 +107,20 @@ const SOLO = (arg("--solo") ?? "")
   .map((p) => p.trim().toUpperCase())
   .filter(Boolean);
 
+/**
+ * Solo queste insegne, e allora il biglietto e' per insegna invece che per paese.
+ *
+ * Serve quando un lettore gia' acceso tiene un paese ma non sa delle insegne
+ * aggiunte dopo il suo avvio: senza questo, quelle insegne restano illeggibili
+ * finche' l'altro non si riavvia. Vedi `soloInsegne` in `prezzi-continuo.ts`.
+ *
+ *   --solo IT --insegne "Xtrawine,Todis,Despar"
+ */
+const INSEGNE = (arg("--insegne") ?? "")
+  .split(",")
+  .map((x) => x.trim())
+  .filter(Boolean);
+
 /** Respiro fra un giro e l'altro: niente di tecnico, e' cortesia verso i negozi. */
 const PAUSA_MS = 20_000;
 /** Dopo un errore si aspetta di piu': se la rete e' giu', riprovare subito non aiuta. */
@@ -244,7 +258,15 @@ async function main() {
        preso uno: non e' un problema, il biglietto resta l'unica verita' e chi
        arriva secondo si tiene il resto. */
     const tenuti = await chiTieneIPaesi();
-    const liberi = disponibili.filter((p) => !tenuti.has(p));
+    /* CON `--insegne` IL BIGLIETTO DEL PAESE NON CI RIGUARDA.
+       Chi tiene `IT` tiene le insegne che aveva in elenco quando si e' acceso;
+       noi chiediamo `IT|Xtrawine`, che e' un lucchetto diverso e non collide.
+       Guardare qui i biglietti di paese vorrebbe dire aspettare un permesso
+       che non ci serve — e il 21 settembre voleva dire aspettare per sempre,
+       perche' le due Raspberry rinnovavano Italia ed Emirati ogni tre minuti
+       senza leggerne le insegne nuove. */
+    const liberi =
+      INSEGNE.length > 0 ? disponibili : disponibili.filter((p) => !tenuti.has(p));
 
     /* FRA I LIBERI, PRIMA QUELLI CHE HANNO ANCORA SCHEDE DA PROVARE.
        Chi non ne ha resta in fondo: non si esclude, perche' fra tre giorni le
@@ -314,7 +336,7 @@ async function main() {
       const e = await giroContinuo(scelti, MINUTI, (fatte, con) => {
         const resa = Math.round((con / Math.max(1, fatte)) * 100);
         process.stdout.write(`\r     ${n(fatte)} aperte · ${n(con)} con prezzo (${resa}%)      `);
-      });
+      }, INSEGNE);
       apertesTotali += e.aperte;
       conPrezzoTotali += e.conPrezzo;
       const resa = Math.round((e.conPrezzo / Math.max(1, e.aperte)) * 100);
