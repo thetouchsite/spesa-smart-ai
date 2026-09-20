@@ -98,6 +98,7 @@ export interface VerifiedPrice {
 }
 
 import { haLettoreApi, prezzoDaApi } from "./prezzi-api.js";
+import { INTESTAZIONE_BROWSER } from "../base/intestazione.js";
 import { quantitaDa } from "./quantita.js";
 
 const UA =
@@ -450,7 +451,12 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
       // risponde entro otto non risponderà, e intanto tiene fermo un posto
       // nella coda dei controlli.
       signal: AbortSignal.timeout(8_000),
-      headers: { "User-Agent": UA, Accept: "text/html" },
+      /* TUTTA l'intestazione di un browser, non il solo nome.
+         Con due header soli, le schede di Alcampo e Continente rispondevano
+         403 al lettore mentre si aprivano cinque volte su cinque alla sonda,
+         che li manda tutti. Centosessantamila indirizzi contati come «pagine
+         che non si aprono» per come bussavamo noi. Vedi `base/intestazione`. */
+      headers: INTESTAZIONE_BROWSER,
     });
     if (!res.ok) {
       // 403 e 429 sono difese anti-bot, non pagine mancanti: l'indirizzo è
