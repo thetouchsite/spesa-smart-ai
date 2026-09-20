@@ -451,9 +451,26 @@ export async function giroContinuo(
     let viste = maiViste.get(f.insegna);
     if (!sue || !viste) {
       const soglia = new Date(Date.now() - FRESCHEZZA_MS);
-      const righe = (await (await collezionePrezzi())
-        .find({ c: numeroInsegna(f.insegna) }, { projection: { _id: 1, t: 1 } })
-        .toArray()) as Array<{ _id: string; t?: Date }>;
+      const numero = numeroInsegna(f.insegna);
+
+      /* PRIMA SI CHIEDE QUANTE SONO, CHE COSTA NIENTE.
+         Per mettere le pagine mai viste in testa alla coda servono gli
+         identificativi di quelle gia' lette. Chiederli tutti e' un
+         trasferimento vero: su Atlas gratuito la banda e' cento kilobyte al
+         secondo, e un'insegna con sessantamila righe sono venti secondi.
+
+         Ma un'insegna appena aggiunta di righe non ne ha NESSUNA — e sono
+         proprio quelle con i cataloghi piu' grossi, Argentina, Colombia,
+         Ucraina. Per loro l'elenco che torna e' vuoto, e lo si e' aspettato
+         per niente. Un conteggio costa una domanda e non trasferisce dati:
+         se e' zero, si sa gia' che nessuna scheda e' stata vista. */
+      const quante = await (await collezionePrezzi()).countDocuments({ c: numero } as never);
+      const righe =
+        quante === 0
+          ? []
+          : ((await (await collezionePrezzi())
+              .find({ c: numero }, { projection: { _id: 1, t: 1 } })
+              .toArray()) as Array<{ _id: string; t?: Date }>);
       sue = new Set(righe.filter((r) => r.t && new Date(r.t) >= soglia).map((r) => r._id));
       viste = new Set(righe.map((r) => r._id));
       gia.set(f.insegna, sue);
