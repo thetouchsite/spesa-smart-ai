@@ -214,3 +214,130 @@ export const CANDIDATI: Record<string, Candidato[]> = {
     { nome: "Bofrost", dominio: "www.bofrost.it" },
   ],
 };
+
+/**
+ * Il secondo giro, sui paesi piu' scoperti.
+ *
+ * Misurato: la Svizzera aveva 678 indirizzi in tutto e la Finlandia 439,
+ * mentre Migros, Coop.ch, S-kaupat e K-ruoka sono catene enormi. Non e' che
+ * quei paesi non abbiano negozi online: e' che non li avevamo mai provati.
+ *
+ * Si uniscono a quelli di sopra invece di sostituirli: un'insegna gia' nota
+ * viene saltata dalla caccia, quindi un doppione costa una riga e non una
+ * richiesta.
+ */
+const ALTRI: Record<string, Candidato[]> = {
+  CH: [
+    { nome: "Migros Online", dominio: "www.migros.ch" },
+    { nome: "Coop Svizzera", dominio: "www.coop.ch" },
+    { nome: "Farmy", dominio: "www.farmy.ch" },
+    { nome: "Lidl Svizzera", dominio: "www.lidl.ch" },
+    { nome: "Aldi Suisse", dominio: "www.aldi-suisse.ch" },
+    { nome: "Volg", dominio: "www.volg.ch" },
+  ],
+  FI: [
+    { nome: "S-kaupat", dominio: "www.s-kaupat.fi" },
+    { nome: "K-ruoka", dominio: "www.k-ruoka.fi" },
+    { nome: "Foodie", dominio: "www.foodie.fi" },
+    { nome: "Lidl Suomi", dominio: "www.lidl.fi" },
+  ],
+  SK: [
+    { nome: "Tesco SK", dominio: "potravinydomov.itesco.sk" },
+    { nome: "Kaufland SK", dominio: "www.kaufland.sk" },
+    { nome: "Lidl SK", dominio: "www.lidl.sk" },
+    { nome: "Metro SK", dominio: "www.metro.sk" },
+  ],
+  SI: [
+    { nome: "Spar Slovenija", dominio: "online.spar.si" },
+    { nome: "Tus", dominio: "www.tus.si" },
+    { nome: "Hofer", dominio: "www.hofer.si" },
+    { nome: "Lidl Slovenija", dominio: "www.lidl.si" },
+  ],
+  HU: [
+    { nome: "Tesco HU", dominio: "bevasarlas.tesco.hu" },
+    { nome: "Spar HU", dominio: "www.spar.hu" },
+    { nome: "Lidl HU", dominio: "www.lidl.hu" },
+    { nome: "Aldi HU", dominio: "www.aldi.hu" },
+    { nome: "Penny HU", dominio: "www.penny.hu" },
+  ],
+  SE: [
+    { nome: "Willys", dominio: "www.willys.se" },
+    { nome: "Hemkop", dominio: "www.hemkop.se" },
+    { nome: "Lidl Sverige", dominio: "www.lidl.se" },
+    { nome: "Apotea", dominio: "www.apotea.se" },
+  ],
+  BE: [
+    { nome: "Delhaize BE", dominio: "www.delhaize.be" },
+    { nome: "Aldi Belgie", dominio: "www.aldi.be" },
+    { nome: "Lidl Belgique", dominio: "www.lidl.be" },
+    { nome: "Spar BE", dominio: "www.spar.be" },
+  ],
+  RS: [
+    { nome: "Idea", dominio: "www.idea.rs" },
+    { nome: "Roda", dominio: "www.rodasmarket.rs" },
+    { nome: "Lidl Srbija", dominio: "www.lidl.rs" },
+    { nome: "DIS", dominio: "www.dis.rs" },
+  ],
+  HR: [
+    { nome: "Konzum", dominio: "www.konzum.hr" },
+    { nome: "Lidl Hrvatska", dominio: "www.lidl.hr" },
+    { nome: "Spar Hrvatska", dominio: "www.spar.hr" },
+    { nome: "Ntl", dominio: "www.ntl.hr" },
+  ],
+  BG: [
+    { nome: "Lidl Bulgaria", dominio: "www.lidl.bg" },
+    { nome: "Metro BG", dominio: "www.metro.bg" },
+    { nome: "T Market", dominio: "www.tmarket.bg" },
+  ],
+  GR: [
+    { nome: "Lidl Hellas", dominio: "www.lidl-hellas.gr" },
+    { nome: "Bazaar", dominio: "www.bazaar.gr" },
+    { nome: "Galaxias", dominio: "www.galaxias.gr" },
+  ],
+  PL: [
+    { nome: "Auchan Polska", dominio: "zakupy.auchan.pl" },
+    { nome: "Makro PL", dominio: "www.makro.pl" },
+    { nome: "Aldi Polska", dominio: "www.aldi.pl" },
+    { nome: "Netto PL", dominio: "www.netto.pl" },
+  ],
+  PT: [
+    { nome: "Lidl Portugal", dominio: "www.lidl.pt" },
+    { nome: "Aldi Portugal", dominio: "www.aldi.pt" },
+    { nome: "Froiz Portugal", dominio: "www.froiz.pt" },
+  ],
+  IS: [
+    { nome: "Kronan", dominio: "kronan.is" },
+    { nome: "Netto IS", dominio: "www.netto.is" },
+    { nome: "Hagkaup", dominio: "www.hagkaup.is" },
+  ],
+  LU: [
+    { nome: "Cactus", dominio: "www.cactus.lu" },
+    { nome: "Auchan Luxembourg", dominio: "www.auchan.lu" },
+  ],
+  IE: [
+    { nome: "Tesco Ireland", dominio: "www.tesco.ie" },
+    { nome: "Dunnes", dominio: "www.dunnesstoresgrocery.com" },
+    { nome: "Lidl Ireland", dominio: "www.lidl.ie" },
+  ],
+  TR: [
+    { nome: "Migros Sanal", dominio: "www.migros.com.tr" },
+    { nome: "CarrefourSA", dominio: "www.carrefoursa.com" },
+    { nome: "A101", dominio: "www.a101.com.tr" },
+    { nome: "Sok Market", dominio: "www.sokmarket.com.tr" },
+  ],
+  GB: [
+    { nome: "Sainsburys", dominio: "www.sainsburys.co.uk" },
+    { nome: "Waitrose", dominio: "www.waitrose.com" },
+    { nome: "Iceland", dominio: "www.iceland.co.uk" },
+    { nome: "Booths", dominio: "www.booths.co.uk" },
+    { nome: "Farmdrop", dominio: "www.abelandcole.co.uk" },
+  ],
+};
+
+for (const [paese, elenco] of Object.entries(ALTRI)) {
+  const visti = new Set((CANDIDATI[paese] ?? []).map((x) => x.dominio.toLowerCase()));
+  CANDIDATI[paese] = [
+    ...(CANDIDATI[paese] ?? []),
+    ...elenco.filter((x) => !visti.has(x.dominio.toLowerCase())),
+  ];
+}
