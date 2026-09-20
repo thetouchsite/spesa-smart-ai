@@ -51,7 +51,8 @@ import {
   impara,
   LINGUA_DEL_PAESE as LINGUA_VOCABOLARIO,
 } from "./vocabolario.js";
-import { prezziGiaVisti, salvaPrezzi, type PrezzoSalvato } from "./prezzi-magazzino.js";
+import { improntaUrl, prezziGiaVisti, salvaPrezzi, type PrezzoSalvato } from "./prezzi-magazzino.js";
+import { scartiDi } from "./scarti.js";
 
 /** La stessa forma che producono le altre due strade. */
 export interface PrezzoGrezzo {
@@ -639,6 +640,21 @@ export async function generatePricesCatalogo(
   const inMagazzino = await prezziGiaVisti(daAprire.map((c) => c.url));
   const daSalvare: PrezzoSalvato[] = [];
 
+  /* CHI ABBIAMO GIA' PROVATO SENZA TROVARE UN PREZZO.
+     Prima questo lo diceva una riga in `prezzi` col prezzo a niente: la si
+     trovava in magazzino e non si riapriva la pagina. Quelle righe adesso non
+     si scrivono piu' — erano sessantacinque megabyte per ripetere quel che gli
+     scarti dicono in pochi byte — quindi la stessa risposta va chiesta a loro.
+
+     Senza questo pezzo l'app tornerebbe ad aprire dal vivo, mentre l'utente
+     aspetta, le stesse pagine che sappiamo gia' essere mute: un risparmio di
+     spazio pagato in secondi di attesa, cioe' un pessimo affare. */
+  const insegneInGioco = [...new Set(daAprire.map((c) => c.insegna))];
+  const scartatePerInsegna = new Map<string, Set<string>>();
+  await Promise.all(
+    insegneInGioco.map(async (ins) => scartatePerInsegna.set(ins, await scartiDi(ins, paeseIso))),
+  );
+
   const letti = await aBrani(
     daAprire,
     INSIEME,
@@ -656,6 +672,23 @@ export async function generatePricesCatalogo(
           link: c.url,
           // La data del MAGAZZINO: e' quando quel prezzo e' stato letto.
           letto: salvato.visto?.toISOString(),
+          giaVerificato: true,
+        } satisfies PrezzoGrezzo,
+        posto: c.posto,
+      };
+    }
+
+    /* Provata e muta: si risponde come rispondeva il magazzino, senza
+       aprire niente. */
+    if (scartatePerInsegna.get(c.insegna)?.has(improntaUrl(c.url))) {
+      return {
+        riga: {
+          prodotto: c.voce,
+          nome: c.nome,
+          prezzo: null,
+          valuta,
+          negozio: c.insegna,
+          link: c.url,
           giaVerificato: true,
         } satisfies PrezzoGrezzo,
         posto: c.posto,

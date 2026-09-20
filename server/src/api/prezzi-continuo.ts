@@ -430,15 +430,29 @@ export async function giroContinuo(
         const c = coda[prossima++];
         const v = await verifyProductPage(c.url);
         aperte++;
-        raccolte.push({
-          url: c.url,
-          prezzo: v.page?.current ?? null,
-          valuta: v.page?.currency ?? "",
-          nome: c.nome.charAt(0).toUpperCase() + c.nome.slice(1),
-          insegna: c.insegna,
-          verifica: v.status,
-          visto: new Date(),
-        });
+
+        /* LA SCHEDA SENZA PREZZO NON SI SCRIVE PIU' IN `prezzi`.
+           La stessa informazione finiva in due posti: una riga intera qui
+           (centottantatre byte fra dati e indici) e un'impronta negli scarti
+           (pochi byte, compressa). E' l'impronta a impedire di riaprirla; la
+           riga pesava e basta. Erano 355.208 righe, sessantacinque megabyte.
+
+           Conta adesso perche' due milioni di prodotti sono trecentosessanta
+           megabyte su cinquecentododici del piano: con le righe vuote dentro
+           non ci si arriva, ci si ferma a meta' col database pieno — che non
+           e' un errore da leggere in un file, e' l'app che smette di
+           rispondere. */
+        if (v.page?.current != null) {
+          raccolte.push({
+            url: c.url,
+            prezzo: v.page.current,
+            valuta: v.page?.currency ?? "",
+            nome: c.nome.charAt(0).toUpperCase() + c.nome.slice(1),
+            insegna: c.insegna,
+            verifica: v.status,
+            visto: new Date(),
+          });
+        }
         if (v.page?.current != null) conPrezzo++;
         /* Nessun prezzo: si annota, cosi' non si riapre per trenta giorni.
            Si tiene per insegna perche' l'elenco si salva per insegna. */
