@@ -467,7 +467,14 @@ function leggiDa(html: string): PagePrice | null {
     /"lowPrice"\s*:\s*"?([\d.,]+)"?/i,
     /"salePrice"\s*:\s*"?([\d.,]+)"?/i,
     // Microdati, nell'attributo o nel testo.
-    /itemprop=["']price["'][^>]*content=["']([\d.,]+)["']/i,
+    /* IL SIMBOLO DELLA VALUTA VIENE PRIMA DEL NUMERO, E CI COSTAVA UN'INSEGNA.
+       SuperValu scrive `itemprop="price" content="€3.00"`. Lo schema
+       pretendeva che il contenuto cominciasse con una cifra e non combaciava
+       mai: undicimilaottocento indirizzi irlandesi dichiarati «senza prezzo»
+       per un carattere. Si lasciano passare fino a tre caratteri davanti —
+       il simbolo e un eventuale spazio — e non di piu', perche' oltre non e'
+       piu' una valuta ma un altro campo. */
+    /itemprop=["']price["'][^>]*content=["'][^\d]{0,3}([\d.,]+)["']/i,
     /itemprop=["']price["'][^>]*>\s*[^\d<]{0,6}([\d.,]+)/i,
     // I meta di Open Graph e di Facebook Commerce.
     /<meta[^>]+(?:property|name)=["'](?:product:price:amount|og:price:amount|twitter:data1)["'][^>]+content=["']\s*([\d.,]+)/i,
