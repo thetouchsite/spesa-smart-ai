@@ -56,6 +56,7 @@ import {
 } from "./prezzi-magazzino.js";
 import { tutteLeFonti } from "./catalogo-fonti.js";
 import { gunzip } from "node:zlib";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { promisify } from "node:util";
 
 /* Decomprimere in modo SINCRONO congela tutto il processo finche' non ha
@@ -186,9 +187,73 @@ async function indirizziDi(paese: string, insegna: string): Promise<Array<{ url:
   return letti;
 }
 
+/**
+ * Dove si tengono i cataloghi gia' scaricati.
+ *
+ * SCARICARLI COSTA QUARANTACINQUE SECONDI L'UNO, SCOMPATTARLI CINQUANTANOVE
+ * MILLISECONDI.
+ *
+ * Misurato il 20 settembre su Atlas gratuito:
+ *
+ *     AR|Disco           4.302 KB   scaricato in 45.405 ms   scompattato in 59 ms
+ *     CO|Carulla         5.543 KB   scaricato in 57.060 ms   scompattato in 92 ms
+ *     UA|Auchan Ukraine  3.050 KB   scaricato in 31.498 ms   scompattato in 49 ms
+ *
+ * Cento kilobyte al secondo: e' la banda del piano, non il nostro codice. Con
+ * dodici insegne per giro sono dieci minuti di attesa PRIMA di aprire una
+ * pagina, e il tetto di memoria butta via i cataloghi appena letti, quindi al
+ * giro dopo si riscaricano tutti. I lettori sembravano morti — zero CPU, zero
+ * pagine — e stavano solo aspettando il download.
+ *
+ * Un catalogo pero' cambia una volta al mese. Tenerlo sul disco dopo il primo
+ * scaricamento trasforma quei quarantacinque secondi in cinque millisecondi,
+ * e non costa niente: sono gli stessi byte che Mongo ci manderebbe.
+ *
+ * La data di aggiornamento fa da chiave: se il catalogo sul database e' piu'
+ * recente di quello sul disco, si riscarica. Cosi' il rinfresco settimanale
+ * arriva lo stesso, senza che nessuno debba svuotare niente a mano.
+ */
+const CACHE = "diario/cataloghi";
+
+function sulDisco(paese: string, insegna: string): string {
+  return `${CACHE}/${paese}-${insegna.replace(/[^\p{L}\p{N}]+/gu, "_")}`;
+}
+
 async function leggiCatalogo(paese: string, insegna: string): Promise<Array<{ url: string; nome: string }>> {
-  const doc = await (await cataloghi()).findOne({ _id: `${paese}|${insegna}` });
-  if (!doc?.dati) return [];
+  const base = sulDisco(paese, insegna);
+
+  /* Prima si chiede al database SOLO la data, che pesa niente: serve a sapere
+     se quel che abbiamo sul disco vale ancora. */
+  const meta = (await (await cataloghi())
+    .findOne({ _id: `${paese}|${insegna}` }, { projection: { aggiornato: 1 } })) as {
+    aggiornato?: Date;
+  } | null;
+  if (!meta) return [];
+  const quando = meta.aggiornato ? new Date(meta.aggiornato).getTime() : 0;
+
+  let dati: Buffer | null = null;
+  try {
+    if (existsSync(`${base}.gz`) && Number(readFileSync(`${base}.quando`, "utf8")) === quando) {
+      dati = readFileSync(`${base}.gz`);
+    }
+  } catch {
+    /* Cache illeggibile: si riscarica, che e' esattamente il ripiego giusto. */
+  }
+
+  if (!dati) {
+    const doc = await (await cataloghi()).findOne({ _id: `${paese}|${insegna}` });
+    if (!doc?.dati) return [];
+    dati = Buffer.from(doc.dati.buffer);
+    try {
+      mkdirSync(CACHE, { recursive: true });
+      writeFileSync(`${base}.gz`, dati);
+      writeFileSync(`${base}.quando`, String(quando));
+    } catch {
+      /* Senza disco si va avanti lo stesso: piu' lenti, non rotti. */
+    }
+  }
+
+  const doc = { dati: { buffer: dati } };
   try {
     const testo = (await decomprimi(Buffer.from(doc.dati.buffer))).toString("utf8");
     const fuori: Array<{ url: string; nome: string }> = [];

@@ -322,11 +322,19 @@ export async function getDb(): Promise<Db> {
     db.collection<CacheDoc>("cache").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection<CacheDoc>("cache_api").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection<CacheDoc>("cache_app").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
-    /* Il TTL sta su `t`, che e' anche la data di lettura: un campo solo fa due
-       mestieri, e si risparmiano trentacinque byte per riga piu' il suo indice.
-       Trenta giorni, non ventiquattro ore: una riga vecchia non si mostra ma
-       evita di riaprire la pagina di una citta' visitata di rado. */
-    db.collection<PrezzoDoc>("prezzi").createIndex({ t: 1 }, { expireAfterSeconds: 30 * 86_400 }),
+    /* NIENTE INDICE TTL SU `t`, E IL MOTIVO E' UNA MISURA.
+       Far scadere le righe da sole dopo trenta giorni era comodissimo e
+       costava SETTANTAQUATTRO BYTE PER RIGA — piu' dei settantasei dei dati
+       veri. Misurato su un milione di righe: sessantasette megabyte per un
+       servizio che uno script fa in pochi secondi una volta al giorno.
+
+       Su due milioni di prodotti quell'indice sarebbe centoquarantotto
+       megabyte, e il piano gratuito ne da' cinquecentododici in tutto: era la
+       differenza fra starci e non starci.
+
+       Adesso le righe vecchie le butta `scripts/butta-scaduti.ts`, che gira
+       col timer settimanale. Il TTL era una garanzia, questo e' un
+       promemoria: se il comando non gira, le righe vecchie restano. */
     // Si cercano sempre per indirizzo E per freschezza insieme: un indice solo
     // su `visto` farebbe scorrere tutte le righe recenti per trovarne dodici.
     // Il giro continuo chiede «di questa insegna, cosa e' ancora fresco».
