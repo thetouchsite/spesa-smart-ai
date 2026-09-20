@@ -37,6 +37,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { nomeDaUrl } from "../src/api/catalogo.js";
 import { salvaCatalogo, statoCataloghi } from "../src/api/catalogo-magazzino.js";
+import { fonti } from "../src/base/db.js";
 
 const CARTELLA = "diario/raccolto";
 
@@ -52,6 +53,39 @@ const CARTELLA = "diario/raccolto";
 const TETTO = 100_000;
 
 const n = (x: number) => x.toLocaleString("it-IT");
+
+/** Le insegne che qualcuno cerca davvero. Si riempie all'avvio di `main`. */
+let vive: Array<{ paese: string; insegna: string }> = [];
+
+/**
+ * Il nome con cui una fonte viva cerca questo catalogo, se esiste.
+ *
+ * Il confronto e' tollerante perche' il nome che arriva dal file e' mutilato:
+ * gli accenti sono caduti e sono rimasti spazi. Si guarda la forma ridotta a
+ * sole lettere e cifre, e in piu' si accetta che al nome del file MANCHINO
+ * lettere rispetto a quello vero — che e' esattamente il danno degli accenti
+ * perduti, e non succede fra due negozi diversi.
+ */
+function nomeDiFonte(paese: string, daFile: string): string | null {
+  const ridotto = (x: string) => x.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]/g, "");
+  const a = ridotto(daFile);
+  const candidate = vive.filter((f) => f.paese === paese);
+
+  const esatto = candidate.find((f) => ridotto(f.insegna) === a);
+  if (esatto) return esatto.insegna;
+
+  /* Al nome del file mancano lettere: deve restare una sottosequenza di
+     quello vero, e mancargliene poche. Con piu' di tre di scarto non e' piu'
+     un accento perduto, e' un altro negozio. */
+  const mutilo = candidate.find((f) => {
+    const b = ridotto(f.insegna);
+    if (a.length >= b.length || b.length - a.length > 3) return false;
+    let i = 0;
+    for (const ch of b) if (i < a.length && a[i] === ch) i++;
+    return i === a.length;
+  });
+  return mutilo ? mutilo.insegna : null;
+}
 
 async function main() {
   const filtro = process.argv.includes("--solo")
@@ -70,8 +104,22 @@ async function main() {
   console.log("prima:", await statoCataloghi());
   console.log();
 
+  /* L'elenco delle insegne vive si legge una volta: e' il metro con cui si
+     decide cosa vale la pena scrivere sul database. */
+  vive = ((await (await fonti())
+    .find({ esclusa: { $exists: false } })
+    .project({ paese: 1, insegna: 1 })
+    .toArray()) as Array<{ paese?: string; insegna?: string }>).map((f) => ({
+    paese: String(f.paese ?? ""),
+    insegna: String(f.insegna ?? ""),
+  }));
+  console.log(`${vive.length} insegne vive nelle fonti
+`);
+
   let totale = 0;
   let scartati = 0;
+  let saltati = 0;
+  let saltatiLink = 0;
   const inizio = Date.now();
 
   for (const f of file) {
@@ -105,11 +153,32 @@ async function main() {
       continue;
     }
 
-    /* L'insegna si salva con il nome del FILE, non con quello delle fonti:
-       chi legge (`catalogo.ts`) cerca per `paese|insegna`, e il nome nelle
-       fonti ha accenti e spazi che nel file sono diventati underscore. Si
-       rimettono come erano. */
-    const insegna = insegnaFile.replace(/_/g, " ").trim();
+    /* IL NOME DEL FILE NON E' IL NOME DELL'INSEGNA, E CREDERLO COSTAVA CARO.
+       Si salvava col nome del file, rimettendo spazi al posto degli
+       underscore. Ma negli underscore gli accenti erano gia' andati persi:
+       «Aldi Sued» tornava indietro come «Aldi S d», «El Corte Ingles» come
+       «El Corte Ingl s». Chi legge cerca per `paese|insegna` col nome esatto
+       delle fonti, quindi quei cataloghi non li trovava nessuno — restavano
+       li' a gonfiare ogni totale senza servire a niente.
+
+       Peggio: questo comando ricarica i file di una battuta di raccolta
+       vecchia, dove c'erano anche insegne poi scartate a ragion veduta —
+       Galaxus e' un generalista, Rossmann e dm sono profumerie. Rilanciarlo
+       rimetteva dentro pure quelle, e annullava ogni pulizia fatta prima.
+       Il 19 settembre sono tornati cosi' 437.480 indirizzi morti.
+
+       Adesso si salva solo quel che una fonte viva cerca davvero, col nome
+       che cerca lei. Il resto si dice e si lascia sul disco. */
+    const daFile = insegnaFile.replace(/_/g, " ").trim();
+    const insegna = nomeDiFonte(paese, daFile);
+    if (!insegna) {
+      saltati++;
+      saltatiLink += voci.length;
+      console.log(
+        `${paese}  ${daFile.padEnd(30).slice(0, 30)} saltata: nessuna fonte viva la cerca`,
+      );
+      continue;
+    }
 
     await salvaCatalogo(paese, insegna, voci);
     totale += voci.length;
@@ -122,6 +191,11 @@ async function main() {
   console.log("\n" + "═".repeat(66));
   console.log(`  caricati            ${n(totale)} indirizzi`);
   console.log(`  scartati (no nome)  ${n(scartati)}`);
+  if (saltati > 0) {
+    console.log(`  saltati             ${n(saltati)} cataloghi, ${n(saltatiLink)} indirizzi`);
+    console.log(`                      nessuna fonte viva li cerca: sarebbero orfani appena nati.`);
+    console.log(`                      I file restano sul disco — riammetti l'insegna e si ricaricano.`);
+  }
   console.log(`  tempo               ${((Date.now() - inizio) / 1000).toFixed(0)}s`);
   console.log("\ndopo:", await statoCataloghi());
   console.log(
