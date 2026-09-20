@@ -46,11 +46,12 @@
  */
 
 import { readFileSync } from "node:fs";
+import { CANDIDATI } from "./insegne-candidate.js";
 import { fonti } from "../src/base/db.js";
 import { posso, robotsDi } from "../src/base/robots.js";
 import { verifyProductPage } from "../src/api/price-page.js";
 
-const paese = (process.argv[2] ?? "").toUpperCase();
+const paese = (process.argv[2] ?? "").toUpperCase().replace(/^--.*/, "");
 const scrivi = process.argv.includes("--scrivi");
 const fondo = process.argv.includes("--fondo");
 const arg = (nome: string) =>
@@ -70,85 +71,6 @@ const { daUnaFonte } = await import("../src/api/catalogo.js");
  * che le apre tutte.
  */
 const CAMPIONE = 20;
-
-/**
- * Le catene alimentari note che il censimento non ha, paese per paese.
- *
- * Gli indirizzi qui sotto sono un punto di partenza, non un dato acquisito: un
- * dominio sbagliato costa una richiesta fallita e viene detto in chiaro. Meglio
- * un elenco largo provato dalla macchina che uno stretto scelto a mano.
- */
-const CANDIDATI: Record<string, Array<{ nome: string; dominio: string }>> = {
-  /* L'ITALIA E' UN CASO DIFFICILE, E VALE LA PENA SAPERE PERCHE'.
-     Il primo giro ha trovato una sola insegna su venti, e non era un difetto
-     dello script: «despar.it» dichiara `sitemap.xml` e `sitemap_stores.xml` —
-     pagine e punti vendita, nessun prodotto. Tante catene italiane sono
-     consorzi di negozi indipendenti: il sito nazionale racconta l'azienda e i
-     volantini, e la spesa online, quando c'e', sta su un dominio suo o non
-     esiste affatto. Per questo qui ci sono i NEGOZI ONLINE dove si conoscono,
-     non le sedi. */
-  IT: [
-    { nome: "Sole365", dominio: "www.sole365.it" },
-    { nome: "Il Gigante", dominio: "www.ilgigante.net" },
-    { nome: "Famila", dominio: "www.famila.it" },
-    { nome: "Migross", dominio: "www.migross.it" },
-    { nome: "Tosano", dominio: "www.tosanocerea.it" },
-    { nome: "Deco Supermercati", dominio: "www.decosupermercati.it" },
-    { nome: "Crai", dominio: "www.craiweb.it" },
-    { nome: "Sisa", dominio: "www.sisa.it" },
-    { nome: "Gulliver", dominio: "www.gulliver.it" },
-    { nome: "Tigota", dominio: "www.tigota.it" },
-    { nome: "Acqua e Sapone", dominio: "www.acquaesapone.it" },
-    { nome: "Risparmio Casa", dominio: "www.risparmiocasa.com" },
-    { nome: "Arcaplanet", dominio: "www.arcaplanet.it" },
-    { nome: "Bofrost", dominio: "www.bofrost.it" },
-    { nome: "Penny Italia", dominio: "www.penny.it" },
-    { nome: "Despar", dominio: "www.despar.it" },
-    { nome: "Todis", dominio: "www.todis.it" },
-    { nome: "MD", dominio: "www.mdspa.it" },
-    { nome: "In's Mercato", dominio: "www.insmercato.it" },
-    { nome: "Everli", dominio: "www.everli.com" },
-  ],
-  ES: [
-    { nome: "Eroski", dominio: "supermercado.eroski.es" },
-    { nome: "Condis", dominio: "www.condisline.com" },
-    { nome: "Ahorramas", dominio: "www.ahorramas.com" },
-    { nome: "Carrefour Espana", dominio: "www.carrefour.es" },
-    { nome: "El Corte Ingles", dominio: "www.elcorteingles.es" },
-    { nome: "Lidl Espana", dominio: "www.lidl.es" },
-    { nome: "Dia", dominio: "www.dia.es" },
-    { nome: "Hipercor", dominio: "www.hipercor.es" },
-    { nome: "Froiz", dominio: "www.froiz.com" },
-    { nome: "Gadis", dominio: "www.gadis.es" },
-    { nome: "Coviran", dominio: "www.covirandomicilio.es" },
-    { nome: "BM Supermercados", dominio: "www.bmsupermercados.es" },
-    { nome: "Caprabo", dominio: "www.caprabo.com" },
-    { nome: "Alimerka", dominio: "www.alimerka.es" },
-    { nome: "HiperDino", dominio: "www.hiperdino.es" },
-    { nome: "Family Cash", dominio: "www.familycash.es" },
-    { nome: "Masymas", dominio: "www.masymas.com" },
-    { nome: "Supercor", dominio: "www.supercor.es" },
-  ],
-  FR: [
-    { nome: "Intermarche", dominio: "www.intermarche.com" },
-    { nome: "Auchan", dominio: "www.auchan.fr" },
-    { nome: "Leclerc", dominio: "www.e.leclerc" },
-    { nome: "Monoprix", dominio: "www.monoprix.fr" },
-    { nome: "Franprix", dominio: "www.franprix.fr" },
-    { nome: "Cora", dominio: "www.cora.fr" },
-    { nome: "Super U", dominio: "www.coursesu.com" },
-    { nome: "Casino", dominio: "www.casino.fr" },
-  ],
-  DE: [
-    { nome: "Rewe", dominio: "shop.rewe.de" },
-    { nome: "Edeka24", dominio: "www.edeka24.de" },
-    { nome: "Kaufland", dominio: "www.kaufland.de" },
-    { nome: "Netto", dominio: "www.netto-online.de" },
-    { nome: "Penny", dominio: "www.penny.de" },
-    { nome: "Bringmeister", dominio: "www.bringmeister.de" },
-    { nome: "Flaschenpost", dominio: "www.flaschenpost.de" },
-  ],
-};
 
 /** Dove sta una sitemap quando il `robots.txt` non la dichiara. */
 const POSTI_SOLITI = [
@@ -249,7 +171,14 @@ const nomi = new Set(gia.map((x) => `${x.paese}|${String(x.insegna).toLowerCase(
 
 /* ── chi provare ─────────────────────────────────────────────────────── */
 
-let lista = CANDIDATI[paese] ?? [];
+/* `--tutti`: si battono tutti i paesi dell'elenco di fila.
+   Serve quando l'obiettivo non e' un paese ma un numero: per raddoppiare le
+   insegne bisogna guardare dappertutto, e farlo a mano un paese per volta
+   vuol dire tornare venti volte a lanciare lo stesso comando. */
+const tutti = process.argv.includes("--tutti");
+let lista = tutti
+  ? Object.entries(CANDIDATI).flatMap(([p, c]) => c.map((x) => ({ ...x, paese: p })))
+  : (CANDIDATI[paese] ?? []).map((x) => ({ ...x, paese }));
 
 const unoSolo = arg("--dominio");
 if (unoSolo) {
@@ -258,7 +187,7 @@ if (unoSolo) {
     console.error('Serve  --dominio "Nome=dominio.it"');
     process.exit(1);
   }
-  lista = [{ nome, dominio }];
+  lista = [{ nome, dominio, paese }];
 }
 
 const daFile = arg("--da");
@@ -269,12 +198,12 @@ if (daFile) {
     .filter((r) => r && !r.startsWith("#"))
     .map((r) => {
       const [nome, dominio] = r.split("=");
-      return { nome: (nome ?? "").trim(), dominio: (dominio ?? "").trim() };
+      return { nome: (nome ?? "").trim(), dominio: (dominio ?? "").trim(), paese };
     })
     .filter((x) => x.nome && x.dominio);
 }
 
-if (!paese || lista.length === 0) {
+if ((!paese && !tutti) || lista.length === 0) {
   console.error("");
   console.error(`  Nessun candidato per «${paese || "(nessun paese)"}».`);
   console.error(`  Paesi con un elenco pronto: ${Object.keys(CANDIDATI).sort().join(", ")}`);
@@ -298,17 +227,18 @@ if (scrivi && !fondo) {
 const n = (v: number) => v.toLocaleString("it-IT");
 console.log("");
 console.log(
-  `CACCIA INSEGNE · ${paese} · ${lista.length} candidati${fondo ? " · a fondo" : " · prova veloce"}`,
+  `CACCIA INSEGNE · ${tutti ? "tutti i paesi" : paese} · ${lista.length} candidati${fondo ? " · a fondo" : " · prova veloce"}`,
 );
 console.log("");
 
-const promosse: Array<{ nome: string; dominio: string; sitemap: string; link: number; resa: number }> = [];
+const promosse: Array<{ nome: string; dominio: string; sitemap: string; link: number; resa: number; paese: string }> = [];
 const rese: Array<{ nome: string; link: number }> = [];
 
 for (const c of lista) {
-  const eti = `  ${c.nome.padEnd(22).slice(0, 22)}`;
+  const eti = `  ${((c as {paese?:string}).paese ?? paese)} ${c.nome.padEnd(20).slice(0, 20)}`;
 
-  if (domini.has(host(c.dominio)) || nomi.has(`${paese}|${c.nome.toLowerCase()}`)) {
+  const suo = (c as { paese?: string }).paese ?? paese;
+  if (domini.has(host(c.dominio)) || nomi.has(`${suo}|${c.nome.toLowerCase()}`)) {
     console.log(`${eti} ce l'abbiamo gia'`);
     continue;
   }
@@ -342,7 +272,7 @@ for (const c of lista) {
   for (const radice of radici) {
     try {
       const prova = await daUnaFonte({
-        paese,
+        paese: suo,
         insegna: c.nome,
         dominio: dominioVero,
         sitemap: radice,
@@ -397,7 +327,7 @@ for (const c of lista) {
       (via.assente ? " · robots.txt assente" : ""),
   );
 
-  if (resa > 0) promosse.push({ nome: c.nome, dominio: dominioVero, sitemap, link: voci.length, resa });
+  if (resa > 0) promosse.push({ nome: c.nome, dominio: dominioVero, sitemap, link: voci.length, resa, paese: suo });
   else rese.push({ nome: c.nome, link: voci.length });
 }
 
@@ -447,9 +377,9 @@ const libero = () => {
 for (const p of promosse) {
   const id = libero();
   await collezione.insertOne({
-    _id: `${paese}|${p.nome}`,
+    _id: `${p.paese}|${p.nome}`,
     id,
-    paese,
+    paese: p.paese,
     insegna: p.nome,
     dominio: p.dominio,
     sitemap: p.sitemap,
@@ -459,7 +389,7 @@ for (const p of promosse) {
       `trovata da caccia-insegne il ${new Date().toLocaleDateString("it-IT")}; ` +
       `resa misurata su ${CAMPIONE} schede aperte davvero`,
   } as never);
-  console.log(`  aggiunta  ${paese}|${p.nome}  (numero ${id})`);
+  console.log(`  aggiunta  ${p.paese}|${p.nome}  (numero ${id})`);
 }
 
 console.log("");
