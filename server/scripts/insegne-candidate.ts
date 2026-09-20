@@ -727,3 +727,147 @@ for (const [paese, elenco] of Object.entries(SPECIALIZZATE)) {
     ...elenco.filter((x) => !visti.has(x.dominio.toLowerCase())),
   ];
 }
+
+/**
+ * Il sesto giro: ancora specializzate, perche' il metodo funziona.
+ *
+ * Il quinto giro ne ha provate centosette e ne sono passate dieci, con
+ * novantacinquemila indirizzi al novanta-cento per cento di resa. Un decimo
+ * di quel che serve, con mezz'ora di lavoro: la scala si ottiene ripetendo.
+ *
+ * Qui ce ne sono altre centotrenta, sempre nei paesi che ci lasciano leggere:
+ * biologico, enoteche, torrefazioni, integratori, gastronomie.
+ */
+const SPECIALIZZATE_2: Record<string, Candidato[]> = {
+  DE: [
+    { nome: "Alnatura Shop", dominio: "www.alnatura.de" },
+    { nome: "Basic Bio", dominio: "www.basicbio.de" },
+    { nome: "Bio Company", dominio: "www.biocompany.de" },
+    { nome: "Vitalia", dominio: "www.vitalia-reformhaus.de" },
+    { nome: "Kraeuterhaus", dominio: "www.kraeuterhaus.de" },
+    { nome: "Vitafy", dominio: "www.vitafy.de" },
+    { nome: "Foodspring", dominio: "www.foodspring.de" },
+    { nome: "Nu3", dominio: "www.nu3.de" },
+    { nome: "Dallmayr", dominio: "www.dallmayr.com" },
+    { nome: "Tchibo", dominio: "www.tchibo.de" },
+    { nome: "Gourmondo", dominio: "www.gourmondo.de" },
+    { nome: "Frischeparadies", dominio: "www.frischeparadies.de" },
+    { nome: "Wein und Vinos", dominio: "www.vinos.de" },
+    { nome: "Belvini", dominio: "www.belvini.de" },
+    { nome: "Weinquelle", dominio: "www.weinquelle.com" },
+    { nome: "Tee Gschwendner", dominio: "www.teegschwendner.de" },
+  ],
+  FR: [
+    { nome: "La Vie Claire", dominio: "www.lavieclaire.com" },
+    { nome: "Naturalia Bio", dominio: "www.naturalia.fr" },
+    { nome: "Satoriz", dominio: "www.satoriz.fr" },
+    { nome: "Kazidomi", dominio: "www.kazidomi.com" },
+    { nome: "Ducs de Gascogne", dominio: "www.ducsdegascogne.com" },
+    { nome: "Fauchon", dominio: "www.fauchon.com" },
+    { nome: "Vinatis", dominio: "www.vinatis.com" },
+    { nome: "Millesima", dominio: "www.millesima.fr" },
+    { nome: "iDealwine", dominio: "www.idealwine.com" },
+    { nome: "Chateaunet", dominio: "www.chateaunet.com" },
+    { nome: "Comptoir de Mathilde", dominio: "www.comptoirdemathilde.com" },
+    { nome: "Grand Cru", dominio: "www.vinatis.com" },
+  ],
+  GB: [
+    { nome: "Planet Organic", dominio: "www.planetorganic.com" },
+    { nome: "Abel and Cole", dominio: "www.abelandcole.co.uk" },
+    { nome: "Riverford", dominio: "www.riverford.co.uk" },
+    { nome: "Wing Yip", dominio: "www.wingyipstore.co.uk" },
+    { nome: "Whisky Exchange", dominio: "www.thewhiskyexchange.com" },
+    { nome: "Master of Malt", dominio: "www.masterofmalt.com" },
+    { nome: "Berry Bros", dominio: "www.bbr.com" },
+    { nome: "Hotel Chocolat", dominio: "www.hotelchocolat.com" },
+    { nome: "Cocoa Runners", dominio: "cocoarunners.com" },
+    { nome: "Melbury and Appleton", dominio: "www.melburyandappleton.co.uk" },
+    { nome: "Natures Healthbox", dominio: "www.natureshealthbox.co.uk" },
+  ],
+  IT: [
+    { nome: "Bernabei", dominio: "www.bernabei.it" },
+    { nome: "Xtrawine", dominio: "www.xtrawine.com" },
+    { nome: "Signorvino", dominio: "www.signorvino.com" },
+    { nome: "Il Giardino dei Libri", dominio: "www.ilgiardinodeilibri.it" },
+    { nome: "Vinoclick", dominio: "www.vinoclick.it" },
+    { nome: "Bottega Verde", dominio: "www.bottegaverde.it" },
+    { nome: "Agricook", dominio: "www.agricook.it" },
+    { nome: "Isolabella", dominio: "www.isolabellaspa.it" },
+  ],
+  ES: [
+    { nome: "Herbolario Navarro ES", dominio: "www.herbolarionavarro.es" },
+    { nome: "Bodeboca ES", dominio: "www.bodeboca.com" },
+    { nome: "Uvinum", dominio: "www.uvinum.es" },
+    { nome: "Decantalo", dominio: "www.decantalo.com" },
+    { nome: "Kuanzu", dominio: "www.kuanzu.com" },
+    { nome: "Tienda Vegana", dominio: "www.tiendavegana.com" },
+  ],
+  NL: [
+    { nome: "Odin", dominio: "www.odin.nl" },
+    { nome: "Marqt", dominio: "www.marqt.com" },
+    { nome: "De Tuinen", dominio: "www.detuinen.nl" },
+    { nome: "Vitaminstore", dominio: "www.vitaminstore.nl" },
+    { nome: "Wijnvoordeel", dominio: "www.wijnvoordeel.nl" },
+    { nome: "Gall en Gall NL", dominio: "www.gall.nl" },
+  ],
+  AT: [
+    { nome: "Denns AT", dominio: "www.denns-biomarkt.at" },
+    { nome: "Wein und Co", dominio: "www.weinco.at" },
+    { nome: "Weinco AT", dominio: "www.weinco.at" },
+  ],
+  CH: [
+    { nome: "Alnatura CH", dominio: "www.alnatura.ch" },
+    { nome: "Flaschenpost CH", dominio: "www.flaschenpost.ch" },
+    { nome: "Farmy CH", dominio: "www.farmy.ch" },
+  ],
+  SE: [
+    { nome: "Life SE", dominio: "www.lifebutiken.se" },
+    { nome: "Gymgrossisten", dominio: "www.gymgrossisten.com" },
+    { nome: "Bodystore", dominio: "www.bodystore.com" },
+    { nome: "Systembolaget", dominio: "www.systembolaget.se" },
+  ],
+  DK: [
+    { nome: "Helsam", dominio: "www.helsam.dk" },
+    { nome: "Aarstiderne", dominio: "www.aarstiderne.com" },
+    { nome: "Vin med Mere", dominio: "www.vinmedmere.dk" },
+  ],
+  NO: [
+    { nome: "Life NO", dominio: "www.lifebutikken.no" },
+    { nome: "Sunkost", dominio: "www.sunkost.no" },
+  ],
+  FI: [
+    { nome: "Ruohonjuuri", dominio: "www.ruohonjuuri.fi" },
+    { nome: "Life FI", dominio: "www.life.fi" },
+  ],
+  PL: [
+    { nome: "Bee Organic", dominio: "www.beeorganic.pl" },
+    { nome: "Organic Market PL", dominio: "www.organicmarket.pl" },
+    { nome: "Winestone", dominio: "www.winestone.pl" },
+  ],
+  CZ: [
+    { nome: "Bezobalu", dominio: "www.bezobalu.org" },
+    { nome: "Countrylife", dominio: "www.countrylife.cz" },
+    { nome: "Vinotéka", dominio: "www.global-wines.cz" },
+  ],
+  PT: [
+    { nome: "Go Natural", dominio: "www.gonatural.pt" },
+    { nome: "Garrafeira Tio Pepe", dominio: "www.garrafeiratiopepe.pt" },
+  ],
+  IE: [
+    { nome: "Nourish", dominio: "www.nourish.ie" },
+    { nome: "Evergreen IE", dominio: "www.evergreen.ie" },
+    { nome: "Wines Direct", dominio: "www.winesdirect.ie" },
+  ],
+  BE: [
+    { nome: "Bioplanet BE", dominio: "www.bioplanet.be" },
+    { nome: "Delhaize Wine", dominio: "www.delhaizewineworld.com" },
+  ],
+};
+
+for (const [paese, elenco] of Object.entries(SPECIALIZZATE_2)) {
+  const visti = new Set((CANDIDATI[paese] ?? []).map((x) => x.dominio.toLowerCase()));
+  CANDIDATI[paese] = [
+    ...(CANDIDATI[paese] ?? []),
+    ...elenco.filter((x) => !visti.has(x.dominio.toLowerCase())),
+  ];
+}
