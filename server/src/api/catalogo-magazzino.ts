@@ -68,7 +68,40 @@ export interface VoceSalvata {
 const VALIDITA_MS = 30 * 3_600_000;
 
 /** Una lettura non deve tenere in ostaggio una richiesta. */
-const ATTESA_MS = 8_000;
+/**
+ * Quanto si aspetta per LEGGERE un catalogo.
+ *
+ * Erano otto secondi, tarati su un catalogo da poche migliaia di voci. Ma
+ * Carrefour Emirati sono ottocentomila indirizzi in venti megabyte, e su
+ * Atlas gratuito - cento kilobyte al secondo - scaricarli richiede piu' di
+ * tre minuti: la lettura scadeva sempre e quel catalogo risultava vuoto.
+ *
+ * Novanta secondi. Chi chiede un paese non resta appeso a questo: il
+ * caricamento gira in sottofondo e la richiesta ha la sua attesa, piu' corta.
+ * Questo e' il tetto oltre il quale si smette di provare, non il tempo che
+ * qualcuno passa a guardare una schermata.
+ */
+const ATTESA_MS = 90_000;
+
+/**
+ * Quanto si aspetta per SCRIVERE un catalogo.
+ *
+ * Otto secondi bastano a una lettura, che sta fra un utente e la sua risposta.
+ * Una scrittura no: il catalogo di Carrefour Emirati sono venti megabyte, e su
+ * Atlas gratuito - cento kilobyte al secondo - sono piu' di tre minuti.
+ * Scadendo a otto secondi il salvataggio falliva ogni volta, in silenzio,
+ * e l'interruttore poi saltava anche i successivi: ottocentomila indirizzi
+ * dichiarati salvati e mai scritti, due volte di fila.
+ *
+ * Qui non c'e' nessuno che aspetta. Dieci minuti sono generosi per un
+ * catalogo grosso e restano un tetto: se il database e' davvero morto, si
+ * smette comunque.
+ */
+const ATTESA_SCRITTURA_MS = 10 * 60_000;
+
+function nonOltreScrivendo<T>(lavoro: () => Promise<T>, ripiego: T): Promise<T> {
+  return conInterruttore("magazzino-catalogo-scrittura", ATTESA_SCRITTURA_MS, lavoro, ripiego);
+}
 
 /** Come sopra: vedi `interruttore.ts` per il perche' non basta un timeout. */
 function nonOltre<T>(lavoro: () => Promise<T>, ripiego: T): Promise<T> {
@@ -177,7 +210,7 @@ export async function salvaCatalogo(
      cinquantamila byte. */
   const PEZZO = 10_000_000;
 
-  await nonOltre(
+  await nonOltreScrivendo(
     async () => {
       const col = await collezioneCataloghi();
 
@@ -216,6 +249,15 @@ export async function salvaCatalogo(
       for (let i = quanti; i < quanti + 8; i++) {
         await col.deleteOne({ _id: `${paese}|${insegna}#${i + 1}` } as never);
       }
+
+      /* SI CONTROLLA DI AVER SCRITTO, INVECE DI FIDARSI.
+         Due volte di fila questo salvataggio ha detto «fatto» senza scrivere
+         niente: la prima perche' il pacchetto era troppo grosso, la seconda
+         perche' scadeva il tempo. Una rilettura costa una domanda e chiude la
+         questione — se il documento non c'e', chi ha chiesto deve saperlo e
+         mettere il catalogo sul disco. */
+      const scritto = await col.findOne({ _id: `${paese}|${insegna}` }, { projection: { _id: 1 } });
+      if (!scritto) throw new Error("scritto senza errori ma il documento non c'e'");
       return undefined;
     },
     undefined,
