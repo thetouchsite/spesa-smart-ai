@@ -197,7 +197,32 @@ const nomi = new Set(gia.map((x) => `${x.paese}|${String(x.insegna).toLowerCase(
    insegne bisogna guardare dappertutto, e farlo a mano un paese per volta
    vuol dire tornare venti volte a lanciare lo stesso comando. */
 const tutti = process.argv.includes("--tutti");
-let lista = tutti
+
+/**
+ * `--europa`: i candidati vengono dal censimento grande.
+ *
+ * `insegne-europa.mjs` tiene trecentoquarantotto catene alimentari europee,
+ * raccolte a suo tempo per la prima battuta. Centocinquantatre sono diventate
+ * nostre; DUECENTOTRENTUNO non le abbiamo mai provate, ed e' un pozzo molto
+ * piu' profondo dei centosettanta candidati scritti a mano in
+ * `insegne-candidate.ts`.
+ *
+ * Si legge il file invece di importarlo: e' un modulo `.mjs` che all'avvio fa
+ * altro, e a noi serve solo l'elenco. Tre campi per riga, fra parentesi quadre.
+ */
+const europa = process.argv.includes("--europa");
+const daEuropa = (): Array<{ nome: string; dominio: string; paese: string }> => {
+  const testo = readFileSync("scripts/insegne-europa.mjs", "utf8");
+  const fuori: Array<{ nome: string; dominio: string; paese: string }> = [];
+  for (const m of testo.matchAll(/\["([A-Z]{2})",\s*"([^"]+)",\s*"([^"]+)"\]/g)) {
+    fuori.push({ paese: m[1], nome: m[2], dominio: m[3] });
+  }
+  return fuori;
+};
+
+let lista = europa
+  ? daEuropa().filter((x) => !paese || x.paese === paese)
+  : tutti
   ? Object.entries(CANDIDATI).flatMap(([p, c]) => c.map((x) => ({ ...x, paese: p })))
   : (CANDIDATI[paese] ?? []).map((x) => ({ ...x, paese }));
 
@@ -224,7 +249,7 @@ if (daFile) {
     .filter((x) => x.nome && x.dominio);
 }
 
-if ((!paese && !tutti) || lista.length === 0) {
+if ((!paese && !tutti && !europa) || lista.length === 0) {
   console.error("");
   console.error(`  Nessun candidato per «${paese || "(nessun paese)"}».`);
   console.error(`  Paesi con un elenco pronto: ${Object.keys(CANDIDATI).sort().join(", ")}`);
@@ -248,7 +273,7 @@ if (scrivi && !fondo) {
 const n = (v: number) => v.toLocaleString("it-IT");
 console.log("");
 console.log(
-  `CACCIA INSEGNE · ${tutti ? "tutti i paesi" : paese} · ${lista.length} candidati${fondo ? " · a fondo" : " · prova veloce"}`,
+  `CACCIA INSEGNE · ${europa ? "censimento europeo" : tutti ? "tutti i paesi" : paese} · ${lista.length} candidati${fondo ? " · a fondo" : " · prova veloce"}`,
 );
 console.log("");
 
