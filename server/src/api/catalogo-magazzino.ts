@@ -133,18 +133,29 @@ export async function salvaCatalogo(
 ): Promise<void> {
   if (!isDbConfigured() || voci.length === 0) return;
 
+  const dati = impacchetta(voci);
+
+  /* TROPPO GRANDE SI DICE, NON SI TACE — E SI DICE FUORI DALL'INTERRUTTORE.
+     Mongo ammette sedici megabyte per documento. Prima, superata la soglia, si
+     tornava `undefined` esattamente come nel caso riuscito: chi chiamava
+     stampava «800.000 indirizzi salvati» su un nulla, e il catalogo di
+     Carrefour Emirati non e' mai esistito pur comparendo nei totali per un
+     giorno intero.
+
+     Il controllo sta PRIMA di `nonOltre` perche' quello e' un interruttore di
+     protezione: prende qualunque eccezione e restituisce il ripiego, che e'
+     giusto per un database che non risponde e sbagliato per un pacchetto
+     troppo grosso — quello non e' un guasto passeggero, e' un no definitivo
+     che chi chiama deve sentire. Un fallimento travestito da successo e'
+     peggio di un errore: nessuno lo va a cercare. */
+  if (dati.length > 15_000_000) {
+    throw new Error(
+      `pacchetto da ${(dati.length / 1048576).toFixed(1)} MB: oltre i 16 MB che Mongo ammette per documento`,
+    );
+  }
+
   await nonOltre(
     async () => {
-      const dati = impacchetta(voci);
-      // Sedici megabyte e' il tetto di Mongo per documento: se un'insegna lo
-      // sfonda si lascia stare invece di far fallire tutto il salvataggio.
-      if (dati.length > 15_000_000) {
-        console.warn(
-          `[catalogo] ${paese} ${insegna}: pacchetto da ${(dati.length / 1048576).toFixed(1)} MB, ` +
-            `troppo per un documento: non lo salvo`,
-        );
-        return undefined;
-      }
       await (await collezioneCataloghi()).updateOne(
         { _id: `${paese}|${insegna}` },
         {
