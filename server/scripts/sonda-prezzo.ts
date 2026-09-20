@@ -42,6 +42,7 @@
 
 import { gunzipSync } from "node:zlib";
 import { cataloghi, fonti, prezzi } from "../src/base/db.js";
+import { readPrices, porzioneConPrezzi } from "../src/api/price-page.js";
 
 const arg = (nome: string) =>
   process.argv.includes(nome) ? process.argv[process.argv.indexOf(nome) + 1] : undefined;
@@ -208,6 +209,7 @@ async function sonda(etichetta: string, indirizzi: string[]): Promise<void> {
   const conteggio = new Map<string, { volte: number; esempio: Esito }>();
   const apiViste = new Set<string>();
   let risposte = 0;
+  let giaLette = 0;
 
   for (const url of campione) {
     try {
@@ -217,7 +219,19 @@ async function sonda(etichetta: string, indirizzi: string[]): Promise<void> {
         continue;
       }
       risposte++;
-      const { esiti, api } = analizza(await r.text());
+      const testo = await r.text();
+
+      /* PRIMA SI CHIEDE AL LETTORE VERO.
+         Questa sonda e' nata per dire dove sta il prezzo quando il lettore non
+         lo trova. Ma la sonda guarda in tre posti e il lettore in venti, e
+         cosi' dichiarava «il prezzo non e' nell'HTML» di pagine che il lettore
+         legge benissimo: Barbora Estonia, cinque schede su cinque.
+         Una diagnosi fatta con meno strumenti della cura da' la malattia
+         sbagliata, e manda a scrivere lettori API che non servono a niente. */
+      const gia = readPrices(porzioneConPrezzi(testo));
+      if (gia && typeof gia.current === "number") giaLette++;
+
+      const { esiti, api } = analizza(testo);
       for (const a of api) apiViste.add(a);
       /* Una sola voce per posto: se il prezzo compare otto volte nello stesso
          JSON-LD e' comunque un posto solo. */
@@ -237,6 +251,14 @@ async function sonda(etichetta: string, indirizzi: string[]): Promise<void> {
 
   if (risposte === 0) {
     console.log("  nessuna pagina si e' aperta: il catalogo e' vecchio o il sito ci blocca");
+    return;
+  }
+
+  if (giaLette > 0) {
+    console.log(
+      `  ${risposte}/${campione.length} pagine aperte · IL LETTORE LE LEGGE GIA' (${giaLette}/${risposte})`,
+    );
+    console.log("  → non serve nessun lettore nuovo: quelle righe sono vecchie e si rifanno da sole.");
     return;
   }
 
