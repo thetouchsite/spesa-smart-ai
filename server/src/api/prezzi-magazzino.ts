@@ -287,27 +287,70 @@ export function oreDa(visto: Date): number {
   return Math.max(0, Math.round((Date.now() - visto.getTime()) / 3_600_000));
 }
 
-/** Quante righe ci sono in magazzino: per l'endpoint di stato. */
+/**
+ * Cosa c'e' in magazzino.
+ *
+ * UNA RIGA NON E' UN PREZZO, E CHIAMARLA COSI' E' COSTATO UNA DOMANDA.
+ * Il magazzino registra tutte le schede che il lettore ha aperto, comprese
+ * quelle in cui il prezzo NON c'era: e' apposta, perche' e' cosi' che sa di
+ * non doverle riaprire domani. Ma allora `righe` e `prezzi` sono due cose
+ * diverse, e il pannello le mostrava come una sola — «prezzi freschi 769.351»
+ * quando i prezzi veri erano meno di cinquecentomila.
+ *
+ * Un numero gonfio del cinquanta per cento su cui si decide quando comprare
+ * un server non e' un dettaglio di etichetta.
+ */
 export async function statoMagazzino(): Promise<{
   /** `aperto` = il database non risponde e abbiamo smesso di chiederglielo. */
   interruttore: "chiuso" | "aperto";
   attivo: boolean;
+  /** Tutte le schede provate, col prezzo e senza. */
   righe: number;
+  /** Quelle provate di recente, col prezzo e senza. */
   fresche: number;
+  /** Quelle che un prezzo ce l'hanno davvero. */
+  conPrezzo: number;
+  /** Quelle che un prezzo ce l'hanno E sono ancora valide: il numero vendibile. */
+  freschiConPrezzo: number;
 }> {
-  if (!isDbConfigured()) return { interruttore: "chiuso" as const, attivo: false, righe: 0, fresche: 0 };
+  const vuoto = {
+    interruttore: "chiuso" as const,
+    attivo: false,
+    righe: 0,
+    fresche: 0,
+    conPrezzo: 0,
+    freschiConPrezzo: 0,
+  };
+  if (!isDbConfigured()) return vuoto;
 
   return nonOltre(
     async () => {
       const c = await collezionePrezzi();
       const soglia = new Date(Date.now() - FRESCHEZZA_MS);
-      const [righe, fresche] = await Promise.all([
+      const [righe, fresche, conPrezzo, freschiConPrezzo] = await Promise.all([
         c.countDocuments(),
         // `t`, non `visto`: nella forma stretta il campo ha un nome di una lettera.
         c.countDocuments({ t: { $gte: soglia } } as never),
+        // `p` a null vuol dire «aperta, nessun prezzo in pagina».
+        c.countDocuments({ p: { $ne: null } } as never),
+        c.countDocuments({ p: { $ne: null }, t: { $gte: soglia } } as never),
       ]);
-      return { interruttore: statoInterruttore("magazzino-prezzi"), attivo: true, righe, fresche };
+      return {
+        interruttore: statoInterruttore("magazzino-prezzi"),
+        attivo: true,
+        righe,
+        fresche,
+        conPrezzo,
+        freschiConPrezzo,
+      };
     },
-    { interruttore: "aperto" as const, attivo: true, righe: -1, fresche: -1 },
+    {
+      interruttore: "aperto" as const,
+      attivo: true,
+      righe: -1,
+      fresche: -1,
+      conPrezzo: -1,
+      freschiConPrezzo: -1,
+    },
   );
 }

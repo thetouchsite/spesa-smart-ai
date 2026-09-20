@@ -719,19 +719,18 @@ async function aggiorna() {
     : '<p class="vuoto">Nessun lettore sta lavorando in questo momento.</p>';
 
   const p = d.prezzi, c = d.cataloghi;
-  const quota = p.righe > 0 ? Math.round((p.fresche / p.righe) * 100) : 0;
   /* LA DOMANDA VERA DEL PANNELLO, che prima bisognava fare a mente:
      di quel che c'e' da leggere, quanto abbiamo letto? Sopra stavano il
      numeratore e il denominatore, uno accanto all'altro, e nessuno li
      divideva. */
-  const copertura = c.prodotti > 0 ? Math.round((p.righe / c.prodotti) * 100) : 0;
+  const copertura = c.prodotti > 0 ? Math.round((p.conPrezzo / c.prodotti) * 100) : 0;
   document.getElementById("magazzini").innerHTML = \`
     <div><b>\${n(c.prodotti)}</b><span>indirizzi da aprire</span></div>
-    <div class="v"><b>\${n(p.righe)}</b><span>prezzi raccolti</span></div>
+    <div class="v"><b>\${n(p.conPrezzo)}</b><span>prodotti con prezzo</span></div>
     <div class="\${copertura >= 60 ? "v" : ""}"><b>\${copertura}%</b><span>catalogo coperto</span></div>
     <div><b>\${n(c.insegne)}</b><span>insegne vive</span></div>
     <div><b>\${n(d.quantiPaesi)}</b><span>paesi</span></div>
-    <div class="\${p.fresche > 0 ? "v" : "r"}"><b>\${quota}%</b><span>prezzi ancora validi</span></div>\`;
+    <div class="\${p.freschiConPrezzo > 0 ? "v" : "r"}"><b>\${n(p.freschiConPrezzo)}</b><span>vendibili adesso</span></div>\`;
 
   /* QUEL CHE RESTA FUORI SI DICE, NON SI NASCONDE NEL TOTALE.
      Il riquadro diceva due milioni di link: dentro c'erano 223.740 indirizzi
