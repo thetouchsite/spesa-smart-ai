@@ -8,6 +8,28 @@ rem  secondi. Per fermarlo davvero si chiude la finestra.
 rem
 rem  Puoi tenerne aperte quante ne vuoi, anche su macchine diverse: i paesi si
 rem  prenotano, quindi due lettori non fanno mai lo stesso lavoro due volte.
+rem
+rem  I NUMERI QUI SOTTO SONO STATI MISURATI, NON SCELTI
+rem  --------------------------------------------------
+rem  Il 20 settembre 2026 la raccolta e' passata da 599.336 a oltre un milione
+rem  di prodotti, e quasi tutto il guadagno e' venuto da come si chiede, non da
+rem  quanto forte. Tre cose imparate a caro prezzo:
+rem
+rem  QUANTE RICHIESTE A UN NEGOZIO ALLA VOLTA. Una. Non due, non quattro.
+rem  Alcampo, in Spagna, aperto a freddo da' quattro prezzi su quattro; con due
+rem  richieste insieme ne da' uno su quattro. Abbiamo perso 93.000 prezzi veri
+rem  per averlo scoperto tardi: il lettore sovrascriveva i prezzi buoni con i
+rem  rifiuti, e poi le righe vuote sono state cancellate.
+rem
+rem  QUANTO ASPETTARE FRA UNA PAGINA E L'ALTRA. Un secondo. Centoventi
+rem  millisecondi - il valore di prima - sono otto pagine al secondo, e per i
+rem  siti sudamericani e spagnoli sono troppe: rispondono 403 e smettono.
+rem
+rem  QUANTI NEGOZI INSIEME. Tanti. E' da li' che viene la velocita': sessanta
+rem  pagine insieme su sessanta negozi DIVERSI sono educate, sessanta sullo
+rem  stesso sono un assedio. Per questo la lista dei paesi va tenuta LARGA -
+rem  restringendola, ogni lettore si ritrova due insegne in coda e la
+rem  concorrenza crolla a due pagine alla volta.
 rem ---------------------------------------------------------------------------
 
 chcp 65001 >nul
@@ -24,14 +46,19 @@ if not exist ".env" (
 )
 
 rem  Il nome con cui compare nel pannello. Se lanci piu' lettori sulla stessa
-rem  macchina, cambia questo o vedrai due righe identiche e non saprai quale e'
+rem  macchina, cambia questo o vedrai due righe identiche senza sapere quale e'
 rem  quale.
 if "%NOME_MACCHINA%"=="" set NOME_MACCHINA=%COMPUTERNAME%
 
-rem  Quante pagine si aprono insieme. Il tetto per singolo negozio resta quello
-rem  di sempre: la velocita' viene dall'avere tanti negozi diversi in coda, non
-rem  dal premere piu' forte su uno solo.
-set GIRO_INSIEME=48
+rem  Sessanta pagine insieme, ma UNA sola per negozio: vedi sopra.
+set GIRO_INSIEME=60
+set GIRO_PER_CATENA_INSIEME=1
+set GIRO_PAUSA_MS=1000
+
+rem  Trentamila schede per insegna a giro: abbastanza per fare strada, poco
+rem  abbastanza da non tenere in memoria mezzo catalogo.
+set GIRO_PER_INSEGNA=30000
+set GIRO_MAX_VOCI=600000
 set NODE_OPTIONS=--max-old-space-size=4096
 
 :ciclo
@@ -41,7 +68,7 @@ echo   LETTORE - avvio: %DATE% %TIME%   (macchina: %NOME_MACCHINA%)
 echo ===========================================================================
 echo.
 
-call npx tsx --env-file-if-exists=.env scripts/lettore.ts %*
+call npx tsx --env-file-if-exists=.env scripts/lettore.ts --paesi 12 --minuti 60 %*
 
 if %ERRORLEVEL% EQU 0 goto fine
 
