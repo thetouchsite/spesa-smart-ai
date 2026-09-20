@@ -830,7 +830,7 @@ async function aggiorna() {
     const capo = perCosa === "paese" ? "paese" : "insegna";
     dove.innerHTML =
       '<div class="pr cap"><span></span><span>' + capo + '</span><span>copertura</span>' +
-      '<span>link</span><span>prezzi</span><span>quota</span></div>' +
+      '<span>indirizzi</span><span>con prezzo</span><span>quota</span></div>' +
       righe.slice(0, 60).map((r) => {
         const q = Math.round(r.copertura * 100);
         const classe = q === 0 ? "zero" : q < 25 ? "bassa" : "";

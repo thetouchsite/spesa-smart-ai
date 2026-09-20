@@ -66,17 +66,47 @@ const VALIDI_MS = 30 * 24 * 60 * 60 * 1000;
  * casi il lettore riprovera' le schede, che e' il comportamento prudente —
  * meglio rileggere per niente che dare per morto un negozio che e' tornato.
  */
+/**
+ * L'elenco tenuto a portata di mano, invece di riprenderlo ogni volta.
+ *
+ * PERCHE' SERVE ADESSO E PRIMA NO.
+ * Finche' questi elenchi li leggeva solo il lettore andava benissimo
+ * ricaricarli: una volta per insegna a ogni giro, e un giro dura minuti.
+ * Adesso li consulta anche l'API, mentre un utente aspetta la sua lista della
+ * spesa — e li' interrogare Mongo e decomprimere un paio di megabyte a ogni
+ * richiesta costerebbe piu' della pagina che stiamo evitando di aprire, cioe'
+ * esattamente il contrario del punto.
+ *
+ * Cinque minuti: un'impronta appena scritta arriva con quel ritardo al
+ * massimo, e il prezzo del ritardo e' una pagina riaperta per niente.
+ */
+const RICORDA_MS = 5 * 60 * 1000;
+const aMente = new Map<string, { quando: number; elenco: Set<string> }>();
+
 export async function scartiDi(insegna: string, paese: string): Promise<Set<string>> {
   if (!isDbConfigured()) return new Set();
+
+  const chiave = `${paese}|${insegna}`;
+  const avuto = aMente.get(chiave);
+  if (avuto && Date.now() - avuto.quando < RICORDA_MS) return avuto.elenco;
+
   try {
-    const doc = await (await scarti()).findOne({ _id: `${paese}|${insegna}` });
+    const doc = await (await scarti()).findOne({ _id: chiave });
     if (!doc) return new Set();
     if (Date.now() - new Date(doc.aggiornato).getTime() > VALIDI_MS) return new Set();
     const testo = gunzipSync(Buffer.from(doc.dati.buffer)).toString("utf8");
-    return new Set(testo.split("\n").filter(Boolean));
+    const elenco = new Set(testo.split("\n").filter(Boolean));
+    aMente.set(chiave, { quando: Date.now(), elenco });
+    return elenco;
   } catch {
     return new Set();
   }
+}
+
+/** Dopo aver scritto impronte nuove, quel che si ricorda non vale piu'. */
+export function dimenticaScarti(insegna?: string, paese?: string): void {
+  if (insegna && paese) aMente.delete(`${paese}|${insegna}`);
+  else aMente.clear();
 }
 
 /**
@@ -118,6 +148,11 @@ export async function segnaScarti(
       },
       { upsert: true },
     );
+    /* Quel che si teneva a mente adesso e' vecchio di qualche impronta: si
+       butta, cosi' la prossima domanda ripesca l'elenco intero. Senza questa
+       riga il lettore riaprirebbe per cinque minuti schede che ha appena
+       finito di scartare. */
+    dimenticaScarti(insegna, paese);
     return tutte.size;
   } catch (err) {
     /* Lo scarto non salvato costa una rilettura, non un guasto: si tace e si

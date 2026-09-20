@@ -91,6 +91,20 @@ const tuttoMuto = new Set(q.tuttoMuto);
 const alBuio = q.paesi.filter((r) => r.prezzi === 0 && r.link > 0).sort((a, b) => b.link - a.link);
 const linkAlBuio = alBuio.reduce((a, r) => a + r.link, 0);
 
+/* LA RESA VERA, CONTATA SU QUEL CHE ABBIAMO APERTO DAVVERO.
+   Questa pagina prometteva «99,9% con prezzo», un numero scritto a mano mesi
+   fa su un campione fortunato. Misurato su novecentomila schede: 64%. Una
+   promessa del genere in cima al cruscotto fa aspettare tre milioni di
+   prodotti da un catalogo che ne dara' ottocentomila. */
+const resaVera = q.totale.prezzi > 0 ? Math.round((q.totale.cifre / q.totale.prezzi) * 100) : 0;
+const apertiQuota = q.totale.link > 0 ? Math.round((q.totale.prezzi / q.totale.link) * 100) : 0;
+
+/* Dove si arriva a lavoro finito: i prodotti di oggi piu' quelli che ci si
+   aspetta dagli indirizzi mai aperti, alla resa misurata. E' una proiezione e
+   va detto che lo e' — ma una proiezione onesta vale piu' di un totale di
+   indirizzi che nessuno leggera' mai come tale. */
+const tetto = q.totale.cifre + Math.round((q.totale.link - q.totale.prezzi) * (resaVera / 100));
+
 const quando = new Date(q.quando).toLocaleString("it-IT", {
   day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
 });
@@ -212,20 +226,24 @@ const html = `<title>Cruscotto dati MealMint</title>
   <p class="quando">${esc(quando)} &middot; LETTO DAL DATABASE, NON DALLE STIME</p>
   <p class="intro">Questa pagina la genera <code>scripts/cruscotto.ts</code> leggendo i due magazzini su Mongo. La versione precedente sommava il campo <code>stimati</code> di un file scritto a mano, e mostrava ${n(q.stimati)} prodotti dove il database ne serve ${n(q.totale.link)}.</p>
 
-  <div class="allarme">
-    <p><b>Il catalogo &egrave; pieno, il magazzino dei prezzi &egrave; vuoto.</b> ${n(q.totale.link)} indirizzi di prodotto contro <b>${n(q.totale.cifre)} prezzi</b> ancora validi. &Egrave; lo ${(q.totale.cifre / q.totale.link * 100).toFixed(2).replace(".", ",")}% del catalogo.</p>
-    <p><b>${alBuio.length} paesi su ${q.paesi.length} hanno il catalogo e nessun prezzo</b>, per ${n(linkAlBuio)} indirizzi. Per quei paesi l&#39;app apre le pagine dal vivo mentre l&#39;utente aspetta: &egrave; il comportamento che il magazzino doveva togliere.</p>
-    <p><b>Il magazzino e&#39; stato svuotato apposta, e si sta riempiendo adesso.</b> La riga di prezzo pesava 443 byte e il prezzo ne occupava dodici: tutto il resto — l&#39;indirizzo per esteso, il nome, l&#39;insegna, la parola &laquo;verificato&raquo; — era gi&agrave; scritto nel catalogo. A quel peso, nei 440 MB liberi del piano ci stavano un milione di prezzi, e il progetto si fermava l&igrave;. Adesso la riga pesa <b>77 byte</b>, e le trentunomila vecchie sono state buttate perch&eacute; incompatibili: si rifanno in venticinque minuti.</p>
-    <p><b>Il giro continuo</b> apre le schede che mancano o sono scadute, le insegne pi&ugrave; generose per prime, e riprende ogni notte da dove si era fermato. Misurato: <b>21 pagine al secondo, 99,9% con prezzo</b> — il catalogo intero si prezza in tre notti, lo stesso ritmo della freschezza.</p>
+  <div class="avviso">
+    <p><b>Un indirizzo non &egrave; un prodotto con prezzo.</b> Gli indirizzi dicono dove guardare; li danno le sitemap dei negozi e costano niente. Il prezzo si ha solo dopo aver aperto quella pagina, e non tutte ce l&#39;hanno: parecchie catene lo disegnano con JavaScript, e nell&#39;HTML non c&#39;&egrave; niente da leggere. <b>Su quel che abbiamo aperto finora, il ${resaVera}% aveva un prezzo.</b></p>
+    <p>Per questo qui sotto ci sono tre numeri e non uno. Confonderli &egrave; il modo piu&#39; rapido di credersi al triplo di dove si &egrave;.</p>
   </div>
 
   <div class="cifre">
-    <div class="cifra ok"><b>${n(q.totale.link)}</b><span>link servibili</span></div>
+    <div class="cifra"><b>${n(q.totale.link)}</b><span>indirizzi da aprire</span></div>
+    <div class="cifra ok"><b>${n(q.totale.cifre)}</b><span>prodotti con prezzo</span></div>
+    <div class="cifra"><b>${n(q.totale.vendibili)}</b><span>vendibili adesso</span></div>
     <div class="cifra"><b>${q.paesi.length}</b><span>paesi</span></div>
-    <div class="cifra"><b>${q.insegneInElenco}</b><span>insegne in elenco</span></div>
-    <div class="cifra male"><b>${n(q.totale.cifre)}</b><span>prezzi validi</span></div>
-    <div class="cifra male"><b>${alBuio.length}</b><span>paesi senza prezzi</span></div>
+    <div class="cifra"><b>${q.insegneInElenco}</b><span>insegne</span></div>
+    <div class="cifra ${apertiQuota >= 60 ? "ok" : "male"}"><b>${apertiQuota}%</b><span>catalogo aperto</span></div>
   </div>
+
+  <p class="nota"><b>Il tetto, per non aspettarsi quel che non pu&ograve; arrivare.</b>
+  Restano ${n(q.totale.link - q.totale.prezzi)} indirizzi mai aperti. Alla resa misurata, a lavoro finito si arriva
+  intorno ai <b>${n(tetto)} prodotti con prezzo</b> — non ai milioni che il numero degli indirizzi lascerebbe sperare.
+  Per salire oltre servono insegne nuove che il prezzo lo pubblichino, non altre letture di queste.</p>
 
   <p class="nota"><b>Come leggere le cinque cifre qui sopra.</b>
   <b>Link servibili</b>: indirizzi di prodotto salvati, di insegne ancora in elenco — quel che l&#39;API pu&ograve; dare subito.

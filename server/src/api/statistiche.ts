@@ -25,7 +25,9 @@
  */
 
 import { cataloghi, fonti, getDb, isDbConfigured, prezzi } from "../base/db.js";
-import { FRESCHEZZA_MS } from "./prezzi-magazzino.js";
+/* La freschezza non serve piu' qui: questa tabella dice quanti prodotti
+   hanno un prezzo, punto. Da quanto tempo ce l'hanno e' un'altra domanda, e
+   la risponde il riquadro in alto con «vendibili adesso». */
 
 /** Quanto si tengono buoni i conti pesanti prima di rifarli. */
 const VALIDI_MS = 60_000;
@@ -167,11 +169,19 @@ async function contaPerPaese(): Promise<{ paesi: RigaPaese[]; insegne: RigaInseg
     insegnaDelNumero.set(id, String((f as { insegna?: string }).insegna ?? ""));
   }
 
-  const soglia = new Date(Date.now() - FRESCHEZZA_MS);
+  /* SI CONTANO I PREZZI, NON LE RIGHE. E per un po' non e' stato cosi'.
+     Il magazzino registra ogni scheda aperta, comprese quelle in cui il
+     prezzo NON c'era — serve, e' cosi' che il lettore sa di non doverla
+     riaprire domani. Ma qui la colonna si chiama «prezzi», e contarle
+     insieme gonfiava ogni riga della tabella di circa un terzo: l'Italia
+     risultava a 121.881 quando i prodotti con una cifra erano 83.490.
+
+     Un pannello che gonfia e' peggio di un pannello che tace, perche' ci si
+     prendono decisioni sopra. */
   const prezziPerPaese = new Map<string, number>();
   const prezziPerInsegna = new Map<string, number>();
   for (const r of await (await prezzi())
-    .aggregate([{ $match: { t: { $gte: soglia } } }, { $group: { _id: "$c", n: { $sum: 1 } } }])
+    .aggregate([{ $match: { p: { $ne: null } } }, { $group: { _id: "$c", n: { $sum: 1 } } }])
     .toArray()) {
     const ins = insegnaDelNumero.get(Number(r._id));
     if (ins) prezziPerInsegna.set(ins, (prezziPerInsegna.get(ins) ?? 0) + (r.n ?? 0));
