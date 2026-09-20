@@ -137,24 +137,45 @@ async function radiciPossibili(dominio: string): Promise<string[]> {
     viste.add(s);
   }
 
-  for (const via of POSTI_SOLITI) {
-    if (viste.size >= RADICI_DA_PROVARE) break;
+  /* IL NEGOZIO STA SPESSO SU UN ALTRO INDIRIZZO, E CE LO DICE LORO.
+     Spar Slovenia dichiara `online.spar.si/sitemap-categories.xml`: il sito
+     racconta l'azienda, la spesa sta su `online.`. Prendevamo quella sitemap
+     e basta — categorie, non prodotti — e l'insegna usciva con UN link, che
+     letto come «non ha catalogo» e' falso.
+
+     Se il robots ci indica un altro host, quell'host va frugato come il
+     primo: e' il posto dove tengono il negozio, e ce l'hanno detto loro. */
+  const altriHost = new Set<string>();
+  for (const s of viste) {
     try {
-      const u = `${origine}${via}`;
-      if (viste.has(u)) continue;
-      const risposta = await fetch(u, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; MealMintBot/1.0)" },
-        signal: AbortSignal.timeout(12_000),
-      });
-      if (!risposta.ok) continue;
-      /* Un sito che risponde 200 a qualunque indirizzo esiste: si guarda che
-         dentro ci sia davvero una sitemap, non la pagina di benvenuto. */
-      const testo = (await risposta.text()).slice(0, 2000);
-      if (/<(urlset|sitemapindex)/i.test(testo)) viste.add(u);
+      const o = new URL(s).origin;
+      if (o !== origine) altriHost.add(o);
     } catch {
-      /* un posto che non risponde non e' una notizia: si prova il prossimo */
+      /* una riga Sitemap: storta non e' una notizia */
     }
   }
+
+  for (const base of [origine, ...altriHost]) {
+    for (const via of POSTI_SOLITI) {
+      if (viste.size >= RADICI_DA_PROVARE) break;
+      try {
+        const u = `${base}${via}`;
+        if (viste.has(u)) continue;
+        const risposta = await fetch(u, {
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; MealMintBot/1.0)" },
+          signal: AbortSignal.timeout(12_000),
+        });
+        if (!risposta.ok) continue;
+        /* Un sito che risponde 200 a qualunque indirizzo esiste: si guarda che
+           dentro ci sia davvero una sitemap, non la pagina di benvenuto. */
+        const testo = (await risposta.text()).slice(0, 2000);
+        if (/<(urlset|sitemapindex)/i.test(testo)) viste.add(u);
+      } catch {
+        /* un posto che non risponde non e' una notizia: si prova il prossimo */
+      }
+    }
+  }
+
   return [...viste].slice(0, RADICI_DA_PROVARE);
 }
 
