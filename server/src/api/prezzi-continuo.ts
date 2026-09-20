@@ -142,6 +142,28 @@ const cataloghiLetti = new Map<string, Array<{ url: string; nome: string }>>();
 const maiViste = new Map<string, Set<string>>();
 
 /**
+ * Le insegne che ci hanno appena sbattuto la porta, e fino a quando.
+ *
+ * UN RIFIUTO NON VALE TRENTA GIORNI, MA NON VALE NEMMENO ZERO.
+ * Una scheda aperta senza prezzo finisce fra gli scarti e non si riapre per un
+ * mese: e' un fatto sul negozio. Un 403 no — dice solo che in quel momento non
+ * ci hanno voluti, e trattarlo come «senza prezzo» aveva sepolto
+ * centosettantamila pagine spagnole.
+ *
+ * Corretto quello, e' comparso il difetto opposto: non finendo piu' da nessuna
+ * parte, le pagine rifiutate tornavano in coda a OGNI giro. Un lettore ha
+ * aperto ventisettemilaseicento pagine di fila con zero prezzi, e le avrebbe
+ * riaperte all'infinito — inutile per noi e sgradevole per loro.
+ *
+ * Due ore e' la via di mezzo: abbastanza perche' un blocco temporaneo passi,
+ * poco perche' un'insegna sana non resti ferma una giornata. Dura quanto il
+ * processo, quindi un lettore riavviato riprova subito: e' un freno, non una
+ * condanna.
+ */
+const ritirateFinoA = new Map<string, number>();
+const RITIRO_MS = 2 * 60 * 60 * 1000;
+
+/**
  * Quante voci di catalogo si tengono in memoria, in tutto.
  *
  * Su Render ci sono 512 MB per tutto, e un milione e ottocentomila voci non ci
@@ -534,12 +556,11 @@ export async function giroContinuo(
        se nel frattempo si sono calmati si riparte. */
     const BASTA_COSI = 20;
     const bloccatiDiFila = new Map<string, number>();
-    const insegneRitirate = new Set<string>();
 
     const lavoratore = async () => {
       while (prossima < coda.length && Date.now() < scadenza && !giro.devoFermarmi) {
         const c = coda[prossima++];
-        if (insegneRitirate.has(c.insegna)) continue;
+        if ((ritirateFinoA.get(c.insegna) ?? 0) > Date.now()) continue;
 
         const v = await verifyProductPage(c.url);
         aperte++;
@@ -548,10 +569,10 @@ export async function giroContinuo(
           const quanti = (bloccatiDiFila.get(c.insegna) ?? 0) + 1;
           bloccatiDiFila.set(c.insegna, quanti);
           if (quanti >= BASTA_COSI) {
-            insegneRitirate.add(c.insegna);
+            ritirateFinoA.set(c.insegna, Date.now() + RITIRO_MS);
             console.info(
               `
-[giro] ${c.insegna}: ${quanti} rifiuti di fila, mi ritiro per questo giro`,
+[giro] ${c.insegna}: ${quanti} rifiuti di fila, la lascio in pace due ore`,
             );
           }
         } else if (bloccatiDiFila.get(c.insegna)) {
