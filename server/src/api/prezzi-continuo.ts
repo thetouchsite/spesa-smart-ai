@@ -137,6 +137,9 @@ async function aBrani<T>(cose: T[], quante: number, lavoro: (c: T) => Promise<vo
  */
 const cataloghiLetti = new Map<string, Array<{ url: string; nome: string }>>();
 
+/** Le impronte gia' viste per insegna, anche se scadute: vedi il commento sui due elenchi. */
+const maiViste = new Map<string, Set<string>>();
+
 /**
  * Quante voci di catalogo si tengono in memoria, in tutto.
  *
@@ -339,17 +342,35 @@ export async function giroContinuo(
     const tutti = await indirizziDi(f.paese, f.insegna);
     if (tutti.length === 0) continue;
 
+    /* DUE ELENCHI, NON UNO, E LA DIFFERENZA E' QUELLA FRA CRESCERE E GIRARE
+       A VUOTO.
+
+         FRESCHE  lette da meno di settantadue ore: si saltano, il prezzo ce
+                  l'abbiamo ed e' buono.
+         VISTE    lette una volta qualsiasi, anche mesi fa.
+
+       Chi e' visto ma non fresco ha un prezzo scaduto: riaprirlo lo rinfresca,
+       e serve — ma non aggiunge un prodotto, perche' la riga c'e' gia'. Chi non
+       e' mai stato visto invece e' un prodotto in piu'.
+
+       Trattarli allo stesso modo si e' visto nei numeri: tre lettori al cento
+       per cento di resa, duecentomila pagine aperte, e il conto dei prodotti
+       fermo allo stesso numero per due ore. Stavano rinfrescando, non
+       scoprendo.
+
+       Quindi prima le mai viste, poi le scadute. Il rinfresco non si perde: si
+       fa dopo, quando non c'e' piu' niente di nuovo da prendere. */
     let sue = gia.get(f.insegna);
-    if (!sue) {
+    let viste = maiViste.get(f.insegna);
+    if (!sue || !viste) {
       const soglia = new Date(Date.now() - FRESCHEZZA_MS);
-      sue = new Set(
-        (
-          await (await collezionePrezzi())
-            .find({ c: numeroInsegna(f.insegna), t: { $gte: soglia } }, { projection: { _id: 1 } })
-            .toArray()
-        ).map((r) => r._id),
-      );
+      const righe = (await (await collezionePrezzi())
+        .find({ c: numeroInsegna(f.insegna) }, { projection: { _id: 1, t: 1 } })
+        .toArray()) as Array<{ _id: string; t?: Date }>;
+      sue = new Set(righe.filter((r) => r.t && new Date(r.t) >= soglia).map((r) => r._id));
+      viste = new Set(righe.map((r) => r._id));
       gia.set(f.insegna, sue);
+      maiViste.set(f.insegna, viste);
     }
 
     /* SI SALTANO ANCHE LE SCHEDE CHE IL PREZZO NON CE L'HANNO.
@@ -362,9 +383,15 @@ export async function giroContinuo(
        Gli scarti scadono dopo trenta giorni, quindi un negozio che cambia
        sito viene comunque riprovato. Vedi `scarti.ts`. */
     const scartate = await scartiDi(f.insegna, f.paese);
-    const daFare = tutti.filter(
+    const candidate = tutti.filter(
       (x) => !sue.has(improntaUrl(x.url)) && !scartate.has(improntaUrl(x.url)),
     );
+    /* Le mai viste davanti: sono l'unica parte della coda che fa crescere il
+       numero dei prodotti. */
+    const daFare = [
+      ...candidate.filter((x) => !viste.has(improntaUrl(x.url))),
+      ...candidate.filter((x) => viste.has(improntaUrl(x.url))),
+    ];
     saltate += tutti.length - daFare.length;
     if (daFare.length === 0) continue;
     /* Solo la sua quota: senza questo tetto la coda terrebbe in memoria un
