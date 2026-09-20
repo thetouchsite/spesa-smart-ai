@@ -82,8 +82,21 @@ const INSIEME = Number(process.env.GIRO_INSIEME ?? 16);
  * quanto e' potente la nostra macchina: dipende da quanto regge la loro.
  */
 const PER_CATENA = Number(process.env.GIRO_PER_CATENA_INSIEME ?? 4);
-/** Una pausa fra una pagina e l'altra: siamo ospiti, anche alle tre di notte. */
-const PAUSA_MS = 120;
+/**
+ * Una pausa fra una pagina e l'altra: siamo ospiti, anche alle tre di notte.
+ *
+ * CENTOVENTI MILLISECONDI NON SONO POCHI PER TUTTI.
+ * Sono otto pagine al secondo per insegna, e per quasi tutte va benissimo. Le
+ * spagnole no: Alcampo e Bonpreu aperte a freddo con cinque secondi di pausa
+ * danno quattro prezzi su quattro, e col lettore addosso ne danno uno su
+ * quattro. Non e' il numero di richieste insieme - era gia' sceso a una per
+ * negozio - e' la frequenza.
+ *
+ * Si regola dal comando, cosi' un paese permaloso puo' avere il suo passo
+ * senza rallentare tutti gli altri. Centootto mila indirizzi spagnoli al
+ * cento per cento valgono un lettore che ci mette il doppio.
+ */
+const PAUSA_MS = Number(process.env.GIRO_PAUSA_MS ?? 120);
 /** Ogni quante righe si salva. Se il giro si ferma a meta', quel che e' fatto resta. */
 const BLOCCO = 200;
 
