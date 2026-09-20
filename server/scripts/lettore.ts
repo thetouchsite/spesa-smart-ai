@@ -57,6 +57,30 @@ const arg = (nome: string) =>
   process.argv.includes(nome) ? process.argv[process.argv.indexOf(nome) + 1] : undefined;
 
 const MINUTI = Number(arg("--minuti") ?? process.env.LETTORE_MINUTI ?? 30);
+
+/**
+ * `--finoAFine`: esci quando non c'e' piu' niente da aprire, invece di restare
+ * acceso in attesa che le schede scadano.
+ *
+ * SERVE A INCATENARE I PAESI, E SENZA NON SI POTEVA.
+ * Il lettore normale non finisce mai, ed e' giusto cosi': un magazzino va
+ * tenuto fresco, non riempito una volta. Ma per chiudere una lista di paesi
+ * uno dopo l'altro serve sapere quando il primo e' a posto, e aspettare
+ * l'uscita di un processo che non esce vuol dire restare sulla Spagna per
+ * sempre mentre la Lituania aspetta il suo turno.
+ *
+ * IL SEGNALE NON PUO' ESSERE «non resta niente da fare».
+ * `restaDaFare` conta gli indirizzi meno i prezzi, e in ogni paese ci sono
+ * insegne che il prezzo non lo pubblicano: la Spagna ha 6.449 indirizzi che
+ * non diventeranno mai una cifra, quindi quel conto non scende sotto 6.449
+ * nemmeno a lavoro finito. Aspettare lo zero vorrebbe dire aspettare per
+ * sempre.
+ *
+ * Il segnale vero e' un giro che non ha aperto NIENTE: ogni scheda del paese
+ * o e' fresca, o e' gia' stata provata e messa fra gli scarti. Quello e'
+ * «finito» detto dai fatti.
+ */
+const FINO_A_FINE = process.argv.includes("--finoAFine");
 /**
  * Quanti paesi per giro.
  *
@@ -261,6 +285,13 @@ async function main() {
          invisibile. `giroContinuo` lo diceva gia' per il suo caso; questo e'
          un secondo punto d'attesa, aggiunto dopo, e si era portato dietro lo
          stesso difetto. */
+      if (FINO_A_FINE) {
+        /* Li sta gia' facendo un'altra macchina. Restare qui ad aspettare
+           bloccherebbe la catena dei paesi dietro a un lavoro che qualcuno sta
+           gia' facendo: si passa al prossimo, che e' il punto della catena. */
+        console.log(`  [${ora()}] li tiene un altro lettore: passo oltre`);
+        process.exit(0);
+      }
       await battitoDiAttesa("in attesa: tutti i paesi occupati");
       await new Promise((r) => setTimeout(r, PAUSA_MS));
       continue;
@@ -295,6 +326,14 @@ async function main() {
       console.log(
         `             da quando e' acceso: ${n(apertesTotali)} aperte, ${n(conPrezzoTotali)} con prezzo`,
       );
+
+      if (FINO_A_FINE && e.aperte === 0) {
+        console.log("");
+        console.log(`  [${ora()}] ${scelti.join(" ")}: niente da aprire, ho finito qui.`);
+        console.log(`             ${n(apertesTotali)} schede aperte, ${n(conPrezzoTotali)} con prezzo.`);
+        console.log("");
+        process.exit(0);
+      }
     } catch (err) {
       /* Un giro che esplode non deve spegnere il lettore: quasi sempre e' la
          rete che ha singhiozzato, e domattina il magazzino sarebbe fermo alla
