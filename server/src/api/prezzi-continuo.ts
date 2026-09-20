@@ -425,11 +425,47 @@ export async function giroContinuo(
     if (giro.devoFermarmi) break;
 
     let prossima = 0;
+
+    /* QUANDO UN NEGOZIO CI DICE DI NO, SI SMETTE DI CHIEDERE.
+       Misurato stanotte: Naturitas ha risposto 403 a CINQUANTATREMILA
+       richieste di fila e ne abbiamo ricavato zero prezzi. Alcampo, che la
+       mattina dava cinque prezzi su sei, dopo settantaseimila pagine rendeva
+       l'uno per cento — non era cambiato il loro sito, l'avevamo rate-limitato
+       noi col nostro stesso volume.
+
+       Non e' solo lavoro buttato. E' insistere con qualcuno che ha gia' detto
+       di no, decine di migliaia di volte, e l'API la rivende un cliente: la
+       lamentela arriva a lui. Un blocco isolato puo' essere un caso; venti di
+       fila sulla stessa insegna sono una risposta, e la risposta e' no.
+
+       Ci si ferma per questo giro, non per sempre: al prossimo si riprova, e
+       se nel frattempo si sono calmati si riparte. */
+    const BASTA_COSI = 20;
+    const bloccatiDiFila = new Map<string, number>();
+    const insegneRitirate = new Set<string>();
+
     const lavoratore = async () => {
       while (prossima < coda.length && Date.now() < scadenza && !giro.devoFermarmi) {
         const c = coda[prossima++];
+        if (insegneRitirate.has(c.insegna)) continue;
+
         const v = await verifyProductPage(c.url);
         aperte++;
+
+        if (v.status === "bloccato") {
+          const quanti = (bloccatiDiFila.get(c.insegna) ?? 0) + 1;
+          bloccatiDiFila.set(c.insegna, quanti);
+          if (quanti >= BASTA_COSI) {
+            insegneRitirate.add(c.insegna);
+            console.info(
+              `
+[giro] ${c.insegna}: ${quanti} rifiuti di fila, mi ritiro per questo giro`,
+            );
+          }
+        } else if (bloccatiDiFila.get(c.insegna)) {
+          /* Una pagina che si apre azzera il conto: erano singhiozzi, non un no. */
+          bloccatiDiFila.set(c.insegna, 0);
+        }
 
         /* LA SCHEDA SENZA PREZZO NON SI SCRIVE PIU' IN `prezzi`.
            La stessa informazione finiva in due posti: una riga intera qui
