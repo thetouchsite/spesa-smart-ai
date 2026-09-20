@@ -71,7 +71,11 @@ for (const r of righe) {
   }
 }
 
-const quanti = await (await prezzi()).countDocuments({});
+/* I PREZZI, NON LE RIGHE. Questo script nasce per non farsi illusioni e ne
+   raccontava una: contava tutte le righe della collezione, comprese quelle
+   aperte senza trovare un prezzo. Diceva 657.004 dove i prodotti veri erano
+   620.559. */
+const quanti = await (await prezzi()).countDocuments({ p: { $ne: null } } as never);
 const copertura = leggibili > 0 ? Math.round((quanti / leggibili) * 100) : 0;
 
 console.log("");
