@@ -871,3 +871,139 @@ for (const [paese, elenco] of Object.entries(SPECIALIZZATE_2)) {
     ...elenco.filter((x) => !visti.has(x.dominio.toLowerCase())),
   ];
 }
+
+/**
+ * Il settimo giro: le categorie che nessuno aveva ancora provato.
+ *
+ * I primi sei cercavano supermercati, poi specializzate generiche. Restano
+ * intere famiglie di negozi alimentari online mai toccate: macellerie,
+ * pescherie, torrefazioni, surgelati, gastronomie regionali, prodotti etnici.
+ *
+ * Sono piccole - qualche migliaio di indirizzi l'una - ma stanno nei paesi
+ * che ci lasciano leggere, e dieci piccole veloci valgono piu' di una grande
+ * che ci concede una pagina ogni tre secondi.
+ */
+const SPECIALIZZATE_3: Record<string, Candidato[]> = {
+  DE: [
+    { nome: "Otto Gourmet", dominio: "www.otto-gourmet.de" },
+    { nome: "Kaufhof Feinkost", dominio: "www.galeria.de" },
+    { nome: "Deutsche See", dominio: "www.deutschesee.de" },
+    { nome: "Bofrost DE", dominio: "www.bofrost.de" },
+    { nome: "Eismann", dominio: "www.eismann.de" },
+    { nome: "Roastmarket", dominio: "www.roastmarket.de" },
+    { nome: "Coffee Circle", dominio: "www.coffeecircle.com" },
+    { nome: "Teekanne", dominio: "www.teekanne.de" },
+    { nome: "Asia Food", dominio: "www.asia-food.de" },
+    { nome: "Kochhaus", dominio: "www.kochhaus.de" },
+    { nome: "Wiesbauer Gourmet", dominio: "www.wiesbauer-gourmet.de" },
+    { nome: "Kaes de", dominio: "www.kaesevonhier.de" },
+  ],
+  FR: [
+    { nome: "Picard FR", dominio: "www.picard.fr" },
+    { nome: "Thiriet", dominio: "www.thiriet.com" },
+    { nome: "Maison Plisson", dominio: "www.lamaisonplisson.com" },
+    { nome: "Cafes Richard", dominio: "www.cafesrichard.fr" },
+    { nome: "Malongo", dominio: "www.malongo.com" },
+    { nome: "Terre Exotique", dominio: "www.terreexotique.fr" },
+    { nome: "Poissonnerie", dominio: "www.poissonnerie-leon.fr" },
+    { nome: "Boucherie", dominio: "www.maison-lascours.fr" },
+    { nome: "Metro FR", dominio: "www.metro.fr" },
+  ],
+  GB: [
+    { nome: "Ocado Fish", dominio: "www.thefishsociety.co.uk" },
+    { nome: "Donald Russell", dominio: "www.donaldrussell.com" },
+    { nome: "Farmison", dominio: "www.farmison.com" },
+    { nome: "Pact Coffee", dominio: "www.pactcoffee.com" },
+    { nome: "Union Coffee", dominio: "unionroasted.com" },
+    { nome: "Bird and Blend", dominio: "www.birdandblendtea.com" },
+    { nome: "Souschef GB", dominio: "www.souschef.co.uk" },
+    { nome: "Natoora", dominio: "www.natoora.co.uk" },
+    { nome: "Ocado Larder", dominio: "www.vinterior.co" },
+    { nome: "Gousto", dominio: "www.gousto.co.uk" },
+  ],
+  IT: [
+    { nome: "Bofrost IT", dominio: "www.bofrost.it" },
+    { nome: "Pescheria", dominio: "www.pescheriaonline.it" },
+    { nome: "Macelleria", dominio: "www.carnisalumi.it" },
+    { nome: "Caffe Borbone", dominio: "www.caffeborbone.com" },
+    { nome: "Illy", dominio: "www.illy.com" },
+    { nome: "Lavazza", dominio: "www.lavazza.it" },
+    { nome: "Nespresso IT", dominio: "www.nespresso.com" },
+    { nome: "Pastificio", dominio: "www.pastificiodeicampi.it" },
+    { nome: "Fratelli Carli", dominio: "www.oliocarli.it" },
+    { nome: "Peck", dominio: "www.peck.it" },
+  ],
+  ES: [
+    { nome: "Carrefour Gourmet", dominio: "www.carrefour.es" },
+    { nome: "Mariscos", dominio: "www.mariscoselnene.com" },
+    { nome: "Jamon", dominio: "www.enriquetomas.com" },
+    { nome: "Cafes Candelas", dominio: "www.cafescandelas.com" },
+    { nome: "Cafento", dominio: "www.cafento.es" },
+    { nome: "Gourmet Madrid", dominio: "www.gourmetmadrid.com" },
+  ],
+  NL: [
+    { nome: "Kwekkeboom", dominio: "www.kwekkeboom.nl" },
+    { nome: "Simon Levelt", dominio: "www.simonlevelt.nl" },
+    { nome: "Koffie", dominio: "www.coffeecompany.nl" },
+    { nome: "Visgilde", dominio: "www.visgilde.nl" },
+  ],
+  BE: [
+    { nome: "Delitraiteur", dominio: "www.delitraiteur.com" },
+    { nome: "Rob", dominio: "www.rob-brussels.be" },
+    { nome: "Or Coffee", dominio: "www.orcoffee.be" },
+  ],
+  AT: [
+    { nome: "Julius Meinl", dominio: "www.meinlamgraben.at" },
+    { nome: "Kaffeeroesterei AT", dominio: "www.kaffeeroesterei.at" },
+  ],
+  CH: [
+    { nome: "Sprungli", dominio: "www.spruengli.ch" },
+    { nome: "Laderach", dominio: "www.laederach.com" },
+    { nome: "Blasercafe", dominio: "www.blasercafe.ch" },
+  ],
+  SE: [
+    { nome: "Johan i Hallen", dominio: "www.johanihallen.se" },
+    { nome: "Lofbergs", dominio: "www.lofbergs.se" },
+    { nome: "Kaffebonan", dominio: "www.kaffebonan.se" },
+  ],
+  DK: [
+    { nome: "Skagenfood", dominio: "www.skagenfood.dk" },
+    { nome: "Peter Larsen", dominio: "www.peterlarsenkaffe.dk" },
+  ],
+  NO: [
+    { nome: "Kaffebrenneriet", dominio: "www.kaffebrenneriet.no" },
+    { nome: "Fiskeriet", dominio: "www.fiskeriet.com" },
+  ],
+  FI: [
+    { nome: "Paulig", dominio: "www.paulig.fi" },
+    { nome: "Kalaliike", dominio: "www.kalaliike.fi" },
+  ],
+  PL: [
+    { nome: "Piwnica Smakoszy", dominio: "www.piwnica-smakoszy.pl" },
+    { nome: "Kawa", dominio: "www.kawa.pl" },
+  ],
+  CZ: [
+    { nome: "Mamacoffee", dominio: "www.mamacoffee.cz" },
+    { nome: "Doubleshot", dominio: "www.doubleshot.cz" },
+  ],
+  PT: [
+    { nome: "Delta Cafes", dominio: "www.deltacafes.pt" },
+    { nome: "Mercearia", dominio: "www.merceariacriativa.pt" },
+  ],
+  IE: [
+    { nome: "Sheridans", dominio: "www.sheridanscheesemongers.com" },
+    { nome: "Bean and Goose", dominio: "www.beanandgoose.ie" },
+  ],
+  GR: [
+    { nome: "Yoleni", dominio: "www.yoleni.com" },
+    { nome: "Ellinika", dominio: "www.ellinika-trofima.gr" },
+  ],
+};
+
+for (const [paese, elenco] of Object.entries(SPECIALIZZATE_3)) {
+  const visti = new Set((CANDIDATI[paese] ?? []).map((x) => x.dominio.toLowerCase()));
+  CANDIDATI[paese] = [
+    ...(CANDIDATI[paese] ?? []),
+    ...elenco.filter((x) => !visti.has(x.dominio.toLowerCase())),
+  ];
+}
