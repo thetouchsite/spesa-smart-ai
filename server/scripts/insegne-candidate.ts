@@ -341,3 +341,106 @@ for (const [paese, elenco] of Object.entries(ALTRI)) {
     ...elenco.filter((x) => !visti.has(x.dominio.toLowerCase())),
   ];
 }
+
+/**
+ * Il terzo giro: i mercati fuori dall'Europa.
+ *
+ * Il censimento da cui veniamo era europeo, e si vede nei numeri: gli Stati
+ * Uniti hanno ventimila indirizzi, il Canada cinquantamila, l'India novemila,
+ * e Brasile, Messico e Australia non esistono proprio. Non perche' li' non si
+ * faccia la spesa online — perche' nessuno li ha mai provati.
+ *
+ * E' anche l'unico posto dove restano indirizzi in quantita': in Europa
+ * occidentale la caccia alle sitemap e' scesa a sei insegne ogni
+ * quarantanove candidati.
+ */
+const FUORI_EUROPA: Record<string, Candidato[]> = {
+  US: [
+    { nome: "Walmart Grocery", dominio: "www.walmart.com" },
+    { nome: "Target", dominio: "www.target.com" },
+    { nome: "Publix", dominio: "www.publix.com" },
+    { nome: "Safeway", dominio: "www.safeway.com" },
+    { nome: "Albertsons", dominio: "www.albertsons.com" },
+    { nome: "Wegmans", dominio: "www.wegmans.com" },
+    { nome: "HEB", dominio: "www.heb.com" },
+    { nome: "Meijer", dominio: "www.meijer.com" },
+    { nome: "Giant Food", dominio: "giantfood.com" },
+    { nome: "Stop and Shop", dominio: "stopandshop.com" },
+    { nome: "Food Lion", dominio: "www.foodlion.com" },
+    { nome: "Sprouts", dominio: "www.sprouts.com" },
+    { nome: "Harris Teeter", dominio: "www.harristeeter.com" },
+    { nome: "Vons", dominio: "www.vons.com" },
+  ],
+  CA: [
+    { nome: "Loblaws", dominio: "www.loblaws.ca" },
+    { nome: "Metro Canada", dominio: "www.metro.ca" },
+    { nome: "Save On Foods", dominio: "www.saveonfoods.com" },
+    { nome: "IGA Quebec", dominio: "www.iga.net" },
+    { nome: "No Frills", dominio: "www.nofrills.ca" },
+    { nome: "Real Canadian Superstore", dominio: "www.realcanadiansuperstore.ca" },
+  ],
+  BR: [
+    { nome: "Pao de Acucar", dominio: "www.paodeacucar.com" },
+    { nome: "Carrefour Brasil", dominio: "mercado.carrefour.com.br" },
+    { nome: "Assai", dominio: "www.assai.com.br" },
+    { nome: "Zona Sul", dominio: "www.zonasul.com.br" },
+    { nome: "St Marche", dominio: "www.marche.com.br" },
+    { nome: "Mambo", dominio: "www.mambo.com.br" },
+  ],
+  MX: [
+    { nome: "Walmart Mexico", dominio: "super.walmart.com.mx" },
+    { nome: "Chedraui", dominio: "www.chedraui.com.mx" },
+    { nome: "Soriana", dominio: "www.soriana.com" },
+    { nome: "La Comer", dominio: "www.lacomer.com.mx" },
+    { nome: "City Market", dominio: "www.citymarket.com.mx" },
+  ],
+  AU: [
+    { nome: "Woolworths", dominio: "www.woolworths.com.au" },
+    { nome: "Coles", dominio: "www.coles.com.au" },
+    { nome: "IGA Australia", dominio: "www.igashop.com.au" },
+    { nome: "Harris Farm", dominio: "www.harrisfarm.com.au" },
+  ],
+  IN: [
+    { nome: "BigBasket", dominio: "www.bigbasket.com" },
+    { nome: "DMart", dominio: "www.dmart.in" },
+    { nome: "Blinkit", dominio: "blinkit.com" },
+    { nome: "Zepto", dominio: "www.zeptonow.com" },
+  ],
+  AE: [
+    { nome: "Carrefour UAE", dominio: "www.carrefouruae.com" },
+    { nome: "Lulu Hypermarket", dominio: "www.luluhypermarket.com" },
+    { nome: "Spinneys", dominio: "www.spinneys.com" },
+  ],
+  ZA: [
+    { nome: "Woolworths SA", dominio: "www.woolworths.co.za" },
+    { nome: "Pick n Pay", dominio: "www.pnp.co.za" },
+    { nome: "Makro SA", dominio: "www.makro.co.za" },
+    { nome: "Shoprite", dominio: "www.shoprite.co.za" },
+  ],
+  NZ: [
+    { nome: "Countdown", dominio: "www.woolworths.co.nz" },
+    { nome: "New World", dominio: "www.newworld.co.nz" },
+    { nome: "Pak n Save", dominio: "www.paknsave.co.nz" },
+  ],
+  JP: [
+    { nome: "Rakuten Seiyu", dominio: "sm.rakuten.co.jp" },
+    { nome: "Aeon", dominio: "shop.aeon.com" },
+  ],
+  IL: [
+    { nome: "Shufersal", dominio: "www.shufersal.co.il" },
+    { nome: "Rami Levy", dominio: "www.rami-levy.co.il" },
+  ],
+  UA: [
+    { nome: "Silpo", dominio: "silpo.ua" },
+    { nome: "ATB", dominio: "www.atbmarket.com" },
+    { nome: "Novus", dominio: "novus.ua" },
+  ],
+};
+
+for (const [paese, elenco] of Object.entries(FUORI_EUROPA)) {
+  const visti = new Set((CANDIDATI[paese] ?? []).map((x) => x.dominio.toLowerCase()));
+  CANDIDATI[paese] = [
+    ...(CANDIDATI[paese] ?? []),
+    ...elenco.filter((x) => !visti.has(x.dominio.toLowerCase())),
+  ];
+}
