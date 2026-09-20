@@ -203,6 +203,10 @@ const SEGNI_DI_PREZZO = [
   "priceCurrency",
   "itemprop=\"price\"",
   "data-price",
+  /* LastMile tiene il prezzo in un oggetto che non si chiama «price»:
+     `"prc":{"p":1.99}`. Senza questo segno la finestra di lettura non ci
+     arriva nemmeno, perche' le loro pagine pesano tre megabyte e mezzo. */
+  '"prc":{"p"',
 ];
 
 /** Legge prezzo, listino e scadenza dell'offerta dai dati strutturati. */
