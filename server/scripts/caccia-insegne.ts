@@ -373,8 +373,23 @@ for (const c of lista) {
       (via.assente ? " · robots.txt assente" : ""),
   );
 
-  if (resa > 0) promosse.push({ nome: c.nome, dominio: dominioVero, sitemap, link: voci.length, resa, paese: suo });
-  else rese.push({ nome: c.nome, link: voci.length });
+  if (resa > 0) {
+    promosse.push({ nome: c.nome, dominio: dominioVero, sitemap, link: voci.length, resa, paese: suo });
+    /* E DA QUESTO MOMENTO IL DOMINIO E' «NOSTRO», ANCHE SE NON E' ANCORA SCRITTO.
+       Il controllo qui sopra guarda `domini`, che viene letto dal database una
+       volta all'avvio. Due candidati dello STESSO sito nello stesso giro
+       passavano quindi tutti e due: l'elenco dei candidati porta Weinco sotto
+       «Wein und Co» e «Weinco AT», e il 21 settembre sono state aggiunte
+       entrambe con lo stesso dominio, la stessa sitemap e gli stessi 14.633
+       indirizzi.
+
+       Quel doppione non e' un'insegna in piu' con qualche riga di troppo: e'
+       lo stesso prodotto contato due volte in ogni conteggio, cioe' il difetto
+       che `doppioni-di-lingua.ts` esiste per togliere, rimesso dentro dalla
+       porta accanto. */
+    domini.add(host(dominioVero));
+    nomi.add(`${suo}|${c.nome.toLowerCase()}`);
+  } else rese.push({ nome: c.nome, link: voci.length });
 }
 
 console.log("");
