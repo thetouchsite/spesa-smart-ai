@@ -488,6 +488,18 @@ export async function giroContinuo(
   const mazzi: Array<Array<{ url: string; nome: string; insegna: string }>> = [];
   for (const f of insegne) {
     if (Date.now() >= scadenza) break;
+    /* UN'INSEGNA IN PAUSA NON ENTRA NEMMENO IN CODA.
+       Il controllo c'era gia', ma DENTRO il lavoratore: le sue schede
+       entravano in coda e venivano saltate una per una, istantaneamente. Con
+       una sola insegna in mano e quella in pausa, il giro montava cinquantamila
+       voci, le scartava tutte in pochi millisecondi, e ricominciava — un ciclo
+       a vuoto che gira a tutta velocita' senza aprire niente.
+
+       Visto sul lettore degli Emirati: Carrefour ci aveva detto no venti volte
+       di fila, il lettore ha fatto la cosa giusta mettendola in pausa due ore,
+       e poi ha passato quelle due ore a rimontare la stessa coda migliaia di
+       volte. Da fuori sembrava un lettore acceso che lavora. */
+    if ((ritirateFinoA.get(f.insegna) ?? 0) > Date.now()) continue;
     const tutti = await indirizziDi(f.paese, f.insegna);
     if (tutti.length === 0) continue;
 
@@ -610,8 +622,26 @@ export async function giroContinuo(
 
     /* Coda vuota vuol dire che non c'e' piu' niente da aprire in nessuna
        insegna: tutto il catalogo e' fresco. E' il solo modo onesto di dire
-       «finito». */
+       «finito».
+
+       Tranne quando la coda e' vuota perche' le insegne sono in PAUSA: li'
+       non e' finito niente, sono loro che per ora non ci vogliono. Si aspetta
+       che scada la prima, invece di dire «fatto» o di rimontare la coda a
+       vuoto: aspettare e' esattamente la cosa giusta da fare quando qualcuno
+       ti ha detto di no. */
     if (coda.length === 0) {
+      const fraQuanto = [...ritirateFinoA.values()]
+        .filter((q) => q > Date.now())
+        .sort((a, b) => a - b)[0];
+      if (fraQuanto && fraQuanto < scadenza) {
+        const attesa = Math.min(fraQuanto - Date.now() + 1000, 5 * 60_000);
+        console.info(
+          `[giro] tutte le insegne in pausa: aspetto ${Math.round(attesa / 1000)}s invece di insistere`,
+        );
+        await battitoDiAttesa("in attesa: insegne in pausa dopo troppi rifiuti");
+        await new Promise((r) => setTimeout(r, attesa));
+        continue;
+      }
       finito = true;
       break;
     }
