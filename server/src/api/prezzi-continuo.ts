@@ -701,12 +701,23 @@ export async function giroContinuo(
        coda non si esaurisce mai. Quel che si salta adesso torna al giro dopo,
        quando le prime saranno fra gli scarti e il passo si accorciera' da
        solo. */
-    const sparse = <T>(elenco: T[], quante: number): T[] => {
-      if (elenco.length <= quante) return elenco;
-      const passo = elenco.length / quante;
-      const fuori: T[] = [];
-      for (let i = 0; fuori.length < quante; i++) fuori.push(elenco[Math.floor(i * passo)]);
-      return fuori;
+    /* NON BASTA SCEGLIERLE SPARSE: VANNO ANCHE APERTE IN ORDINE SPARSO.
+       Il primo rimedio prendeva una voce ogni `passo` e le lasciava in ordine
+       di indice — 0, 9, 18, 27... Le prime cinquanta pagine aperte restavano
+       quindi dentro i primi cinquecento indirizzi del catalogo, cioe' ancora
+       dentro la testa morta. Misurato: il lettore argentino segnava zero su
+       250 pagine mentre un campione sparso della stessa insegna dava 6 su 8.
+
+       Ordinare per IMPRONTA risolve tutti e due i problemi in una riga.
+       L'impronta e' gia' calcolata, e' distribuita come un numero a caso, ed
+       e' STABILE: due giri di fila danno lo stesso ordine, che serve perche'
+       la coda si esaurisca invece di rimescolarsi all'infinito. */
+    const sparse = <T extends { url: string }>(elenco: T[], quante: number): T[] => {
+      if (elenco.length === 0 || quante === 0) return [];
+      const ordinato = [...elenco].sort((a, b) =>
+        improntaUrl(a.url) < improntaUrl(b.url) ? -1 : 1,
+      );
+      return ordinato.slice(0, quante);
     };
 
     /* Le mai viste davanti, e sparse anche loro: sono l'unica parte della coda
