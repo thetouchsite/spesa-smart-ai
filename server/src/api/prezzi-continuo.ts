@@ -55,7 +55,7 @@ import {
   type PrezzoSalvato,
 } from "./prezzi-magazzino.js";
 import { tutteLeFonti } from "./catalogo-fonti.js";
-import { gunzip } from "node:zlib";
+import { gunzip, gunzipSync, gzipSync } from "node:zlib";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { promisify } from "node:util";
 
@@ -249,6 +249,63 @@ async function indirizziDi(paese: string, insegna: string): Promise<Array<{ url:
  * arriva lo stesso, senza che nessuno debba svuotare niente a mano.
  */
 const CACHE = "diario/cataloghi";
+
+/**
+ * Dove si tiene l'elenco delle schede gia' viste, per non riscaricarlo.
+ *
+ * Una cartella diversa da quella dei cataloghi perche' sono due cose con due
+ * vite: un catalogo cambia una volta al mese, questo elenco cresce ogni
+ * minuto. Metterli insieme vorrebbe dire non poter buttare l'uno senza
+ * l'altro.
+ */
+const VISTE = "diario/viste";
+
+function schedarioSulDisco(paese: string, insegna: string): string {
+  return `${VISTE}/${paese}-${insegna.replace(/[^\p{L}\p{N}]+/gu, "_")}.json.gz`;
+}
+
+interface Schedario {
+  /** Quando e' stato scritto: da qui in poi si chiedono solo le novita'. */
+  quando: number;
+  viste: string[];
+  fresche: string[];
+}
+
+function elencoDalDisco(paese: string, insegna: string): Schedario | null {
+  try {
+    const f = schedarioSulDisco(paese, insegna);
+    if (!existsSync(f)) return null;
+    const d = JSON.parse(gunzipSync(readFileSync(f)).toString("utf8")) as Schedario;
+    if (!Array.isArray(d.viste) || typeof d.quando !== "number") return null;
+    /* SCADE, E DEVE SCADERE.
+       Un elenco che non scade non si accorge mai delle righe cancellate, e
+       col tempo dichiara «gia' vista» meta' del catalogo che invece e' da
+       rifare. Una settimana: abbastanza da coprire i riavvii di una
+       giornata, poco da non diventare una bugia. */
+    if (Date.now() - d.quando > 7 * 24 * 3_600_000) return null;
+    return d;
+  } catch {
+    return null;
+  }
+}
+
+function elencoSulDisco(paese: string, insegna: string, viste: Set<string>, fresche: Set<string>): void {
+  try {
+    mkdirSync(VISTE, { recursive: true });
+    writeFileSync(
+      schedarioSulDisco(paese, insegna),
+      gzipSync(
+        Buffer.from(
+          JSON.stringify({ quando: Date.now(), viste: [...viste], fresche: [...fresche] }),
+          "utf8",
+        ),
+        { level: 6 },
+      ),
+    );
+  } catch {
+    /* Senza disco si va avanti lo stesso: piu' lenti, non rotti. */
+  }
+}
 
 function sulDisco(paese: string, insegna: string): string {
   return `${CACHE}/${paese}-${insegna.replace(/[^\p{L}\p{N}]+/gu, "_")}`;
@@ -550,16 +607,60 @@ export async function giroContinuo(
          per niente. Un conteggio costa una domanda e non trasferisce dati:
          se e' zero, si sa gia' che nessuna scheda e' stata vista. */
       const quante = await (await collezionePrezzi()).countDocuments({ c: numero } as never);
+
+      /* E POI SI CHIEDE SOLO QUEL CHE MANCA.
+         Questo elenco costa banda vera: Continente ha 89.000 righe, che a
+         novantasei kilobyte al secondo — la banda misurata del piano — sono
+         piu' di trenta secondi. Con venti insegne in mano sono dieci minuti
+         prima di aprire una pagina, e sette lettori accesi se li dividono la
+         stessa banda: ogni riavvio della squadra costava piu' di un'ora di
+         lavoro perso, e stanotte di riavvii ne ho fatti otto.
+
+         Le righe pero' non cambiano quasi mai: quelle di ieri sono ancora li'
+         oggi. Si tiene l'elenco sul disco con la data dell'ultima lettura, e
+         alla volta dopo si chiedono solo le righe toccate DA ALLORA. Su
+         un'insegna ferma sono zero righe e un millisecondo.
+
+         Le cancellazioni non si vedono — una riga sparita resta nell'elenco
+         come «vista» — e va bene cosi': l'errore e' che una pagina non viene
+         riaperta subito, e verra' riaperta quando l'elenco scade. Il
+         contrario, credere nuova una pagina gia' letta, costerebbe una
+         richiesta al negozio per niente. */
+      const daDisco = elencoDalDisco(f.paese, f.insegna);
+      const da = daDisco?.quando;
       const righe =
         quante === 0
           ? []
           : ((await (await collezionePrezzi())
-              .find({ c: numero }, { projection: { _id: 1, t: 1 } })
+              .find(
+                da ? ({ c: numero, t: { $gte: new Date(da) } } as never) : ({ c: numero } as never),
+                { projection: { _id: 1, t: 1 } },
+              )
               .toArray()) as Array<{ _id: string; t?: Date }>);
-      sue = new Set(righe.filter((r) => r.t && new Date(r.t) >= soglia).map((r) => r._id));
-      viste = new Set(righe.map((r) => r._id));
+
+      /* LE VISTE SI SOMMANO, LE FRESCHE NO.
+         «Vista una volta» non scade mai: l'elenco sul disco vale per sempre e
+         le novita' si aggiungono. «Fresca» invece scade a settantadue ore, e
+         una riga che sul disco era fresca puo' non esserlo piu' — il
+         controllo delta non la riporta indietro, perche' da allora nessuno
+         l'ha toccata.
+
+         Se l'elenco sul disco e' stato scritto DENTRO la finestra di
+         freschezza, l'errore vale quanto e' vecchio l'elenco: minuti, e si
+         accetta. Se e' piu' vecchio, le sue fresche si buttano tutte e
+         valgono solo quelle appena lette. Sbagliare qui costa un prezzo
+         rinfrescato in ritardo, mai un prodotto perso. */
+      const frescheDelDisco = daDisco && daDisco.quando >= Date.now() - FRESCHEZZA_MS;
+      viste = new Set(daDisco?.viste ?? []);
+      sue = new Set(frescheDelDisco ? (daDisco?.fresche ?? []) : []);
+      for (const r of righe) {
+        viste.add(r._id);
+        if (r.t && new Date(r.t) >= soglia) sue.add(r._id);
+      }
+
       gia.set(f.insegna, sue);
       maiViste.set(f.insegna, viste);
+      elencoSulDisco(f.paese, f.insegna, viste, sue);
     }
 
     /* SI SALTANO ANCHE LE SCHEDE CHE IL PREZZO NON CE L'HANNO.
