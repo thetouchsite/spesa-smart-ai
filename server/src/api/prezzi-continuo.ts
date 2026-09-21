@@ -577,9 +577,46 @@ export async function giroContinuo(
     );
     /* Le mai viste davanti: sono l'unica parte della coda che fa crescere il
        numero dei prodotti. */
+    /* SPARSE PER TUTTO L'ELENCO, NON LE PRIME IN FILA.
+       Questa e' costata mezza giornata di lettori che sembravano bloccati.
+
+       Il giro prende la sua quota con `daFare.slice(0, MAX_PER_INSEGNA_A_GIRO)`,
+       cioe' le PRIME in ordine di catalogo, e l'ordine del catalogo e' quello
+       della sitemap del negozio. Misurato il 21 settembre, sulle schede mai
+       viste di due insegne:
+
+           UA Auchan Ukraine   le prime 10 in ordine  0/10
+                               10 sparse nell'elenco  9/10
+           SA Carrefour KSA    le prime 10 in ordine  0/10
+                               10 sparse nell'elenco  7/10
+
+       L'inizio di quelle sitemap e' roba morta — prodotti tolti, una
+       categoria sparita — e il lettore ci sbatteva contro a ogni giro,
+       riportando lo zero per cento con i negozi che rispondevano benissimo.
+       Dal di fuori e' identico a un blocco, e per un'ora l'ho creduto tale.
+
+       Si prende quindi una voce ogni `passo`, coprendo tutto l'elenco. Non e'
+       a caso: due giri di fila devono dare lo stesso ordine, altrimenti la
+       coda non si esaurisce mai. Quel che si salta adesso torna al giro dopo,
+       quando le prime saranno fra gli scarti e il passo si accorciera' da
+       solo. */
+    const sparse = <T>(elenco: T[], quante: number): T[] => {
+      if (elenco.length <= quante) return elenco;
+      const passo = elenco.length / quante;
+      const fuori: T[] = [];
+      for (let i = 0; fuori.length < quante; i++) fuori.push(elenco[Math.floor(i * passo)]);
+      return fuori;
+    };
+
+    /* Le mai viste davanti, e sparse anche loro: sono l'unica parte della coda
+       che fa crescere il numero dei prodotti, quindi e' li' che sbagliare
+       ordine costa di piu'. */
+    const maiVistePronte = candidate.filter((x) => !viste.has(improntaUrl(x.url)));
+    const giaVistePronte = candidate.filter((x) => viste.has(improntaUrl(x.url)));
+    const quotaNuove = Math.min(maiVistePronte.length, MAX_PER_INSEGNA_A_GIRO);
     const daFare = [
-      ...candidate.filter((x) => !viste.has(improntaUrl(x.url))),
-      ...candidate.filter((x) => viste.has(improntaUrl(x.url))),
+      ...sparse(maiVistePronte, quotaNuove),
+      ...sparse(giaVistePronte, Math.max(0, MAX_PER_INSEGNA_A_GIRO - quotaNuove)),
     ];
     saltate += tutti.length - daFare.length;
     if (daFare.length === 0) continue;
