@@ -381,9 +381,20 @@ export async function giroContinuo(
      vedi `soloInsegne`. Quel che segue lavora comunque per paese — cambia solo
      il nome del lucchetto. */
   const perInsegna = (soloInsegne ?? []).filter((x) => x.trim().length > 0);
+  /* SOLO LE COPPIE CHE ESISTONO DAVVERO.
+     Il prodotto incrociato fra paesi e insegne genera combinazioni che non
+     esistono — «AT|Berry Bros», «DE|Peck» — e per ognuna si prende un
+     biglietto che non servira' mai a niente. Con otto paesi e venti insegne
+     sono centosessanta righe scritte sul database per venti di lavoro vero,
+     e un elenco dei biglietti illeggibile proprio quando serve capire chi
+     tiene cosa.
+
+     Le fonti sanno gia' quali coppie esistono: si chiede a loro. */
   const chiesti =
     perInsegna.length > 0
-      ? paesiChiesti.flatMap((pa) => perInsegna.map((ins) => `${pa}|${ins}`))
+      ? tutteLeFonti()
+          .filter((f) => paesiChiesti.includes(f.paese) && perInsegna.includes(f.insegna))
+          .map((f) => `${f.paese}|${f.insegna}`)
       : paesiChiesti;
   const biglietti = await prendiTurni(chiesti, chiesti.length, VALIDITA_MIN);
   const paesi =
