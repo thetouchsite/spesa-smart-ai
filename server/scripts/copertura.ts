@@ -37,36 +37,92 @@
 import { writeFileSync } from "node:fs";
 import { prezzi as collezionePrezzi } from "../src/base/db.js";
 import { caricaFontiDalDb, tutteLeFonti } from "../src/api/catalogo-fonti.js";
+import { numeroInsegnaPubblico } from "../src/api/prezzi-magazzino.js";
+import { quantiScarti } from "../src/api/scarti.js";
 
 const n = (x: number) => x.toLocaleString("it-IT");
 const perc = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : "—");
 
 async function main() {
-  const righe = await (await collezionePrezzi()).find({}).toArray();
+  /* LE FONTI SI CARICANO, NON SI DANNO PER CARICATE.
+     `caricaFontiDalDb` era importata e mai chiamata: `tutteLeFonti()`
+     tornava vuota, quindi nessun numero di insegna trovava un nome, la
+     tabella usciva senza righe e il totale a zero. Un rapporto che dice zero
+     su tutto sembra un magazzino vuoto, non uno strumento rotto — ed e' il
+     modo piu' rapido di far concludere a qualcuno che il lavoro di un giorno
+     e' andato perso.
 
-  if (righe.length === 0) {
-    console.log("\nIl magazzino e' vuoto: lancia prima scripts/riempi-prezzi.ts\n");
+     Il compilatore non poteva vederlo: un import non usato non e' un errore.
+     L'ho visto solo lanciandolo. */
+  if ((await caricaFontiDalDb()) === 0) {
+    console.error("\n  il database non ha insegne: `semina-fonti` non e' mai girato?\n");
+    process.exit(1);
+  }
+
+  /* IL CONTO LO FA MONGO, E LA RIGA NON HA PIU' QUEI CAMPI.
+     Questo comando faceva `find({}).toArray()` e poi leggeva `r.insegna`,
+     `r.verifica`, `r.prezzo`. Nessuno dei tre esiste piu': la riga di prezzo
+     e' stata stretta a `{_id, c, p, s, t, v}` per far stare due milioni di
+     prodotti in mezzo giga, e il nome dell'insegna e' diventato un numero.
+
+     Era quindi rotto due volte. Leggeva campi inesistenti — ogni paese «??»,
+     ogni conteggio a zero — e per farlo si portava dietro l'intera
+     collezione: un milione e seicentomila righe a novantasei kilobyte al
+     secondo sono ore. E' lo stesso difetto che aveva fatto scadere
+     `quadro-db`, e la cura e' la stessa: raggruppare sul database e tirare
+     giu' un centinaio di righe invece di un milione.
+
+     Non se n'era accorto nessuno perche' `tsconfig.json` guarda solo `src/`:
+     `npx tsc` diceva «tutto a posto» su codice che non poteva funzionare.
+     `tsconfig.scripts.json` e' nato da qui. */
+  const perNumero = (await (await collezionePrezzi())
+    .aggregate([
+      {
+        $group: {
+          _id: "$c",
+          righe: { $sum: 1 },
+          conPrezzo: { $sum: { $cond: [{ $ne: ["$p", null] }, 1, 0] } },
+        },
+      },
+    ])
+    .toArray()) as Array<{ _id: number; righe: number; conPrezzo: number }>;
+
+  if (perNumero.length === 0) {
+    console.log("\nIl magazzino e' vuoto: lancia prima scripts/lettore.ts\n");
     process.exit(0);
   }
 
-  /* Le insegne del magazzino si riconducono al loro paese passando dalle
-     fonti: nel magazzino c'e' il nome dell'insegna, non il paese, perche' la
-     chiave e' l'indirizzo della scheda. */
+  /* Dal numero al nome, e dal nome al paese: la corrispondenza la tengono le
+     fonti, che sono l'unico posto in cui i due mondi si toccano. */
+  const nomeDi = new Map<number, string>();
   const paeseDi = new Map<string, string>();
-  for (const f of tutteLeFonti()) paeseDi.set(f.insegna, f.paese);
+  for (const f of tutteLeFonti()) {
+    paeseDi.set(f.insegna, f.paese);
+    nomeDi.set(numeroInsegnaPubblico(f.insegna), f.insegna);
+  }
+
+  /* LE PAGINE APERTE SENZA PREZZO STANNO NEGLI SCARTI, NON QUI.
+     Una scheda che si apre e il prezzo non ce l'ha non lascia riga in
+     `prezzi`. Contando solo le righe, «provate» e «con prezzo» coincidono e
+     la copertura risulta sempre del cento per cento — che e' esattamente la
+     bugia che il cruscotto ha raccontato per mezza giornata. */
+  const scarti = await quantiScarti();
 
   const perInsegna = new Map<
     string,
     { paese: string; provate: number; conPrezzo: number; aperte: number }
   >();
 
-  for (const r of righe) {
-    const paese = paeseDi.get(r.insegna) ?? "??";
-    const c = perInsegna.get(r.insegna) ?? { paese, provate: 0, conPrezzo: 0, aperte: 0 };
-    c.provate++;
-    if (r.verifica !== "non-raggiungibile") c.aperte++;
-    if (r.prezzo != null) c.conPrezzo++;
-    perInsegna.set(r.insegna, c);
+  for (const g of perNumero) {
+    const insegna = nomeDi.get(g._id);
+    if (!insegna) continue;
+    const senza = scarti.get(insegna) ?? 0;
+    perInsegna.set(insegna, {
+      paese: paeseDi.get(insegna) ?? "??",
+      provate: g.conPrezzo + senza,
+      conPrezzo: g.conPrezzo,
+      aperte: g.conPrezzo + senza,
+    });
   }
 
   /* ── Per paese ────────────────────────────────────────────────── */
@@ -131,16 +187,20 @@ async function main() {
   }
 
   /* ── Il totale onesto ─────────────────────────────────────────── */
-  const provate = righe.length;
-  const aperte = righe.filter((r) => r.verifica !== "non-raggiungibile").length;
-  const conPrezzo = righe.filter((r) => r.prezzo != null).length;
+  const conPrezzo = [...perInsegna.values()].reduce((a, v) => a + v.conPrezzo, 0);
+  const provate = [...perInsegna.values()].reduce((a, v) => a + v.provate, 0);
 
   console.log("\n" + "═".repeat(78));
   console.log("  IN TUTTO");
   console.log("═".repeat(78));
-  console.log(`  schede in magazzino        ${n(provate)}`);
-  console.log(`  di cui la pagina si apre   ${n(aperte)}  (${perc(aperte, provate)})`);
+  /* «Quante si aprono» non si puo' piu' dire, e fingere di saperlo sarebbe
+     peggio che tacere: un rifiuto non lascia traccia da nessuna parte — non
+     una riga in `prezzi`, non un'impronta negli scarti — perche' un 403 non
+     dice niente sul prezzo e va riprovato, non archiviato. Quel che si sa e'
+     quante pagine hanno RISPOSTO qualcosa, con o senza prezzo. */
+  console.log(`  schede aperte davvero      ${n(provate)}`);
   console.log(`  di cui con prezzo VERO     ${n(conPrezzo)}  (${perc(conPrezzo, provate)})`);
+  console.log(`  di cui aperte e senza      ${n(provate - conPrezzo)}  (${perc(provate - conPrezzo, provate)})`);
   console.log(
     `\n  prodotti dichiarati dalle sitemap: ${n(tutteLeFonti().reduce((a, f) => a + f.stimati, 0))}` +
       `\n  — e' la grandezza del catalogo, non la copertura. La copertura e' la riga sopra.\n`,
@@ -159,7 +219,6 @@ async function main() {
       insegneInCatalogo: tutteLeFonti().length,
       paesiInCatalogo: new Set(tutteLeFonti().map((f) => f.paese)).size,
       schedeAperteDavvero: provate,
-      schedeCheSiAprono: aperte,
       SCHEDE_CON_PREZZO_VERO: conPrezzo,
       quotaConPrezzo: perc(conPrezzo, provate),
       paesiConCoperturaMisurata: ordinati.filter(([, v]) => v.provate > 0).length,

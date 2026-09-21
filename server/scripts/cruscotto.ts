@@ -41,7 +41,7 @@ interface RigaPaese {
 
 interface Quadro {
   quando: string;
-  totale: { link: number; freschi: number; prezzi: number; cifre: number };
+  totale: { link: number; freschi: number; prezzi: number; cifre: number; vendibili: number };
   /** Pagine aperte che il prezzo non ce l'avevano. Manca nei quadri vecchi. */
   scartate?: number;
   stimati: number;

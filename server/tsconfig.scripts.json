@@ -1,0 +1,29 @@
+{
+  // I COMANDI VANNO CONTROLLATI ANCHE SE NON SI COMPILANO.
+  //
+  // `tsconfig.json` ha `rootDir: "src"` e `outDir: "dist"`: serve a produrre il
+  // server, e la cartella `scripts/` non c'entra — quei file girano con `tsx`,
+  // che li trascrive al volo senza controllarli.
+  //
+  // Il risultato e' che `npx tsc` diceva «tutto a posto» su codice che non
+  // poteva funzionare. Il 21 settembre 2026 ho aggiunto a `quadro-db.ts` due
+  // righe che usavano una variabile mai dichiarata: il compilatore non le ha
+  // guardate, `tsx` e' partito lo stesso, lo script e' morto a meta' con un
+  // ReferenceError e il quadro del database non e' stato riscritto. In
+  // silenzio, e dentro un comando che serve a generare il cruscotto — cioe'
+  // proprio quello che Antonio legge per sapere come vanno le cose.
+  //
+  // Qui non si compila niente (`noEmit`): si controlla e basta. La cartella
+  // `scripts/` contiene i comandi che si lanciano a mano e quelli che gireranno
+  // sul server, ed e' esattamente il codice che nessuno rilegge mai.
+  //
+  //   npx tsc --noEmit -p tsconfig.scripts.json
+  //
+  // Gira insieme all'altro dentro `npm run typecheck`.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["scripts/**/*.ts", "src/**/*.ts"]
+}
