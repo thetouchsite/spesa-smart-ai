@@ -928,6 +928,49 @@ export async function giroContinuo(
     }
     await Promise.all(Array.from({ length: quanti }, lavoratore));
     if (raccolte.length > 0) await salvaPrezzi(raccolte.splice(0, raccolte.length));
+
+    /* GLI SCARTI SI SALVANO A OGNI PASSATA, NON A FINE GIRO.
+       Si salvavano una volta sola, alla fine di `giroContinuo`. Con un giro
+       da un'ora era un dettaglio; con `--minuti 1400`, che uso per non
+       riavviare i lettori, quel momento arriva DOPO UN GIORNO.
+
+       Nel frattempo le schede senza prezzo non sono ne' in `prezzi` (non
+       lasciano riga) ne' in `scarti` (non ancora scritte): per la passata
+       successiva sono «mai viste», e finiscono di nuovo in cima alla coda.
+       Il lettore riapriva le stesse pagine morte all'infinito.
+
+       Misurato: gli scarti non sono cresciuti di UNA riga in nove minuti
+       mentre i lettori aprivano ventidue pagine al secondo, meta' delle quali
+       senza prezzo. Ed e' la spiegazione delle rese ferme al 7-9% sui paesi
+       piu' letti: non erano esauriti, stavano rimacinando la stessa
+       spazzatura.
+
+       Salvare a ogni passata costa una scrittura per insegna ogni qualche
+       minuto — gli scarti sono un elenco compresso, non una riga per scheda —
+       e toglie il problema alla radice. */
+    if (senzaPrezzo.size > 0) {
+      for (const [insegna, impronte] of senzaPrezzo) {
+        /* NON A OGNI SINGOLA SCHEDA: SALVARE COSTA.
+           `segnaScarti` rilegge l'elenco intero dell'insegna, ci aggiunge le
+           nuove e lo riscrive: per Checkers, che di scarti ne ha novantamila,
+           e' un megabyte dentro e uno fuori. A novantasei kilobyte al secondo
+           farlo per duecento impronte sarebbe piu' caro delle pagine che
+           risparmia.
+
+           Duecento e' il punto in cui il conto gira: sotto si aspetta la
+           passata dopo, e se il giro finisce prima il salvataggio in coda a
+           `giroContinuo` le prende comunque. */
+        if (impronte.length < 200) continue;
+        await segnaScarti(insegna, paeseDi.get(insegna) ?? "", impronte);
+        /* E si tengono anche qui: `scartiDi` ha una memoria di qualche minuto,
+           e senza questo la passata subito dopo non le vedrebbe ancora. */
+        const viste = maiViste.get(insegna);
+        if (viste) for (const i of impronte) viste.add(i);
+        /* Solo quelle salvate: le altre restano in attesa della passata dopo,
+           e `senzaPrezzo.clear()` in blocco le avrebbe buttate. */
+        senzaPrezzo.set(insegna, []);
+      }
+    }
   }
 
   if (raccolte.length > 0) await salvaPrezzi(raccolte);
