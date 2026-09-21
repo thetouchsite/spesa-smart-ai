@@ -291,7 +291,23 @@ async function main() {
        prende meno al giro successivo; spento uno, gli altri si allargano. */
     const vivi = await chiStaLavorando();
     const quantiLettori = Math.max(1, new Set(vivi.map((v) => v.macchina + "#" + v.pid)).size);
-    const quota = Math.max(1, Math.ceil(disponibili.length / quantiLettori));
+    /* LA QUOTA SERVE SOLO A CHI PESCA DALLO STESSO MUCCHIO.
+       Dividere i paesi per quanti lettori sono accesi e' giusto quando tutti
+       chiedono «dammi quel che c'e'»: senza, il primo acceso se li prende
+       tutti e chi arriva dopo trova gli avanzi.
+
+       Ma un lettore lanciato con `--solo` non pesca dal mucchio: gli e' stato
+       detto esattamente dove lavorare, e quasi sempre perche' quei paesi
+       hanno bisogno di un passo diverso. Li' la quota non spartisce niente —
+       restringe e basta.
+
+       Misurato il 21 settembre: un lettore su AU, FI, CL, MY, PL chiedeva
+       cinque paesi e ne otteneva UNO, perche' erano accesi cinque lettori che
+       lavoravano su paesi completamente diversi. Un quinto del lavoro, e la
+       causa non compariva da nessuna parte — la riga diceva solo «quota 1».
+       Con sette lettori accesi per buona parte della notte, ogni lettore
+       mirato ne ha risentito. */
+    const quota = SOLO.length > 0 ? QUANTI_PAESI : Math.max(1, Math.ceil(disponibili.length / quantiLettori));
     const quanti = Math.min(QUANTI_PAESI, quota, daCui.length);
 
     const scelti: string[] = [];
