@@ -479,6 +479,50 @@ export async function giroContinuo(
      e non una per una: l'elenco si riscrive intero ogni volta, e farlo a ogni
      pagina vorrebbe dire riscrivere due megabyte per ogni scheda vuota. */
   const senzaPrezzo = new Map<string, string[]>();
+
+  /**
+   * Mette via le pagine morte MENTRE si lavora, non quando si ha finito.
+   *
+   * Le schede aperte senza prezzo non lasciano riga in `prezzi` e non stanno
+   * ancora in `scarti`: finche' non ci finiscono, per la passata successiva
+   * sono «mai viste» e tornano in cima alla coda. Il lettore riapre le stesse
+   * pagine morte all'infinito.
+   *
+   * Si salvava a fine giro — con `--minuti 1400`, dopo un giorno. Poi a fine
+   * passata: meglio, ma con ventimila schede per insegna una passata dura ore
+   * e il problema restava. Misurato: 246.330 scarti fermi mentre i lettori
+   * aprivano ventidue pagine al secondo, meta' senza prezzo.
+   *
+   * Adesso a tempo. Due minuti e' il compromesso: `segnaScarti` rilegge
+   * l'elenco intero dell'insegna e lo riscrive — per Checkers, novantamila
+   * impronte, e' un megabyte dentro e uno fuori — quindi farlo troppo spesso
+   * costerebbe piu' delle pagine che risparmia. La soglia delle duecento
+   * impronte serve allo stesso scopo.
+   */
+  let ultimoScarico = Date.now();
+  let scaricando = false;
+  const SCARICO_OGNI_MS = 120_000;
+
+  const scaricaScarti = async (forza = false): Promise<void> => {
+    if (scaricando) return;
+    if (!forza && Date.now() - ultimoScarico < SCARICO_OGNI_MS) return;
+    scaricando = true;
+    ultimoScarico = Date.now();
+    try {
+      for (const [insegna, impronte] of senzaPrezzo) {
+        if (impronte.length === 0) continue;
+        if (!forza && impronte.length < 200) continue;
+        senzaPrezzo.set(insegna, []);
+        await segnaScarti(insegna, paeseDi.get(insegna) ?? "", impronte);
+        /* E si tengono anche qui: cosi' la coda montata subito dopo non le
+           rimette davanti mentre `scartiDi` ha ancora l'elenco vecchio. */
+        const viste = maiViste.get(insegna);
+        if (viste) for (const i of impronte) viste.add(i);
+      }
+    } finally {
+      scaricando = false;
+    }
+  };
   const paeseDi = new Map<string, string>();
   let aperte = 0;
   let conPrezzo = 0;
@@ -891,6 +935,10 @@ export async function giroContinuo(
           per.push(improntaUrl(c.url));
           senzaPrezzo.set(c.insegna, per);
         }
+
+        /* Costa un confronto di date per pagina, e ogni due minuti una
+           scrittura per insegna. Vedi `scaricaScarti`. */
+        void scaricaScarti();
         if (raccolte.length >= BLOCCO) await salvaPrezzi(raccolte.splice(0, raccolte.length));
         if (aperte % 50 === 0) {
           onAvanzamento?.(aperte, conPrezzo);
@@ -929,55 +977,19 @@ export async function giroContinuo(
     await Promise.all(Array.from({ length: quanti }, lavoratore));
     if (raccolte.length > 0) await salvaPrezzi(raccolte.splice(0, raccolte.length));
 
-    /* GLI SCARTI SI SALVANO A OGNI PASSATA, NON A FINE GIRO.
-       Si salvavano una volta sola, alla fine di `giroContinuo`. Con un giro
-       da un'ora era un dettaglio; con `--minuti 1400`, che uso per non
-       riavviare i lettori, quel momento arriva DOPO UN GIORNO.
-
-       Nel frattempo le schede senza prezzo non sono ne' in `prezzi` (non
-       lasciano riga) ne' in `scarti` (non ancora scritte): per la passata
-       successiva sono «mai viste», e finiscono di nuovo in cima alla coda.
-       Il lettore riapriva le stesse pagine morte all'infinito.
-
-       Misurato: gli scarti non sono cresciuti di UNA riga in nove minuti
-       mentre i lettori aprivano ventidue pagine al secondo, meta' delle quali
-       senza prezzo. Ed e' la spiegazione delle rese ferme al 7-9% sui paesi
-       piu' letti: non erano esauriti, stavano rimacinando la stessa
-       spazzatura.
-
-       Salvare a ogni passata costa una scrittura per insegna ogni qualche
-       minuto — gli scarti sono un elenco compresso, non una riga per scheda —
-       e toglie il problema alla radice. */
-    if (senzaPrezzo.size > 0) {
-      for (const [insegna, impronte] of senzaPrezzo) {
-        /* NON A OGNI SINGOLA SCHEDA: SALVARE COSTA.
-           `segnaScarti` rilegge l'elenco intero dell'insegna, ci aggiunge le
-           nuove e lo riscrive: per Checkers, che di scarti ne ha novantamila,
-           e' un megabyte dentro e uno fuori. A novantasei kilobyte al secondo
-           farlo per duecento impronte sarebbe piu' caro delle pagine che
-           risparmia.
-
-           Duecento e' il punto in cui il conto gira: sotto si aspetta la
-           passata dopo, e se il giro finisce prima il salvataggio in coda a
-           `giroContinuo` le prende comunque. */
-        if (impronte.length < 200) continue;
-        await segnaScarti(insegna, paeseDi.get(insegna) ?? "", impronte);
-        /* E si tengono anche qui: `scartiDi` ha una memoria di qualche minuto,
-           e senza questo la passata subito dopo non le vedrebbe ancora. */
-        const viste = maiViste.get(insegna);
-        if (viste) for (const i of impronte) viste.add(i);
-        /* Solo quelle salvate: le altre restano in attesa della passata dopo,
-           e `senzaPrezzo.clear()` in blocco le avrebbe buttate. */
-        senzaPrezzo.set(insegna, []);
-      }
-    }
+    /* Il salvataggio degli scarti non sta piu' qui: vedi `scaricaScarti`, che
+       gira a tempo dentro il lavoratore. Una passata con ventimila schede per
+       insegna dura ore, e aspettarne la fine era quasi come aspettare la fine
+       del giro. */
   }
 
   if (raccolte.length > 0) await salvaPrezzi(raccolte);
 
   /* Gli scarti si salvano prima di chiudere: se il giro e' stato interrotto,
      quel che si e' imparato resta comunque. */
+  await scaricaScarti(true);
   for (const [insegna, impronte] of senzaPrezzo) {
+    if (impronte.length === 0) continue;
     await segnaScarti(insegna, paeseDi.get(insegna) ?? "", impronte);
   }
   if (senzaPrezzo.size > 0) {
