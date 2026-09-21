@@ -140,12 +140,22 @@ export async function catalogoSalvato(
 ): Promise<VoceSalvata[] | null> {
   if (!isDbConfigured()) return null;
 
+  /* Alzata quando il corpo della lettura arriva in fondo: serve a distinguere
+     «non c'e'» da «non ho fatto in tempo». Vedi il commento in coda. */
+  let letto = false;
+
   return nonOltre(
     async () => {
       const col = await collezioneCataloghi();
       const capo = await col.findOne({ _id: `${paese}|${insegna}` });
-      if (!capo) return null;
-      if (Date.now() - capo.aggiornato.getTime() > VALIDITA_MS) return null;
+      if (!capo) {
+        letto = true;
+        return null;
+      }
+      if (Date.now() - capo.aggiornato.getTime() > VALIDITA_MS) {
+        letto = true;
+        return null;
+      }
 
       /* I cataloghi troppo grossi per un documento stanno in piu' pezzi: il
          primo dice quanti sono, gli altri si chiamano `#2`, `#3`... Quelli
@@ -162,10 +172,33 @@ export async function catalogoSalvato(
           // Pacchetto rovinato: gli altri pezzi si tengono lo stesso.
         }
       }
+      letto = true;
       return fuori.length > 0 ? fuori : null;
     },
     null,
-  );
+  ).then((esito) => {
+    /* UN'ATTESA SCADUTA NON E' UN CATALOGO CHE NON C'E'.
+       `nonOltre` restituisce il ripiego — `null` — sia quando il documento
+       manca sia quando i novanta secondi finiscono, e chi chiama non puo'
+       distinguerli. E' lo stesso difetto che ha fatto dire «800.000 indirizzi
+       salvati» su niente per un giorno intero, in senso inverso.
+
+       Misurato il 21 settembre: Disco, Jumbo, Carrefour KSA, Carulla e Auchan
+       Ucraina risultavano tutti «catalogo illeggibile». Sono i cinque
+       cataloghi piu' grossi che abbiamo, e a cento kilobyte al secondo —
+       la banda del piano gratuito — novanta secondi bastano per nove
+       megabyte. Non manca niente: non facciamo in tempo a leggerlo.
+
+       Non si puo' cambiare cosa torna senza cambiare tutti i chiamanti, ma si
+       puo' smettere di tacerlo. */
+    if (esito === null && !letto) {
+      console.warn(
+        `[catalogo] ${paese}|${insegna}: lettura non finita entro ${ATTESA_MS / 1000}s. ` +
+          `Non vuol dire che il catalogo non ci sia — vuol dire che non si e' fatto in tempo a leggerlo.`,
+      );
+    }
+    return esito;
+  });
 }
 
 /** Mette da parte il catalogo di un'insegna appena scaricato. */
