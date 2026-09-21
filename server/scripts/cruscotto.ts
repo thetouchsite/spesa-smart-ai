@@ -274,11 +274,15 @@ const html = `<title>Cruscotto dati MealMint</title>
   intorno ai <b>${n(tetto)} prodotti con prezzo</b> — non ai milioni che il numero degli indirizzi lascerebbe sperare.
   Per salire oltre servono insegne nuove che il prezzo lo pubblichino, non altre letture di queste.</p>
 
-  <p class="nota"><b>E quella proiezione d&agrave; per scontata una cosa che oggi non &egrave; vera:</b>
-  che ogni negozio continui a rispondere. Un sito letto troppo in fretta smette di rispondere, e ci mette ore a tornare:
-  al 21 settembre erano fuori uso per questo Carrefour Emirati (800.000 indirizzi), Disco, Jumbo e Vea in Argentina (580.000),
-  Alcampo (87.000) e Carulla (182.000). Sono un milione e seicentomila indirizzi dentro quel numero che <b>oggi non si possono aprire</b>,
-  e il rimedio non &egrave; insistere: &egrave; rallentare e aspettare.</p>
+  <p class="nota"><b>Un avvertimento che va letto al contrario di come sembra.</b>
+  Per mezza giornata questa pagina ha detto che Carrefour Emirati, Disco, Jumbo, Vea e Carulla erano fuori uso perch&eacute; ci bloccavano:
+  un milione e seicentomila indirizzi dati per irraggiungibili. <b>Non era vero.</b>
+  Il lettore apriva sempre le prime schede in ordine di catalogo, e l&#39;inizio di quelle sitemap &egrave; roba morta &mdash; prodotti tolti, categorie sparite.
+  Zero per cento su mille pagine, visto da fuori, &egrave; identico a un blocco.
+  Aprendo le stesse insegne con le schede prese sparse: Disco 6 su 8, Vea 6 su 8, Carrefour Emirati 8 su 8, Carulla 4 su 8.
+  Quegli indirizzi sono tornati tutti in gioco. Resta vero che un sito letto troppo in fretta smette di rispondere &mdash; misurato: due richieste
+  allo stesso negozio invece di una fanno scendere la resa dall&#39;87% al 52% &mdash; ma la prossima volta che un&#39;insegna d&agrave; zero,
+  la prima cosa da guardare &egrave; <b>quali</b> pagine stiamo aprendo, non quanto in fretta.</p>
 
   <p class="nota"><b>Come leggere le cinque cifre qui sopra.</b>
   <b>Link servibili</b>: indirizzi di prodotto salvati, di insegne ancora in elenco — quel che l&#39;API pu&ograve; dare subito.
