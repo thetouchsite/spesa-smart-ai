@@ -43,6 +43,7 @@
  * lento, non rotto. La stessa regola del magazzino dei prezzi.
  */
 
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { Binary } from "mongodb";
 import { cataloghi as collezioneCataloghi, fonti, isDbConfigured } from "../base/db.js";
@@ -119,6 +120,70 @@ function impacchetta(voci: VoceSalvata[]): Buffer {
   return gzipSync(voci.map((v) => `${v.url}\t${v.nome}`).join("\n"), { level: 6 });
 }
 
+/**
+ * Dove il catalogo si ferma dopo essere stato scaricato una volta.
+ *
+ * MISURATO: novantasei kilobyte al secondo.
+ * E' la banda di Atlas nel piano gratuito, non il nostro codice. Il catalogo
+ * di Carrefour Emirati sono cinquantotto megabyte in sei pezzi: dieci minuti.
+ * Con novanta secondi di tetto non si leggeva MAI, e la risposta era `null` —
+ * la stessa che dice «non c'e'». Cinque cataloghi, i piu' grossi che abbiamo,
+ * risultavano inesistenti.
+ *
+ * Un catalogo pero' cambia una volta al mese, e sul disco ci sta. La chiave e'
+ * la data di aggiornamento: se quella sul disco combacia con quella sul
+ * database, il pacchetto e' lo stesso e non c'e' niente da riscaricare.
+ * Quarantacinque secondi diventano cinque millisecondi.
+ *
+ * E' LA STESSA CARTELLA DEL LETTORE, DI PROPOSITO.
+ * `prezzi-continuo.ts` aveva gia' questa cache e se la riempiva da solo, ma
+ * solo per se': chi passava di qui — l'API, gli script, il cruscotto —
+ * continuava a pagare lo scaricamento intero. Adesso la riempie il primo che
+ * arriva e la usano tutti. Vedi anche `scalda-cataloghi.ts`, che la riempie
+ * apposta senza tetto di tempo.
+ *
+ * SENZA DISCO SI VA AVANTI LO STESSO.
+ * Su Render il disco e' effimero e sparisce a ogni riavvio: li' questa cache
+ * vale quanto dura il processo, che e' comunque meglio di niente. Ogni
+ * lettura e ogni scrittura sono avvolte, perche' un disco pieno o di sola
+ * lettura deve rendere il codice piu' lento, non rotto.
+ */
+const CACHE = "diario/cataloghi";
+
+function sulDisco(paese: string, insegna: string, pezzo: number): string {
+  const nome = `${paese}-${insegna.replace(/[^\p{L}\p{N}]+/gu, "_")}`;
+  return `${CACHE}/${nome}${pezzo === 0 ? "" : "-" + (pezzo + 1)}`;
+}
+
+/** Il pezzo dal disco, se c'e' ed e' della stessa data. */
+function dalDisco(paese: string, insegna: string, pezzo: number, quando: number): Buffer | null {
+  try {
+    const base = sulDisco(paese, insegna, pezzo);
+    if (!existsSync(base + ".gz")) return null;
+    if (Number(readFileSync(base + ".quando", "utf8")) !== quando) return null;
+    return readFileSync(base + ".gz");
+  } catch {
+    return null;
+  }
+}
+
+function versoIlDisco(
+  paese: string,
+  insegna: string,
+  pezzo: number,
+  quando: number,
+  dati: Buffer,
+): void {
+  try {
+    mkdirSync(CACHE, { recursive: true });
+    const base = sulDisco(paese, insegna, pezzo);
+    writeFileSync(base + ".gz", dati);
+    writeFileSync(base + ".quando", String(quando));
+  } catch {
+    /* Senza disco si va avanti lo stesso: piu' lenti, non rotti. */
+  }
+}
+
 function scompatta(dati: Buffer): VoceSalvata[] {
   const fuori: VoceSalvata[] = [];
   for (const riga of gunzipSync(dati).toString("utf8").split("\n")) {
@@ -147,7 +212,17 @@ export async function catalogoSalvato(
   return nonOltre(
     async () => {
       const col = await collezioneCataloghi();
-      const capo = await col.findOne({ _id: `${paese}|${insegna}` });
+      /* PRIMA LA DATA, SENZA IL PACCHETTO.
+         Per sapere se il catalogo e' ancora valido — e se quello sul disco e'
+         lo stesso — bastano due campi. Chiedendo il documento intero si
+         scaricano i dieci megabyte del primo pezzo PER DECIDERE se servono:
+         su Carrefour Emirati sono cento secondi, e i novanta di tetto
+         finivano li' dentro, prima ancora di guardare il disco dove il
+         pacchetto stava gia'. */
+      const capo = await col.findOne(
+        { _id: `${paese}|${insegna}` },
+        { projection: { aggiornato: 1, pezzi: 1 } },
+      );
       if (!capo) {
         letto = true;
         return null;
@@ -161,13 +236,38 @@ export async function catalogoSalvato(
          primo dice quanti sono, gli altri si chiamano `#2`, `#3`... Quelli
          vecchi non hanno il campo e valgono per uno. */
       const quanti = Math.max(1, Number((capo as { pezzi?: number }).pezzi) || 1);
+      const quando = capo.aggiornato.getTime();
       const fuori: VoceSalvata[] = [];
       for (let i = 0; i < quanti; i++) {
-        const doc =
-          i === 0 ? capo : await col.findOne({ _id: `${paese}|${insegna}#${i + 1}` });
-        if (!doc?.dati) continue;
+        /* Prima il disco: se la data combacia e' lo stesso pacchetto, e
+           costa millisecondi invece di decine di secondi. */
+        let dati = dalDisco(paese, insegna, i, quando);
+        if (!dati) {
+          /* Solo adesso si paga il pacchetto, e solo del pezzo che manca. */
+          const doc = (await col.findOne({
+            _id: i === 0 ? `${paese}|${insegna}` : `${paese}|${insegna}#${i + 1}`,
+          })) as { dati?: { buffer: Buffer } } | null;
+          if (!doc?.dati) continue;
+          dati = Buffer.from(doc.dati.buffer);
+          versoIlDisco(paese, insegna, i, quando, dati);
+        }
         try {
-          fuori.push(...scompatta(Buffer.from(doc.dati.buffer)));
+          /* UNO PER VOLTA, NON `push(...)`.
+             `push(...array)` passa OGNI elemento come argomento, e un
+             argomento per ognuna di 188.965 voci sfonda lo stack:
+             «Maximum call stack size exceeded». L'eccezione finiva
+             nell'interruttore, che restituiva il ripiego — `null` — cioe'
+             «catalogo assente».
+
+             Fallivano ESATTAMENTE i cataloghi piu' grossi, che sono quelli
+             dove sta tutto il lavoro da fare: Disco 188.965, Auchan Ucraina
+             146.568, Carrefour KSA 138.025, Carulla 181.953, e i sei pezzi di
+             Carrefour Emirati da 133.334 l'uno. Piu' di ottocentomila
+             indirizzi dichiarati inesistenti da una riga che sembrava un
+             dettaglio di stile. Alcampo, con 87.208 voci, passava: la soglia
+             sta in mezzo, e dipende da quanto stack resta — che e' il motivo
+             per cui non si era mai vista in una prova piccola. */
+          for (const voce of scompatta(dati)) fuori.push(voce);
         } catch {
           // Pacchetto rovinato: gli altri pezzi si tengono lo stesso.
         }
