@@ -98,7 +98,13 @@ const PER_CATENA = Number(process.env.GIRO_PER_CATENA_INSIEME ?? 4);
  * cento per cento valgono un lettore che ci mette il doppio.
  */
 const PAUSA_MS = Number(process.env.GIRO_PAUSA_MS ?? 120);
-/** Ogni quante righe si salva. Se il giro si ferma a meta', quel che e' fatto resta. */
+/**
+ * Ogni quante righe si salva. Se il giro si ferma a meta', quel che e' fatto resta.
+ *
+ * Duecento righe pero' non bastano da sole: un'insegna che rende il quattro
+ * per cento ci mette ore ad accumularne duecento, e in quelle ore i prezzi
+ * stanno solo in memoria. Per questo `scaricaPrezzi` scrive anche a tempo.
+ */
 const BLOCCO = 200;
 
 /**
@@ -503,6 +509,40 @@ export async function giroContinuo(
   let ultimoScarico = Date.now();
   let scaricando = false;
   const SCARICO_OGNI_MS = 120_000;
+
+  /**
+   * I prezzi si scrivono mentre si legge, non a fine passata.
+   *
+   * Si salvavano una volta sola, quando la passata finiva. Con ventimila
+   * schede per insegna e cinque insegne in coda una passata sono centomila
+   * pagine: a tre al secondo, nove ore. Nove ore di prezzi tenuti in memoria,
+   * e se il processo cade — o se lo riavvio io per «sistemare» qualcosa — sono
+   * tutti persi.
+   *
+   * Misurato il 22 settembre: i lettori riportavano rese dell'85% e del 94%
+   * mentre il totale sul database non si muoveva di una riga, poi arrivava una
+   * raffica. Non era un guasto: era il salvataggio che aspettava la fine di
+   * una passata lunghissima.
+   *
+   * Duecento righe o due minuti, quel che viene prima. Duecento perche' una
+   * scrittura in blocco da duecento costa quanto una da dieci; due minuti
+   * perche' e' il massimo lavoro che accetto di perdere se la macchina si
+   * spegne.
+   */
+  let ultimoPrezzo = Date.now();
+  let scrivendo = false;
+
+  const scaricaPrezzi = async (forza = false): Promise<void> => {
+    if (scrivendo || raccolte.length === 0) return;
+    if (!forza && raccolte.length < BLOCCO && Date.now() - ultimoPrezzo < 120_000) return;
+    scrivendo = true;
+    ultimoPrezzo = Date.now();
+    try {
+      await salvaPrezzi(raccolte.splice(0, raccolte.length));
+    } finally {
+      scrivendo = false;
+    }
+  };
 
   const scaricaScarti = async (forza = false): Promise<void> => {
     if (scaricando) return;
@@ -942,7 +982,9 @@ export async function giroContinuo(
         /* Costa un confronto di date per pagina, e ogni due minuti una
            scrittura per insegna. Vedi `scaricaScarti`. */
         void scaricaScarti();
-        if (raccolte.length >= BLOCCO) await salvaPrezzi(raccolte.splice(0, raccolte.length));
+        await scaricaPrezzi();
+        /* Il salvataggio a blocchi di duecento sta in `scaricaPrezzi`, che alla
+           soglia aggiunge un tetto di tempo: vedi li' il perche'. */
         if (aperte % 50 === 0) {
           onAvanzamento?.(aperte, conPrezzo);
           giro.segna(aperte, conPrezzo, saltate);
