@@ -52,6 +52,7 @@ import {
   improntaUrl,
   numeroInsegnaPubblico as numeroInsegna,
   salvaPrezzi,
+  campiDallaPagina,
   salvataggiArrivano,
   type PrezzoSalvato,
 } from "./prezzi-magazzino.js";
@@ -956,6 +957,7 @@ export async function giroContinuo(
             insegna: c.insegna,
             verifica: v.status,
             visto: new Date(),
+            ...campiDallaPagina(v),
           });
         }
         if (v.page?.current != null) conPrezzo++;

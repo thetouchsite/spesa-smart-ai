@@ -51,7 +51,13 @@ import {
   impara,
   LINGUA_DEL_PAESE as LINGUA_VOCABOLARIO,
 } from "./vocabolario.js";
-import { improntaUrl, prezziGiaVisti, salvaPrezzi, type PrezzoSalvato } from "./prezzi-magazzino.js";
+import {
+  improntaUrl,
+  prezziGiaVisti,
+  salvaPrezzi,
+  campiDallaPagina,
+  type PrezzoSalvato,
+} from "./prezzi-magazzino.js";
 import { scartiDi, segnaScarti } from "./scarti.js";
 
 /** La stessa forma che producono le altre due strade. */
@@ -762,6 +768,7 @@ export async function generatePricesCatalogo(
         insegna: c.insegna,
         verifica: v.status,
         visto: new Date(),
+        ...campiDallaPagina(v),
       });
     } else if (v.status !== "non-raggiungibile") {
       daScartare.push({ insegna: c.insegna, impronta: improntaUrl(c.url) });

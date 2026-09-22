@@ -33,7 +33,8 @@
 import { catalogoDi, cercaNelCatalogo } from "./catalogo.js";
 import { tutteLeFonti } from "./catalogo-fonti.js";
 import { verifyProductPage } from "./price-page.js";
-import { prezziGiaVisti, salvaPrezzi, statoMagazzino, type PrezzoSalvato } from "./prezzi-magazzino.js";
+import { prezziGiaVisti, salvaPrezzi,
+  campiDallaPagina, statoMagazzino, type PrezzoSalvato } from "./prezzi-magazzino.js";
 import { LINGUA_DEL_PAESE, traduciVoce } from "./vocabolario.js";
 /**
  * La spesa di base, nella lingua di chi la compra.
@@ -388,6 +389,7 @@ export async function riempiPrezzi(paese: string, quanteVoci: number): Promise<v
       insegna: c.insegna,
       verifica: v.status,
       visto: new Date(),
+      ...campiDallaPagina(v),
     });
     if (v.page?.current != null) conPrezzo++;
 
