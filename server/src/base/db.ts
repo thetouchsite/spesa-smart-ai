@@ -17,7 +17,7 @@
  * regime il costo scende a ~0,02 € a piano.
  */
 
-import { MongoClient, type Binary, type Collection, type Db } from "mongodb";
+import { MongoClient, type Binary, type Collection, type Db, type ObjectId } from "mongodb";
 import type { VerifyStatus } from "../api/price-page.js";
 
 export interface UserDoc {
@@ -118,6 +118,134 @@ export interface PrezzoDoc {
   t: Date;
   /** Il numero dell'insegna, non il nome: serve al giro continuo e al cruscotto. */
   c: number;
+
+  /* ─── FASE 1: quel che la pagina dichiara e prima si buttava ───
+     Tre numeri e un'impronta. Stanno QUI e non in `schede` perche' cambiano
+     a ogni lettura come il prezzo: metterli fra i campi descrittivi
+     vorrebbe dire riscrivere `schede` mezzo milione di volte al giorno.
+     Tutti facoltativi: assente vuol dire NON OSSERVATO, mai zero. */
+
+  /** Prezzo pieno, quando la pagina dichiara una promozione. */
+  l?: number;
+  /** Percentuale di sconto, arrotondata. */
+  sc?: number;
+  /** Disponibilita': 0 ignota, 1 disponibile, 2 esaurita, 3 scorte limitate. */
+  av?: 0 | 1 | 2 | 3;
+  /**
+   * Impronta degli otto byte dei campi descrittivi che stanno in `schede`.
+   *
+   * SERVE A NON RILEGGERE `schede` A OGNI LOTTO.
+   * Per sapere se marca, immagine o nome sono cambiati ci sono tre strade:
+   * rileggere `schede` (una query in piu' ogni duecento pagine), riscriverla
+   * sempre (mezzo milione di scritture al giorno di roba che non cambia mai),
+   * oppure un upsert condizionato — che e' una trappola: quando il filtro non
+   * combacia perche' nulla e' cambiato, `upsert: true` INSERISCE un doppione.
+   *
+   * L'impronta costa otto byte e toglie la domanda: la lettura del lotto su
+   * `prezzi` si fa comunque per il prezzo, e torna anche questa.
+   *
+   * Una collisione fa perdere l'aggiornamento di un campo descrittivo, non
+   * corrompe un prezzo. A otto byte e' un rischio che si accetta.
+   */
+  sh?: string;
+}
+
+/**
+ * I campi descrittivi di una scheda: quel che NON cambia fra una lettura e
+ * l'altra.
+ *
+ * PERCHE' UNA COLLEZIONE A PARTE E NON ALTRI CAMPI SU `prezzi`
+ * ------------------------------------------------------------
+ * Perche' `prezzi` si riscrive mezzo milione di volte al giorno e questi campi
+ * non cambiano quasi mai. Sono anche lunghi: marca, indirizzo dell'immagine,
+ * percorso della categoria e nome per esteso fanno circa 250 byte, contro i 77
+ * dell'intera riga di prezzo. Messi la' dentro quadruplicherebbero la
+ * collezione calda — l'opposto della compattazione che l'ha portata a 77 byte.
+ *
+ * Divisi per QUANTO CAMBIANO, non per argomento: e' la stessa regola che ha
+ * fatto diventare l'insegna un numero invece di un nome.
+ *
+ * NIENTE TTL SU QUESTA COLLEZIONE. `prezzi.t` ne ha uno da trenta giorni, e
+ * copiarlo qui cancellerebbe in silenzio i campi che stiamo raccogliendo.
+ */
+export interface SchedaDoc {
+  /** Lo STESSO identificativo di `prezzi._id`: e' la chiave del collegamento. */
+  _id: string;
+  /** Il nome come lo dichiara la pagina — piu' completo di quello dell'indirizzo. */
+  n?: string;
+  /** La marca, dai dati strutturati. */
+  b?: string;
+  /** Il codice interno del negozio. Non e' un EAN: non attraversa le insegne. */
+  sk?: string;
+  /** L'INDIRIZZO dell'immagine, mai l'immagine. Vedi il commento qui sotto. */
+  im?: string;
+  /** Il percorso di categoria come lo scrive il negozio, non normalizzato. */
+  cr?: string;
+  /** Da dove sono stati presi: `jsonld`, `og`, `microdata`, `url`. */
+  fo?: string;
+  /** Quando sono stati osservati l'ultima volta. */
+  t: Date;
+}
+
+/* SULL'IMMAGINE SI TIENE L'INDIRIZZO, MAI I BYTE.
+   Un prezzo e' un fatto e i fatti non hanno un autore. Una fotografia di
+   prodotto e' un'opera con un titolare, e copiarla e' riproduzione — un
+   terreno molto piu' netto di tutta la questione sul diritto sui generis.
+   Conservare l'indirizzo non lo e'.
+
+   E per la stessa ragione qui NON c'e' la descrizione del prodotto, che pure
+   sarebbe facile da prendere: un nome e' funzionale, tre paragrafi di testo
+   promozionale sono scritti da qualcuno. E' la parte del dataset che meno
+   somiglia a un dato e piu' a contenuto altrui. */
+
+/**
+ * Un intervallo di prezzo: da quando a quando quell'offerta e' stata a quella
+ * cifra.
+ *
+ * SI SCRIVE SOLO QUANDO CAMBIA
+ * ----------------------------
+ * Una riga per ogni lettura sarebbe una riga ogni 72 ore per offerta, quasi
+ * sempre identica a quella prima: circa 32 GB l'anno di ripetizioni. Con
+ * `t` (prima volta vista a questa cifra) e `u` (ultima volta confermata), una
+ * sfilza di letture uguali diventa una riga sola con una durata — che e' poi
+ * quello che una serie di prezzi e' davvero. Da 32 GB a 2-3.
+ *
+ * Non si perde niente: i vuoti fra una riga e l'altra sono periodi senza
+ * variazione per costruzione.
+ *
+ * PERCHE' NON DENTRO `prezzi`
+ * ---------------------------
+ * Si era valutato di tenere l'intervallo aperto sulla riga del prezzo: niente
+ * indice parziale, unicita' garantita per costruzione, e 255 MB risparmiati.
+ * Scartata per via del TTL: `prezzi.t` cancella la riga dopo trenta giorni, e
+ * un prodotto letto a 2,99 per sei mesi e poi ritirato dal negozio perderebbe
+ * tutta la sua storia un mese dopo. Che e' esattamente cio' che stiamo
+ * cercando di conservare.
+ *
+ * NIENTE TTL SU QUESTA COLLEZIONE.
+ */
+export interface OsservazioneDoc {
+  _id: ObjectId;
+  /** L'offerta: lo stesso identificativo di `prezzi._id`. */
+  o: string;
+  p: number | null;
+  /** Il prezzo pieno di allora, se c'era una promozione. */
+  l?: number;
+  v: string;
+  /** Prima volta vista a questa cifra. */
+  t: Date;
+  /** Ultima volta confermata a questa cifra. */
+  u: Date;
+  /**
+   * C'e' solo sull'intervallo ancora aperto.
+   *
+   * Il vincolo lo mette il database, non il codice: un indice unico PARZIALE
+   * su `{ o: 1 }` limitato a `{ aperta: true }` rende impossibile avere due
+   * intervalli aperti per la stessa offerta. Se la chiusura fallisce a meta',
+   * l'inserimento viola l'indice e fallisce rumorosamente invece di lasciare
+   * due righe aperte in silenzio.
+   */
+  aperta?: true;
 }
 
 /**
@@ -191,6 +319,44 @@ export interface FonteDoc {
   stimati: number;
   /** Se c'e', l'insegna e' TENUTA FUORI e questa frase dice perche'. */
   esclusa?: string;
+
+  /* ─── SCHEDA DI CONFORMITA' ───
+     `esclusa` resta ed e' l'interruttore generale: c'e' una frase, l'insegna
+     sparisce da tutto. Questi campi non lo sostituiscono, lo affinano.
+
+     RACCOGLIERE ED ESPORRE SONO DUE COSE DIVERSE, e con un interruttore solo
+     non si possono dire. Leggere un negozio per la nostra app e rivendere gli
+     stessi dati a terzi sono due esposizioni diverse di un ordine di
+     grandezza, e la seconda e' quella che pesa. Un'insegna puo' stare a
+     `raccolta: "ATTIVA"` e `esposizione: "RICHIEDE_REVISIONE"`: la leggiamo,
+     non la vendiamo ancora.
+
+     `riusoCommerciale: "VERDE"` NON vuol dire «legalmente sicuro». Vuol dire
+     «nessuna criticita' evidente secondo la revisione interna corrente». La
+     differenza non e' formale: e' l'unica lettura che il campo puo' reggere,
+     visto che nessuno di questi giudizi viene da un legale.
+
+     La giurisdizione c'e' perche' senza di lei la scheda non descrive niente:
+     il diritto sui generis sulle banche dati e' europeo, e in catalogo ci sono
+     Argentina, Brasile, Messico, Emirati, Arabia Saudita, India, Corea,
+     Sudafrica, Stati Uniti e Canada. */
+
+  /** Il paese la cui legge governa la fonte. ISO a due lettere. */
+  giurisdizione?: string;
+  /** La leggiamo? */
+  raccolta?: "ATTIVA" | "SOSPESA" | "MAI";
+  /** La vendiamo attraverso l'API? Il valore prudente e' RICHIEDE_REVISIONE. */
+  esposizione?: "ABILITATA" | "RICHIEDE_REVISIONE" | "DISABILITATA";
+  /** Come arrivano i dati: pagina, dati strutturati, API interna, API ufficiale, feed. */
+  fonteTipo?: "HTML" | "JSON_LD" | "API_FRONTEND" | "API_UFFICIALE" | "FEED";
+  /** Cosa dice il loro `robots.txt` sull'ultimo controllo. */
+  robots?: "ALLOW" | "DISALLOW" | "PARZIALE" | "IGNOTO";
+  /** Qualcuno ha letto le loro condizioni d'uso? Su tutte, oggi, no. */
+  termini?: "RIVISTI" | "NON_RIVISTI";
+  /** Il semaforo. VERDE = nessuna criticita' evidente, non «sicuro». */
+  riusoCommerciale?: "VERDE" | "GIALLO" | "ROSSO";
+  /** Quando la scheda e' stata guardata l'ultima volta. */
+  controllatoIl?: Date;
   /**
    * Quel che si e' imparato su questa insegna, in chiaro.
    *
@@ -459,6 +625,14 @@ export async function cataloghi(): Promise<Collection<CatalogoDoc>> {
 
 export async function vocabolario(): Promise<Collection<ParolaDoc>> {
   return (await getDb()).collection<ParolaDoc>("vocabolario");
+}
+
+export async function schede(): Promise<Collection<SchedaDoc>> {
+  return (await getDb()).collection<SchedaDoc>("schede");
+}
+
+export async function osservazioni(): Promise<Collection<OsservazioneDoc>> {
+  return (await getDb()).collection<OsservazioneDoc>("osservazioni");
 }
 
 export async function fonti(): Promise<Collection<FonteDoc>> {
