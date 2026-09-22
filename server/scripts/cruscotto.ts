@@ -140,6 +140,37 @@ const barra = (parte: number, tutto: number) =>
    fa sembrare quei paesi coperti piu' del doppio di quanto sono. */
 const disallineati = q.paesi.filter((r) => r.prezziConCifra > r.link && r.link > 0);
 
+/* QUANTE INSEGNE PER PAESE, IN ORDINE DI QUANTE SONO.
+   Antonio l'ha chiesto per rispondere a una domanda che i numeri grossi non
+   fanno: dove siamo larghi e dove stiamo in piedi su un negozio solo. Un
+   paese con undici insegne regge la scomparsa di una; l'Arabia Saudita, che
+   ne ha una, il giorno che Carrefour cambia sito sparisce.
+
+   Due valori per riga e si sommano davvero, quindi la barra e' divisa: quante
+   ne abbiamo in elenco e quante di quelle hanno un catalogo raccolto. La
+   differenza fra i due e' lavoro che non e' ancora stato fatto, e in una
+   tabella di numeri non si nota; qui si vede come un buco nella barra. */
+const perNegozi = q.paesi
+  .filter((r) => r.insegneInElenco > 0)
+  .slice()
+  .sort((a, b) => b.insegneInElenco - a.insegneInElenco || a.paese.localeCompare(b.paese));
+const maxNegozi = perNegozi.length > 0 ? perNegozi[0].insegneInElenco : 1;
+
+const righeNegozi = perNegozi
+  .map((r) => {
+    const conCat = Math.min(r.insegneNelDb, r.insegneInElenco);
+    const senza = r.insegneInElenco - conCat;
+    const largo = (x: number) => (x / maxNegozi) * 100;
+    return `    <div class="riga-neg">
+      <span class="sigla">${esc(r.paese)}</span>
+      <span class="barra-neg" title="${esc(r.paese)}: ${r.insegneInElenco} insegne in elenco, ${conCat} con catalogo raccolto">
+        <i class="pieno" style="width:${largo(conCat).toFixed(2)}%"></i>${senza > 0 ? `<i class="vuoto" style="width:${largo(senza).toFixed(2)}%"></i>` : ""}
+      </span>
+      <span class="conta">${r.insegneInElenco}</span>
+    </div>`;
+  })
+  .join("\n");
+
 const righeTabella = q.paesi
   .map((r) => {
     const conPrezzo = r.prezziConCifra;
@@ -233,6 +264,18 @@ const html = `<title>Cruscotto dati MealMint</title>
   .quota { font-family: var(--mono); font-size: 12.5px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--verde); }
   .quota.bassa { color: var(--ambra); }
   .quota.zero { color: var(--rosso); }
+  .negozi { background: var(--piano); border: 1px solid var(--filo); border-radius: 9px; padding: 10px 16px 14px; }
+  .riga-neg { display: grid; grid-template-columns: 40px 1fr 34px; gap: 12px; align-items: center; padding: 3px 0; }
+  .barra-neg { display: flex; gap: 2px; height: 10px; }
+  .barra-neg i { display: block; height: 100%; border-radius: 3px; }
+  .barra-neg .pieno { background: var(--verde); }
+  .barra-neg .vuoto { background: var(--incavo); border: 1px solid var(--filo); box-sizing: border-box; }
+  .conta { font-family: var(--mono); font-size: 12.5px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .chiave { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 0 0 12px; font-size: 12.5px; color: var(--inch-tenue); }
+  .chiave span { display: inline-flex; align-items: center; gap: 7px; }
+  .chiave i { width: 14px; height: 10px; border-radius: 3px; display: inline-block; }
+  .chiave .pieno { background: var(--verde); }
+  .chiave .vuoto { background: var(--incavo); border: 1px solid var(--filo); box-sizing: border-box; }
   .nota { font-size: 13.5px; color: var(--inch-tenue); border-left: 2px solid var(--filo); padding-left: 13px; margin: 16px 0 0; }
   .nota b { color: var(--inch); }
   ul.semplice { list-style: none; padding: 0; margin: 12px 0 0; columns: 2; column-gap: 28px; }
@@ -303,6 +346,18 @@ ${righeTabella}
   ${disallineati.length === 0 ? "" : `<p class="nota"><b>&#9888; ${disallineati.length} paesi hanno piu&#39; prezzi che indirizzi</b> (${disallineati.map((r) => `${esc(r.paese)}: ${n(r.prezziConCifra)} su ${n(r.link)}`).join(", ")}).
   Non &egrave; un errore di conto: sono prezzi veri, letti da pagine vere, di indirizzi che il catalogo <b>non ha pi&ugrave;</b> &mdash; quelle insegne sono state riraccolte e la loro sitemap adesso ne dichiara meno.
   L&#39;API non potr&agrave; mai servirli, perch&eacute; per servirli le servirebbe un indirizzo: occupano spazio e vanno tolti.</p>`}
+
+  <h2>Quante insegne per paese</h2>
+  <p class="nota"><b>Dove siamo larghi e dove stiamo in piedi su un negozio solo.</b>
+  Un paese con dodici insegne regge la scomparsa di una; l&#39;Arabia Saudita, che ne ha una, il giorno che Carrefour cambia sito sparisce.
+  La parte piena della barra sono le insegne di cui abbiamo gi&agrave; raccolto il catalogo; quella vuota sono quelle in elenco e non ancora raccolte &mdash; lavoro da fare, non un limite del paese.</p>
+  <div class="chiave">
+    <span><i class="pieno"></i> catalogo raccolto</span>
+    <span><i class="vuoto"></i> in elenco, catalogo da raccogliere</span>
+  </div>
+  <div class="negozi">
+${righeNegozi}
+  </div>
 
   <h2>I paesi al buio</h2>
   <p class="nota">Catalogo salvato e fresco, zero prezzi: ${n(linkAlBuio)} indirizzi che l&#39;API conosce e non sa quotare. <b>Ma sono due problemi diversi.</b> Dove c&#39;&egrave; scritto &laquo;non ancora prezzato&raquo; basta far girare il lavoro notturno. Dove nessuna insegna pubblica il prezzo il notturno non pu&ograve; farci niente: servono insegne nuove o un lettore per la loro API. Sono ${tuttoMuto.size} paesi, ${n(alBuio.filter((r) => tuttoMuto.has(r.paese)).reduce((a, r) => a + r.link, 0))} indirizzi.</p>
