@@ -253,8 +253,39 @@ export async function prezziGiaVisti(url: string[]): Promise<Map<string, PrezzoS
  * Non si aspetta l'esito: chi chiama ha gia' i suoi dati in mano e l'utente
  * non deve attendere una scrittura che non cambia cio' che vedra'.
  */
+/**
+ * Vero se l'ultimo salvataggio e' arrivato davvero sul database.
+ *
+ * PERCHE' NON BASTA CHE `salvaPrezzi` NON ESPLODA
+ * -----------------------------------------------
+ * Perche' non esplode mai. Sta dentro l'interruttore, che per progetto
+ * inghiotte l'eccezione e restituisce il ripiego: e' quel che salva l'API
+ * quando il database fa i capricci, ed e' anche quel che rende un guasto
+ * invisibile a chi scrive.
+ *
+ * Il 22 settembre 2026 un intoppo del DNS ha rotto la connessione dei lettori
+ * — `getaddrinfo ENOTFOUND` sull'host di Atlas — e loro hanno continuato per
+ * un'ora: aprivano pagine, trovavano prezzi, riportavano rese del 92% e del
+ * 98%, e non scrivevano una riga. Dal pannello sembravano sani; un processo
+ * nuovo si collegava benissimo, quindi nemmeno guardando il database si
+ * capiva. Me ne sono accorto solo perche' tredici pagine al secondo con quelle
+ * rese devono dare dieci prodotti al secondo, e ne davano uno.
+ *
+ * Chi legge questo valore puo' fare l'unica cosa sensata: fermarsi e dirlo.
+ * Un lettore fermo si vede; un lettore che finge di lavorare no.
+ */
+let ultimoSalvataggioRiuscito = true;
+
+export function salvataggiArrivano(): boolean {
+  return ultimoSalvataggioRiuscito;
+}
+
 export async function salvaPrezzi(righe: PrezzoSalvato[]): Promise<void> {
   if (!isDbConfigured() || righe.length === 0) return;
+
+  /* La sentinella: se il corpo arriva in fondo, il database ha risposto. Se
+     l'interruttore lo salta o l'eccezione lo interrompe, resta a false. */
+  let arrivato = false;
 
   await nonOltre(
     async () => {
@@ -276,10 +307,13 @@ export async function salvaPrezzi(righe: PrezzoSalvato[]): Promise<void> {
         })),
         { ordered: false },
       );
+      arrivato = true;
       return undefined;
     },
     undefined,
   );
+
+  ultimoSalvataggioRiuscito = arrivato;
 }
 
 /** Quanto e' vecchio un prezzo, in ore: serve a dirlo a chi lo guarda. */

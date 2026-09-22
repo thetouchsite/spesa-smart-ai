@@ -655,6 +655,29 @@ export function paScheda(u: string): boolean {
   // Trattini bassi al posto dei trattini, con o senza `.html` in fondo.
   if (/[a-z]{3,}(?:_[a-z0-9]{2,}){2,}_\d{6,}(\.html?)?$/i.test(u)) return true;
 
+  /* IL CODICE CORTO IN FONDO A UN `.html`.
+     `/garbanzos-con-espinacas-litoral-425g-13.html`. E' la stessa forma della
+     prima riga — nome lungo, poi il codice — ma il codice e' di due cifre, e
+     noi ne chiedevamo sei. Un negozio che ha cinquemila prodotti non ha
+     bisogno di numerarli a sei cifre, e non c'e' ragione per cui debba.
+
+     Ahorramas pubblica 4.594 schede e per noi ne erano TRE. Non «non
+     rispondono», non «non pubblicano i prezzi»: non riconoscevamo l'indirizzo.
+
+     E' la regola piu' larga di tutte quelle qui sopra, quindi l'ho misurata
+     invece di ragionarci. Sulle due sitemap di Ahorramas, che sono separate e
+     dicono loro stesse quale contiene cosa:
+
+         sitemap_0-product.xml    4.594 indirizzi  ->  4.491 presi   (97,8%)
+         sitemap_2-category.xml   2.047 indirizzi  ->      0 presi
+
+     Zero categorie su duemila. Le tre cose che lo garantiscono: `.html` in
+     fondo (le categorie finiscono con la barra), almeno tre pezzi separati da
+     trattino prima del codice, e soprattutto il controllo delle vetrine qui
+     sopra, che gira PRIMA di questa riga e tiene fuori tutto quel che sta
+     sotto /categoria/, /ofertas/ e simili. */
+  if (/\/[a-z][a-z0-9]*(?:-[a-z0-9]*){2,}-\d{1,5}\.html?$/i.test(u)) return true;
+
   /* LA `/p` FINALE, SENZA BARRA: E' LA CONVENZIONE VTEX.
      `/achocolatado-danone-200ml-9339990/p` e' una scheda; la riga qui sopra che
      accetta `/p/` non la prende, perche' la barra finale non c'e'.

@@ -195,6 +195,19 @@ async function main() {
     { link: 0, freschi: 0, prezzi: 0, cifre: 0, vendibili: 0 },
   );
 
+  /* QUANTE PAGINE ABBIAMO APERTO SENZA TROVARE UN PREZZO.
+     Serve al cruscotto per la resa, e senza di questo quel numero e' una
+     bugia: la resa si faceva `righe con cifra / righe totali`, giusta finche'
+     una pagina senza prezzo lasciava una riga vuota. Da quando non la lascia
+     piu' quel rapporto vale SEMPRE cento per cento, e il cruscotto prometteva
+     «il 100% aveva un prezzo» proiettando quattro milioni e mezzo di prodotti
+     — cioe' il numero degli indirizzi.
+
+     Il denominatore giusto e' quante pagine si sono APERTE: quelle che un
+     prezzo l'hanno dato piu' quelle che si sono aperte senza. */
+  const { quantiScarti } = await import("../src/api/scarti.js");
+  const scartate = [...(await quantiScarti()).values()].reduce((a, x) => a + x, 0);
+
   const n = (x: number) => x.toLocaleString("it-IT");
 
   console.log("\n  QUEL CHE L'API SERVE OGGI, letto dal database\n");
@@ -214,6 +227,14 @@ async function main() {
   );
 
   const stimati = FONTI.reduce((a, f) => a + f.stimati, 0);
+  const aperte = tot.cifre + scartate;
+  console.log(
+    `\n  pagine aperte                : ${n(aperte)}` +
+      `  (${n(tot.cifre)} con prezzo, ${n(scartate)} senza)`,
+  );
+  if (aperte > 0) {
+    console.log(`  resa vera                    : ${Math.round((tot.cifre / aperte) * 100)}%`);
+  }
   console.log(`\n  stimato in catalogo-fonti.ts : ${n(stimati)}`);
   console.log(`  servibile dal database       : ${n(tot.link)}`);
   const scarto = tot.link - stimati;
@@ -231,6 +252,7 @@ async function main() {
       {
         quando: new Date().toISOString(),
         totale: tot,
+        scartate,
         stimati,
         orfane,
         orfaneLink,

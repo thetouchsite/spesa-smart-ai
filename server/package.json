@@ -8,7 +8,7 @@
     "confine": "node scripts/confine.mjs --dettaglio",
     "build": "node scripts/confine.mjs && tsc -p tsconfig.json",
     "start": "node --env-file-if-exists=.env dist/index.js",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.0",

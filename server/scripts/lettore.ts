@@ -107,6 +107,20 @@ const SOLO = (arg("--solo") ?? "")
   .map((p) => p.trim().toUpperCase())
   .filter(Boolean);
 
+/**
+ * Solo queste insegne, e allora il biglietto e' per insegna invece che per paese.
+ *
+ * Serve quando un lettore gia' acceso tiene un paese ma non sa delle insegne
+ * aggiunte dopo il suo avvio: senza questo, quelle insegne restano illeggibili
+ * finche' l'altro non si riavvia. Vedi `soloInsegne` in `prezzi-continuo.ts`.
+ *
+ *   --solo IT --insegne "Xtrawine,Todis,Despar"
+ */
+const INSEGNE = (arg("--insegne") ?? "")
+  .split(",")
+  .map((x) => x.trim())
+  .filter(Boolean);
+
 /** Respiro fra un giro e l'altro: niente di tecnico, e' cortesia verso i negozi. */
 const PAUSA_MS = 20_000;
 /** Dopo un errore si aspetta di piu': se la rete e' giu', riprovare subito non aiuta. */
@@ -244,7 +258,15 @@ async function main() {
        preso uno: non e' un problema, il biglietto resta l'unica verita' e chi
        arriva secondo si tiene il resto. */
     const tenuti = await chiTieneIPaesi();
-    const liberi = disponibili.filter((p) => !tenuti.has(p));
+    /* CON `--insegne` IL BIGLIETTO DEL PAESE NON CI RIGUARDA.
+       Chi tiene `IT` tiene le insegne che aveva in elenco quando si e' acceso;
+       noi chiediamo `IT|Xtrawine`, che e' un lucchetto diverso e non collide.
+       Guardare qui i biglietti di paese vorrebbe dire aspettare un permesso
+       che non ci serve — e il 21 settembre voleva dire aspettare per sempre,
+       perche' le due Raspberry rinnovavano Italia ed Emirati ogni tre minuti
+       senza leggerne le insegne nuove. */
+    const liberi =
+      INSEGNE.length > 0 ? disponibili : disponibili.filter((p) => !tenuti.has(p));
 
     /* FRA I LIBERI, PRIMA QUELLI CHE HANNO ANCORA SCHEDE DA PROVARE.
        Chi non ne ha resta in fondo: non si esclude, perche' fra tre giorni le
@@ -269,7 +291,23 @@ async function main() {
        prende meno al giro successivo; spento uno, gli altri si allargano. */
     const vivi = await chiStaLavorando();
     const quantiLettori = Math.max(1, new Set(vivi.map((v) => v.macchina + "#" + v.pid)).size);
-    const quota = Math.max(1, Math.ceil(disponibili.length / quantiLettori));
+    /* LA QUOTA SERVE SOLO A CHI PESCA DALLO STESSO MUCCHIO.
+       Dividere i paesi per quanti lettori sono accesi e' giusto quando tutti
+       chiedono «dammi quel che c'e'»: senza, il primo acceso se li prende
+       tutti e chi arriva dopo trova gli avanzi.
+
+       Ma un lettore lanciato con `--solo` non pesca dal mucchio: gli e' stato
+       detto esattamente dove lavorare, e quasi sempre perche' quei paesi
+       hanno bisogno di un passo diverso. Li' la quota non spartisce niente —
+       restringe e basta.
+
+       Misurato il 21 settembre: un lettore su AU, FI, CL, MY, PL chiedeva
+       cinque paesi e ne otteneva UNO, perche' erano accesi cinque lettori che
+       lavoravano su paesi completamente diversi. Un quinto del lavoro, e la
+       causa non compariva da nessuna parte — la riga diceva solo «quota 1».
+       Con sette lettori accesi per buona parte della notte, ogni lettore
+       mirato ne ha risentito. */
+    const quota = SOLO.length > 0 ? QUANTI_PAESI : Math.max(1, Math.ceil(disponibili.length / quantiLettori));
     const quanti = Math.min(QUANTI_PAESI, quota, daCui.length);
 
     const scelti: string[] = [];
@@ -314,7 +352,7 @@ async function main() {
       const e = await giroContinuo(scelti, MINUTI, (fatte, con) => {
         const resa = Math.round((con / Math.max(1, fatte)) * 100);
         process.stdout.write(`\r     ${n(fatte)} aperte · ${n(con)} con prezzo (${resa}%)      `);
-      });
+      }, INSEGNE);
       apertesTotali += e.aperte;
       conPrezzoTotali += e.conPrezzo;
       const resa = Math.round((e.conPrezzo / Math.max(1, e.aperte)) * 100);

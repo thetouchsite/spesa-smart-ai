@@ -21,6 +21,18 @@ rem  richieste insieme ne da' uno su quattro. Abbiamo perso 93.000 prezzi veri
 rem  per averlo scoperto tardi: il lettore sovrascriveva i prezzi buoni con i
 rem  rifiuti, e poi le righe vuote sono state cancellate.
 rem
+rem  Rimisurato il 21 settembre su venticinque paesi insieme, cioe' su decine
+rem  di negozi diversi e non su uno solo, cambiando UNA cosa sola:
+rem
+rem      una richiesta per negozio     40.800 pagine · 87% con prezzo
+rem      due richieste per negozio      4.500 pagine · 52% con prezzo
+rem
+rem  Trentacinque punti di resa. Non e' una particolarita' spagnola, e non
+rem  serve a niente aumentare i lavoratori: il tetto e' quante richieste arriva
+rem  no al SINGOLO negozio, e superarlo non rende meno - rende NEGATIVO, perche
+rem  ' ogni pagina rifiutata e' una richiesta fatta a un negozio vero per
+rem  ricevere un no.
+rem
 rem  QUANTO ASPETTARE FRA UNA PAGINA E L'ALTRA. Un secondo. Centoventi
 rem  millisecondi - il valore di prima - sono otto pagine al secondo, e per i
 rem  siti sudamericani e spagnoli sono troppe: rispondono 403 e smettono.

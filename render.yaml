@@ -34,6 +34,31 @@
 # Su Render: New → Blueprint, si punta a questa repo, lui legge questo file.
 # Le chiavi NON stanno qui — `sync: false` significa "chiedimela nel
 # cruscotto", ed e' l'unico posto dove vanno messe.
+#
+# DA QUALE RAMO DISTRIBUISCE, E PERCHE' QUI NON C'E' SCRITTO
+# ----------------------------------------------------------
+# Non c'e' nessuna riga `branch:`, quindi il ramo lo decide un'impostazione nel
+# cruscotto di Render che da qui non si vede. Verificato il 22 settembre 2026
+# interrogando l'API viva:
+#
+#   /health risponde  flusso: spesa-prima, dbConfigured: true, quota per
+#   provider — roba che su `main` non esiste
+#
+# e `main` e' fermo a «Import prototipo Spesa Smart da Lovable», DUECENTOOTTAN-
+# TAQUATTRO commit indietro. Quindi oggi Render sta prendendo
+# `feat/react-native`, che e' quel che serve.
+#
+# E' pero' una configurazione che vive solo nel loro cruscotto: se qualcuno
+# rinomina il ramo, lo cancella dopo un merge, o ricrea il Blueprint, la
+# produzione torna al prototipo senza che nessuno se ne accorga — l'API
+# risponderebbe, semplicemente sarebbe un'altra API.
+#
+# Per fissarlo basta una riga sotto `- type: web`:
+#
+#   branch: feat/react-native
+#
+# Non l'ho aggiunta perche' cambia cosa viene pubblicato se il ramo attivo
+# fosse un altro, e questa e' una decisione di chi consegna, non mia.
 
 services:
   - type: web

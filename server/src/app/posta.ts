@@ -54,7 +54,28 @@ const MITTENTE = process.env.SMTP_FROM ?? process.env.EMAIL_FROM ?? SMTP_USER ??
 
 export type ComeSpedito = "smtp" | "resend" | "solo-registro";
 
-/** Quale strada useremmo adesso. Serve a dirlo nelle risposte e nel pannello. */
+/**
+ * Quale strada useremmo adesso. Serve a dirlo nelle risposte e nel pannello.
+ *
+ * SMTP VINCE, E CHI MIGRA A RESEND DEVE SAPERLO.
+ * L'ordine qui sotto non e' una preferenza: e' una trappola per chi fa la
+ * migrazione. Aggiungere `RESEND_API_KEY` su Render NON basta — finche'
+ * `SMTP_HOST`, `SMTP_USER` e `SMTP_PASS` restano li', la posta continua a
+ * passare da SMTP e la chiave nuova non viene mai guardata. Al 22 settembre
+ * 2026 `/health` in produzione dice ancora `postaVia: "smtp"`.
+ *
+ * Per passare a Resend servono tre cose, in quest'ordine:
+ *
+ *   1. `RESEND_API_KEY` fra le variabili su Render
+ *   2. il dominio `touchsite.it` verificato nel cruscotto di Resend, con i
+ *      record SPF e DKIM che chiedono loro — senza, le email partono e
+ *      finiscono nello spam, che e' peggio di non mandarle
+ *   3. TOGLIERE `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`
+ *
+ * Il terzo e' quello che si dimentica, e senza il terzo i primi due non fanno
+ * niente. L'ordine conta anche al contrario: togliere prima l'SMTP e
+ * aggiungere dopo la chiave lascia la posta ferma nel mezzo.
+ */
 export function comeSiSpedisce(): ComeSpedito {
   if (SMTP_HOST && SMTP_USER && SMTP_PASS) return "smtp";
   if (RESEND_KEY) return "resend";

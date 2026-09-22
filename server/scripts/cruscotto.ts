@@ -41,7 +41,9 @@ interface RigaPaese {
 
 interface Quadro {
   quando: string;
-  totale: { link: number; freschi: number; prezzi: number; cifre: number };
+  totale: { link: number; freschi: number; prezzi: number; cifre: number; vendibili: number };
+  /** Pagine aperte che il prezzo non ce l'avevano. Manca nei quadri vecchi. */
+  scartate?: number;
   stimati: number;
   orfane: number;
   orfaneLink: number;
@@ -92,18 +94,33 @@ const alBuio = q.paesi.filter((r) => r.prezzi === 0 && r.link > 0).sort((a, b) =
 const linkAlBuio = alBuio.reduce((a, r) => a + r.link, 0);
 
 /* LA RESA VERA, CONTATA SU QUEL CHE ABBIAMO APERTO DAVVERO.
-   Questa pagina prometteva «99,9% con prezzo», un numero scritto a mano mesi
-   fa su un campione fortunato. Misurato su novecentomila schede: 64%. Una
-   promessa del genere in cima al cruscotto fa aspettare tre milioni di
-   prodotti da un catalogo che ne dara' ottocentomila. */
-const resaVera = q.totale.prezzi > 0 ? Math.round((q.totale.cifre / q.totale.prezzi) * 100) : 0;
+   Questa pagina ha gia' mentito due volte su questo numero. La prima con un
+   «99,9% con prezzo» scritto a mano mesi fa su un campione fortunato; la
+   seconda, il 21 settembre, con un 100% che veniva da un conto sbagliato.
+   Una promessa del genere in cima al cruscotto fa aspettare milioni di
+   prodotti da un catalogo che ne dara' molti meno.
+
+   IL DENOMINATORE E' QUANTE PAGINE SI SONO APERTE, NON QUANTE RIGHE CI SONO.
+   Questa riga faceva `cifre / righe`, ed era giusta finche' una pagina aperta
+   senza prezzo lasciava in magazzino una riga vuota. Da quando non la lascia
+   piu' — sessantacinque megabyte risparmiati — quel rapporto vale SEMPRE
+   cento per cento: il 21 settembre il cruscotto annunciava «il 100% aveva un
+   prezzo» e proiettava 4.550.990 prodotti, cioe' esattamente il numero degli
+   indirizzi. Una promessa impossibile, in cima alla pagina, scritta con
+   l'aria di un fatto misurato.
+
+   Le pagine aperte sono quelle che un prezzo l'hanno dato PIU' quelle che si
+   sono aperte e non ce l'avevano, che ora stanno negli scarti. */
+const aperteDavvero = q.totale.cifre + (q.scartate ?? 0);
+const resaVera = aperteDavvero > 0 ? Math.round((q.totale.cifre / aperteDavvero) * 100) : 0;
 const apertiQuota = q.totale.link > 0 ? Math.round((q.totale.prezzi / q.totale.link) * 100) : 0;
 
 /* Dove si arriva a lavoro finito: i prodotti di oggi piu' quelli che ci si
    aspetta dagli indirizzi mai aperti, alla resa misurata. E' una proiezione e
    va detto che lo e' — ma una proiezione onesta vale piu' di un totale di
    indirizzi che nessuno leggera' mai come tale. */
-const tetto = q.totale.cifre + Math.round((q.totale.link - q.totale.prezzi) * (resaVera / 100));
+const maiAperti = Math.max(0, q.totale.link - aperteDavvero);
+const tetto = q.totale.cifre + Math.round(maiAperti * (resaVera / 100));
 
 const quando = new Date(q.quando).toLocaleString("it-IT", {
   day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
@@ -112,16 +129,28 @@ const quando = new Date(q.quando).toLocaleString("it-IT", {
 const barra = (parte: number, tutto: number) =>
   tutto === 0 ? 0 : Math.max(1, Math.round((parte / tutto) * 100));
 
+/* PIU' PREZZI CHE INDIRIZZI E' IMPOSSIBILE, E VA DETTO.
+   Il 21 settembre la Croazia mostrava 11.670 indirizzi e 31.743 prezzi, la
+   Slovenia 2.231 e 17.301. Non e' un errore di conto: sono prezzi veri, letti
+   da pagine vere, di indirizzi che il catalogo NON HA PIU' — quelle insegne
+   sono state riraccolte e la loro sitemap adesso ne dichiara meno.
+
+   L'API non potra' mai servirli, perche' per servirli le servirebbe un
+   indirizzo. Mostrarli in colonna accanto agli indirizzi, senza dire niente,
+   fa sembrare quei paesi coperti piu' del doppio di quanto sono. */
+const disallineati = q.paesi.filter((r) => r.prezziConCifra > r.link && r.link > 0);
+
 const righeTabella = q.paesi
   .map((r) => {
     const conPrezzo = r.prezziConCifra;
     const larg = barra(r.link, q.paesi[0].link);
-    const classe = conPrezzo === 0 ? " zero" : conPrezzo < 100 ? " bassa" : "";
+    const storto = conPrezzo > r.link && r.link > 0;
+    const classe = storto || (conPrezzo > 0 && conPrezzo < 100) ? " bassa" : conPrezzo === 0 ? " zero" : "";
     return `    <div class="riga">
       <span class="sigla">${esc(r.paese)}</span>
       <span class="barra"><i style="width:${larg}%"></i></span>
       <span class="cifra-r">${n(r.link)}</span>
-      <span class="quota${classe}">${conPrezzo === 0 ? "—" : n(conPrezzo)}</span>
+      <span class="quota${classe}">${conPrezzo === 0 ? "—" : n(conPrezzo)}${storto ? " &#9888;" : ""}</span>
     </div>`;
   })
   .join("\n");
@@ -227,7 +256,7 @@ const html = `<title>Cruscotto dati MealMint</title>
   <p class="intro">Questa pagina la genera <code>scripts/cruscotto.ts</code> leggendo i due magazzini su Mongo. La versione precedente sommava il campo <code>stimati</code> di un file scritto a mano, e mostrava ${n(q.stimati)} prodotti dove il database ne serve ${n(q.totale.link)}.</p>
 
   <div class="avviso">
-    <p><b>Un indirizzo non &egrave; un prodotto con prezzo.</b> Gli indirizzi dicono dove guardare; li danno le sitemap dei negozi e costano niente. Il prezzo si ha solo dopo aver aperto quella pagina, e non tutte ce l&#39;hanno: parecchie catene lo disegnano con JavaScript, e nell&#39;HTML non c&#39;&egrave; niente da leggere. <b>Su quel che abbiamo aperto finora, il ${resaVera}% aveva un prezzo.</b></p>
+    <p><b>Un indirizzo non &egrave; un prodotto con prezzo.</b> Gli indirizzi dicono dove guardare; li danno le sitemap dei negozi e costano niente. Il prezzo si ha solo dopo aver aperto quella pagina, e non tutte ce l&#39;hanno: parecchie catene lo disegnano con JavaScript, e nell&#39;HTML non c&#39;&egrave; niente da leggere. <b>Su quel che abbiamo aperto finora &mdash; ${n(aperteDavvero)} pagine &mdash; ${resaVera === 8 || resaVera === 11 || (resaVera >= 80 && resaVera <= 89) ? "l&#39;" : "il "}${resaVera}% aveva un prezzo.</b></p>
     <p>Per questo qui sotto ci sono tre numeri e non uno. Confonderli &egrave; il modo piu&#39; rapido di credersi al triplo di dove si &egrave;.</p>
   </div>
 
@@ -241,9 +270,19 @@ const html = `<title>Cruscotto dati MealMint</title>
   </div>
 
   <p class="nota"><b>Il tetto, per non aspettarsi quel che non pu&ograve; arrivare.</b>
-  Restano ${n(q.totale.link - q.totale.prezzi)} indirizzi mai aperti. Alla resa misurata, a lavoro finito si arriva
+  Restano ${n(maiAperti)} indirizzi mai aperti. Alla resa misurata (${resaVera}%, su ${n(aperteDavvero)} pagine aperte davvero), a lavoro finito si arriva
   intorno ai <b>${n(tetto)} prodotti con prezzo</b> — non ai milioni che il numero degli indirizzi lascerebbe sperare.
   Per salire oltre servono insegne nuove che il prezzo lo pubblichino, non altre letture di queste.</p>
+
+  <p class="nota"><b>Un avvertimento che va letto al contrario di come sembra.</b>
+  Per mezza giornata questa pagina ha detto che Carrefour Emirati, Disco, Jumbo, Vea e Carulla erano fuori uso perch&eacute; ci bloccavano:
+  un milione e seicentomila indirizzi dati per irraggiungibili. <b>Non era vero.</b>
+  Il lettore apriva sempre le prime schede in ordine di catalogo, e l&#39;inizio di quelle sitemap &egrave; roba morta &mdash; prodotti tolti, categorie sparite.
+  Zero per cento su mille pagine, visto da fuori, &egrave; identico a un blocco.
+  Aprendo le stesse insegne con le schede prese sparse: Disco 6 su 8, Vea 6 su 8, Carrefour Emirati 8 su 8, Carulla 4 su 8.
+  Quegli indirizzi sono tornati tutti in gioco. Resta vero che un sito letto troppo in fretta smette di rispondere &mdash; misurato: due richieste
+  allo stesso negozio invece di una fanno scendere la resa dall&#39;87% al 52% &mdash; ma la prossima volta che un&#39;insegna d&agrave; zero,
+  la prima cosa da guardare &egrave; <b>quali</b> pagine stiamo aprendo, non quanto in fretta.</p>
 
   <p class="nota"><b>Come leggere le cinque cifre qui sopra.</b>
   <b>Link servibili</b>: indirizzi di prodotto salvati, di insegne ancora in elenco — quel che l&#39;API pu&ograve; dare subito.
@@ -260,6 +299,10 @@ const html = `<title>Cruscotto dati MealMint</title>
     <div class="riga intestazione"><span>Paese</span><span>quanto pesa</span><span>link salvati</span><span>con prezzo</span></div>
 ${righeTabella}
   </div>
+
+  ${disallineati.length === 0 ? "" : `<p class="nota"><b>&#9888; ${disallineati.length} paesi hanno piu&#39; prezzi che indirizzi</b> (${disallineati.map((r) => `${esc(r.paese)}: ${n(r.prezziConCifra)} su ${n(r.link)}`).join(", ")}).
+  Non &egrave; un errore di conto: sono prezzi veri, letti da pagine vere, di indirizzi che il catalogo <b>non ha pi&ugrave;</b> &mdash; quelle insegne sono state riraccolte e la loro sitemap adesso ne dichiara meno.
+  L&#39;API non potr&agrave; mai servirli, perch&eacute; per servirli le servirebbe un indirizzo: occupano spazio e vanno tolti.</p>`}
 
   <h2>I paesi al buio</h2>
   <p class="nota">Catalogo salvato e fresco, zero prezzi: ${n(linkAlBuio)} indirizzi che l&#39;API conosce e non sa quotare. <b>Ma sono due problemi diversi.</b> Dove c&#39;&egrave; scritto &laquo;non ancora prezzato&raquo; basta far girare il lavoro notturno. Dove nessuna insegna pubblica il prezzo il notturno non pu&ograve; farci niente: servono insegne nuove o un lettore per la loro API. Sono ${tuttoMuto.size} paesi, ${n(alBuio.filter((r) => tuttoMuto.has(r.paese)).reduce((a, r) => a + r.link, 0))} indirizzi.</p>

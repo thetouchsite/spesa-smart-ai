@@ -29,6 +29,28 @@
  * L'identificativo di una riga di prezzo E' l'impronta dell'indirizzo: sono la
  * stessa cosa, quindi lo spostamento non ha bisogno di ricalcolare niente.
  *
+ * QUANDO INVECE VANNO BUTTATE, E NON SPOSTATE
+ * -------------------------------------------
+ * Spostare conserva il giudizio «qui il prezzo non c'era». Vale finche' quel
+ * giudizio e' buono — e smette di valerlo quando il lettore impara a leggere
+ * pagine che prima non sapeva leggere.
+ *
+ * Il 21 settembre `ripensa-scarti.ts` ha provato dieci insegne riaprendo
+ * davvero le loro schede scartate: Continente ne leggeva 12 su 12, Checkers 4
+ * su 12. Tolti i loro scarti, restavano pero' le righe vuote a fare lo stesso
+ * lavoro da un altro posto — il lucchetto aperto e la porta chiusa:
+ *
+ *     ZA Checkers Sixty60   81.313 righe vuote
+ *     PT Continente Online  43.539
+ *
+ * cioe' il 98% di tutte le righe vuote del magazzino. Per quelle dieci sono
+ * state cancellate, non spostate. Per tutte le altre lo spostamento resta la
+ * risposta giusta: il giudizio e' ancora buono, e riaprire trecentomila pagine
+ * per riscoprire quel che gia' si sa e' disturbare dei negozi per niente.
+ *
+ * La regola, detta in una riga: si butta il ricordo solo dopo aver MISURATO
+ * che e' sbagliato, insegna per insegna. Mai in blocco.
+ *
  *   npx tsx --env-file-if-exists=.env scripts/sposta-vuote-negli-scarti.ts
  *   npx tsx --env-file-if-exists=.env scripts/sposta-vuote-negli-scarti.ts --scrivi
  */
