@@ -45,6 +45,7 @@
  */
 
 import { gunzipSync } from "node:zlib";
+import { INTESTAZIONE_BROWSER } from "../base/intestazione.js";
 import { assicuraFonti, fontiDi, paesiConCatalogo, partiSuccessive, type FonteCatalogo } from "./catalogo-fonti.js";
 import { conSinonimi } from "./sinonimi.js";
 import { catalogoSalvato, salvaCatalogo } from "./catalogo-magazzino.js";
@@ -208,20 +209,9 @@ const inCorso = new Map<string, Promise<CatalogoPaese | null>>();
  * leggiamo e lo rispettiamo, e queste sono le stesse richieste che farebbe
  * una persona. E' per non misurare il nostro difetto al posto del loro sito.
  */
-const INTESTAZIONE = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-  "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
-  "Accept-Encoding": "gzip, deflate, br",
-  "Sec-Fetch-Dest": "document",
-  "Sec-Fetch-Mode": "navigate",
-  "Sec-Fetch-Site": "none",
-  "Sec-Fetch-User": "?1",
-  "Upgrade-Insecure-Requests": "1",
-  "Cache-Control": "no-cache",
-} as const;
+/* Sta in `base/intestazione`: la mandano anche il lettore dei prezzi e la
+   sonda, e per mesi ognuno aveva la sua idea di come presentarsi. */
+const INTESTAZIONE = INTESTAZIONE_BROWSER;
 
 /* ─────────────────────────── Scaricare ─────────────────────────── */
 

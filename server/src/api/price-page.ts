@@ -98,6 +98,7 @@ export interface VerifiedPrice {
 }
 
 import { haLettoreApi, prezzoDaApi } from "./prezzi-api.js";
+import { INTESTAZIONE_BROWSER } from "../base/intestazione.js";
 import { quantitaDa } from "./quantita.js";
 
 const UA =
@@ -202,6 +203,10 @@ const SEGNI_DI_PREZZO = [
   "priceCurrency",
   "itemprop=\"price\"",
   "data-price",
+  /* LastMile tiene il prezzo in un oggetto che non si chiama «price»:
+     `"prc":{"p":1.99}`. Senza questo segno la finestra di lettura non ci
+     arriva nemmeno, perche' le loro pagine pesano tre megabyte e mezzo. */
+  '"prc":{"p"',
 ];
 
 /** Legge prezzo, listino e scadenza dell'offerta dai dati strutturati. */
@@ -295,8 +300,137 @@ export function nomeDallaPagina(html: string): string | undefined {
  * mezzo megabyte di HTML per ogni scheda quando non serve sarebbe lavoro
  * buttato su decine di migliaia di pagine.
  */
+/**
+ * I blocchi che parlano di soldi ma non del prodotto.
+ *
+ * IL CASO CHE L'HA RESA NECESSARIA
+ * --------------------------------
+ * Checkers, in Sudafrica. Su ogni scheda senza prezzo il magazzino aveva
+ * registrato 37 — lo stesso numero su prodotti diversi. Non era un prezzo:
+ *
+ *     "shippingRate":{"@type":"MonetaryAmount","value":37,"currency":"ZAR"}
+ *
+ * E' il costo di consegna. Le ultime due regole di `leggiDa` cercano
+ * `"value": numero, "currency"` come ultima spiaggia, ed e' esattamente la
+ * forma che ha la tariffa del corriere. 6.831 righe su 13.053, cioe' meta'
+ * dell'insegna, portavano il prezzo del fattorino attaccato alla spesa.
+ *
+ * Un prezzo mancante e' un buco e si vede. Un prezzo SBAGLIATO e' un numero
+ * che l'utente legge, confronta e su cui decide dove fare la spesa: e' il
+ * danno peggiore che questo file possa fare, ed e' gia' successo una volta
+ * con le mele di Lidl UK a 63 sterline (la guardia contro le tabelle di
+ * indici, piu' sotto, nasce da li').
+ *
+ * Si tolgono PRIMA di cercare invece di scartarli dopo: dopo vorrebbe dire
+ * riconoscere un prezzo sbagliato, e se sapessimo farlo non avremmo il
+ * problema.
+ */
+const NON_E_IL_PRODOTTO =
+  /"(?:shippingRate|shippingDetails|deliveryFee|deliveryCost|shippingCost|handlingFee|freight|serviceFee|minimumOrder)"\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/gi;
+
+/**
+ * Il prezzo dall'offerta del PRODOTTO, leggendo il JSON-LD come JSON.
+ *
+ * PERCHE' NON BASTANO LE ESPRESSIONI SUL TESTO
+ * --------------------------------------------
+ * Perche' cercano `"price"` ovunque capiti, e in una pagina di negozio quella
+ * parola capita in parecchi posti che prezzi di prodotti non sono. Matas, in
+ * Danimarca, aveva SETTEMILATRECENTOCINQUANTACINQUE prodotti tutti a 31 — il
+ * cento per cento del suo catalogo. Trentuno corone e' la quota mensile del
+ * loro programma fedelta':
+ *
+ *     {"@type":"PriceSpecification","price":31,"priceCurrency":"DKK",
+ *      "description":"MånedsmedlemskabClubMatas"}
+ *
+ * Un abbonamento, attaccato a un rossetto di Dior.
+ *
+ * Togliere anche questo con un'altra esclusione sarebbe la terza toppa dopo
+ * la tariffa di consegna e la tabella di indici di Lidl: tre sintomi della
+ * stessa causa, cioe' che stiamo cercando una parola invece di leggere una
+ * struttura. Il JSON-LD e' JSON, e dice DOVE sta il prezzo del prodotto —
+ * dentro `offers` di un oggetto `Product`. Chiederlo li' e' esatto: o c'e', e
+ * allora e' quello giusto, o non c'e', e allora si passa alle espressioni.
+ *
+ * Le espressioni restano, per i siti che il JSON-LD non ce l'hanno o ce
+ * l'hanno rotto. Ma non sono piu' la prima risposta.
+ */
+function dallOffertaDelProdotto(html: string): number | null {
+  for (const m of html.matchAll(
+    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  )) {
+    let dati: unknown;
+    try {
+      dati = JSON.parse(m[1].trim());
+    } catch {
+      /* Un blocco tagliato a meta' dalla porzione, o malformato: ce ne sono
+         altri, e in fondo restano le espressioni. */
+      continue;
+    }
+
+    /* Un documento JSON-LD puo' essere un oggetto, un elenco, o un `@graph`
+       con dentro tutte le entita' della pagina. Si guardano tutti. */
+    const candidati: unknown[] = Array.isArray(dati)
+      ? dati
+      : [dati, ...((dati as { "@graph"?: unknown[] })?.["@graph"] ?? [])];
+
+    for (const c of candidati) {
+      const o = c as { "@type"?: string | string[]; offers?: unknown; hasVariant?: unknown };
+      const tipo = Array.isArray(o?.["@type"]) ? o["@type"].join(" ") : String(o?.["@type"] ?? "");
+      if (!/Product/i.test(tipo)) continue;
+
+      /* IL PREZZO PUO' STARE UN PIANO PIU' GIU'.
+         Un `ProductGroup` e' un prodotto che esiste in varianti — le tonalita'
+         di un rossetto, le taglie di una maglietta — e spesso il gruppo un
+         prezzo non ce l'ha: ce l'ha ogni variante, in `hasVariant`. Matas e'
+         fatto cosi', e guardando solo il piano di sopra si concludeva «questo
+         prodotto non ha offerte» per poi ripiegare sulle espressioni e
+         pescare la quota del programma fedelta'. */
+      const varianti = Array.isArray(o.hasVariant) ? o.hasVariant : [];
+      const daGuardare = [
+        o.offers,
+        ...varianti.map((v) => (v as { offers?: unknown })?.offers),
+      ].filter(Boolean);
+      if (daGuardare.length === 0) continue;
+
+      /* `offers` puo' essere un'offerta sola, un elenco di offerte (taglie,
+         formati) o un `AggregateOffer` con il minimo. Si prende la piu' bassa
+         fra quelle valide: e' il prezzo a cui quel prodotto si compra. */
+      const offerte = daGuardare.flatMap((x) => (Array.isArray(x) ? x : [x]));
+      const prezzi: number[] = [];
+      for (const off of offerte) {
+        const x = off as { price?: unknown; lowPrice?: unknown; priceSpecification?: unknown };
+        for (const v of [x?.price, x?.lowPrice, (x?.priceSpecification as { price?: unknown })?.price]) {
+          const n = typeof v === "string" ? Number.parseFloat(v.replace(",", ".")) : Number(v);
+          /* Lo zero non e' un prezzo: e' «non disponibile» scritto male, ed e'
+             proprio il caso in cui prima si ripiegava sulla tariffa del
+             corriere. */
+          if (Number.isFinite(n) && n > 0.01 && n < 100_000) prezzi.push(n);
+        }
+      }
+      if (prezzi.length > 0) return Math.min(...prezzi);
+    }
+  }
+  return null;
+}
+
 export function readPrices(html: string): PagePrice | null {
-  return leggiDa(html) ?? (html.includes("&quot;") ? leggiDa(sciogliEntita(html)) : null);
+  /* LA STRUTTURA SI LEGGE INTATTA, LE PAROLE SI CERCANO NEL RIPULITO.
+     Togliere i blocchi di spedizione serve alle espressioni, che guardano il
+     testo. Ma quei blocchi stanno DENTRO il JSON dell'offerta, e toglierli
+     lascia un JSON monco che non si apre piu': Matas ha il prezzo giusto in
+     `offers.priceSpecification.price`, e leggendo la versione ripulita si
+     tornava a pescare i trentuno corone dell'abbonamento. Un rimedio che
+     rompeva la cura. */
+  const dallOfferta = dallOffertaDelProdotto(html);
+  const pulito = html.replace(NON_E_IL_PRODOTTO, "");
+  if (dallOfferta !== null) {
+    const resto = leggiDa(pulito);
+    /* Del resto si tiene quel che l'offerta non dice — listino, sconto,
+       valuta — ma il prezzo corrente e' quello dell'offerta. */
+    return { ...(resto ?? {}), current: dallOfferta } as PagePrice;
+  }
+
+  return leggiDa(pulito) ?? (pulito.includes("&quot;") ? leggiDa(sciogliEntita(pulito)) : null);
 }
 
 function leggiDa(html: string): PagePrice | null {
@@ -333,7 +467,14 @@ function leggiDa(html: string): PagePrice | null {
     /"lowPrice"\s*:\s*"?([\d.,]+)"?/i,
     /"salePrice"\s*:\s*"?([\d.,]+)"?/i,
     // Microdati, nell'attributo o nel testo.
-    /itemprop=["']price["'][^>]*content=["']([\d.,]+)["']/i,
+    /* IL SIMBOLO DELLA VALUTA VIENE PRIMA DEL NUMERO, E CI COSTAVA UN'INSEGNA.
+       SuperValu scrive `itemprop="price" content="€3.00"`. Lo schema
+       pretendeva che il contenuto cominciasse con una cifra e non combaciava
+       mai: undicimilaottocento indirizzi irlandesi dichiarati «senza prezzo»
+       per un carattere. Si lasciano passare fino a tre caratteri davanti —
+       il simbolo e un eventuale spazio — e non di piu', perche' oltre non e'
+       piu' una valuta ma un altro campo. */
+    /itemprop=["']price["'][^>]*content=["'][^\d]{0,3}([\d.,]+)["']/i,
     /itemprop=["']price["'][^>]*>\s*[^\d<]{0,6}([\d.,]+)/i,
     // I meta di Open Graph e di Facebook Commerce.
     /<meta[^>]+(?:property|name)=["'](?:product:price:amount|og:price:amount|twitter:data1)["'][^>]+content=["']\s*([\d.,]+)/i,
@@ -450,7 +591,12 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
       // risponde entro otto non risponderà, e intanto tiene fermo un posto
       // nella coda dei controlli.
       signal: AbortSignal.timeout(8_000),
-      headers: { "User-Agent": UA, Accept: "text/html" },
+      /* TUTTA l'intestazione di un browser, non il solo nome.
+         Con due header soli, le schede di Alcampo e Continente rispondevano
+         403 al lettore mentre si aprivano cinque volte su cinque alla sonda,
+         che li manda tutti. Centosessantamila indirizzi contati come «pagine
+         che non si aprono» per come bussavamo noi. Vedi `base/intestazione`. */
+      headers: INTESTAZIONE_BROWSER,
     });
     if (!res.ok) {
       // 403 e 429 sono difese anti-bot, non pagine mancanti: l'indirizzo è

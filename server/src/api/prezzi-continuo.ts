@@ -43,6 +43,7 @@
 
 import { cataloghi } from "../base/db.js";
 import { prendiTurni, rendiTurni, rinnovaTurni } from "./turni.js";
+import { scartiDi, segnaScarti } from "./scarti.js";
 import { prezzi as collezionePrezzi } from "../base/db.js";
 import { verifyProductPage } from "./price-page.js";
 import { GiroInCorso, battitoDiAttesa } from "./giri.js";
@@ -55,6 +56,7 @@ import {
 } from "./prezzi-magazzino.js";
 import { tutteLeFonti } from "./catalogo-fonti.js";
 import { gunzip } from "node:zlib";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { promisify } from "node:util";
 
 /* Decomprimere in modo SINCRONO congela tutto il processo finche' non ha
@@ -73,8 +75,28 @@ const decomprimi = promisify(gunzip);
  * diversi — e ognuno ne riceve una alla volta, cioe' meno di prima.
  */
 const INSIEME = Number(process.env.GIRO_INSIEME ?? 16);
-/** Una pausa fra una pagina e l'altra: siamo ospiti, anche alle tre di notte. */
-const PAUSA_MS = 120;
+/**
+ * Quante richieste insieme allo STESSO negozio, al massimo.
+ *
+ * E' il numero che decide se siamo ospiti o un assedio, e non dipende da
+ * quanto e' potente la nostra macchina: dipende da quanto regge la loro.
+ */
+const PER_CATENA = Number(process.env.GIRO_PER_CATENA_INSIEME ?? 4);
+/**
+ * Una pausa fra una pagina e l'altra: siamo ospiti, anche alle tre di notte.
+ *
+ * CENTOVENTI MILLISECONDI NON SONO POCHI PER TUTTI.
+ * Sono otto pagine al secondo per insegna, e per quasi tutte va benissimo. Le
+ * spagnole no: Alcampo e Bonpreu aperte a freddo con cinque secondi di pausa
+ * danno quattro prezzi su quattro, e col lettore addosso ne danno uno su
+ * quattro. Non e' il numero di richieste insieme - era gia' sceso a una per
+ * negozio - e' la frequenza.
+ *
+ * Si regola dal comando, cosi' un paese permaloso puo' avere il suo passo
+ * senza rallentare tutti gli altri. Centootto mila indirizzi spagnoli al
+ * cento per cento valgono un lettore che ci mette il doppio.
+ */
+const PAUSA_MS = Number(process.env.GIRO_PAUSA_MS ?? 120);
 /** Ogni quante righe si salva. Se il giro si ferma a meta', quel che e' fatto resta. */
 const BLOCCO = 200;
 
@@ -129,6 +151,31 @@ async function aBrani<T>(cose: T[], quante: number, lavoro: (c: T) => Promise<vo
  */
 const cataloghiLetti = new Map<string, Array<{ url: string; nome: string }>>();
 
+/** Le impronte gia' viste per insegna, anche se scadute: vedi il commento sui due elenchi. */
+const maiViste = new Map<string, Set<string>>();
+
+/**
+ * Le insegne che ci hanno appena sbattuto la porta, e fino a quando.
+ *
+ * UN RIFIUTO NON VALE TRENTA GIORNI, MA NON VALE NEMMENO ZERO.
+ * Una scheda aperta senza prezzo finisce fra gli scarti e non si riapre per un
+ * mese: e' un fatto sul negozio. Un 403 no — dice solo che in quel momento non
+ * ci hanno voluti, e trattarlo come «senza prezzo» aveva sepolto
+ * centosettantamila pagine spagnole.
+ *
+ * Corretto quello, e' comparso il difetto opposto: non finendo piu' da nessuna
+ * parte, le pagine rifiutate tornavano in coda a OGNI giro. Un lettore ha
+ * aperto ventisettemilaseicento pagine di fila con zero prezzi, e le avrebbe
+ * riaperte all'infinito — inutile per noi e sgradevole per loro.
+ *
+ * Due ore e' la via di mezzo: abbastanza perche' un blocco temporaneo passi,
+ * poco perche' un'insegna sana non resti ferma una giornata. Dura quanto il
+ * processo, quindi un lettore riavviato riprova subito: e' un freno, non una
+ * condanna.
+ */
+const ritirateFinoA = new Map<string, number>();
+const RITIRO_MS = 2 * 60 * 60 * 1000;
+
 /**
  * Quante voci di catalogo si tengono in memoria, in tutto.
  *
@@ -175,30 +222,104 @@ async function indirizziDi(paese: string, insegna: string): Promise<Array<{ url:
   return letti;
 }
 
+/**
+ * Dove si tengono i cataloghi gia' scaricati.
+ *
+ * SCARICARLI COSTA QUARANTACINQUE SECONDI L'UNO, SCOMPATTARLI CINQUANTANOVE
+ * MILLISECONDI.
+ *
+ * Misurato il 20 settembre su Atlas gratuito:
+ *
+ *     AR|Disco           4.302 KB   scaricato in 45.405 ms   scompattato in 59 ms
+ *     CO|Carulla         5.543 KB   scaricato in 57.060 ms   scompattato in 92 ms
+ *     UA|Auchan Ukraine  3.050 KB   scaricato in 31.498 ms   scompattato in 49 ms
+ *
+ * Cento kilobyte al secondo: e' la banda del piano, non il nostro codice. Con
+ * dodici insegne per giro sono dieci minuti di attesa PRIMA di aprire una
+ * pagina, e il tetto di memoria butta via i cataloghi appena letti, quindi al
+ * giro dopo si riscaricano tutti. I lettori sembravano morti — zero CPU, zero
+ * pagine — e stavano solo aspettando il download.
+ *
+ * Un catalogo pero' cambia una volta al mese. Tenerlo sul disco dopo il primo
+ * scaricamento trasforma quei quarantacinque secondi in cinque millisecondi,
+ * e non costa niente: sono gli stessi byte che Mongo ci manderebbe.
+ *
+ * La data di aggiornamento fa da chiave: se il catalogo sul database e' piu'
+ * recente di quello sul disco, si riscarica. Cosi' il rinfresco settimanale
+ * arriva lo stesso, senza che nessuno debba svuotare niente a mano.
+ */
+const CACHE = "diario/cataloghi";
+
+function sulDisco(paese: string, insegna: string): string {
+  return `${CACHE}/${paese}-${insegna.replace(/[^\p{L}\p{N}]+/gu, "_")}`;
+}
+
 async function leggiCatalogo(paese: string, insegna: string): Promise<Array<{ url: string; nome: string }>> {
-  const doc = await (await cataloghi()).findOne({ _id: `${paese}|${insegna}` });
-  if (!doc?.dati) return [];
-  try {
-    const testo = (await decomprimi(Buffer.from(doc.dati.buffer))).toString("utf8");
-    const fuori: Array<{ url: string; nome: string }> = [];
-    /* Si scorre il testo a mano invece di `split("\n")`: quello costruisce un
-       array di duecentomila stringhe che esiste solo per essere buttato riga
-       dopo riga, e per un attimo la sua memoria si somma a quella del testo E a
-       quella degli oggetti. Su mezzo giga quell'attimo e' l'uccisione. */
-    let da = 0;
-    while (da < testo.length) {
-      let fine = testo.indexOf("\n", da);
-      if (fine === -1) fine = testo.length;
-      const t = testo.indexOf("\t", da);
-      if (t > da && t < fine) {
-        fuori.push({ url: testo.slice(da, t), nome: testo.slice(t + 1, fine) });
+  /* UN CATALOGO PUO' ESSERE SPEZZATO IN PIU' PEZZI.
+     Mongo ammette sedici megabyte per documento e Carrefour Emirati ne occupa
+     di piu': i cataloghi grossi si salvano come `PAESE|Insegna` piu' `#2`,
+     `#3`... Il primo dice quanti sono; chi legge li rimette insieme. I
+     cataloghi vecchi non hanno quel campo e valgono per uno, quindi
+     continuano a funzionare senza sapere niente di tutto questo. */
+  const col = await cataloghi();
+  const capo = (await col.findOne(
+    { _id: `${paese}|${insegna}` },
+    { projection: { aggiornato: 1, pezzi: 1 } },
+  )) as { aggiornato?: Date; pezzi?: number } | null;
+  if (!capo) return [];
+
+  const quanti = Math.max(1, Number(capo.pezzi) || 1);
+  const quando = capo.aggiornato ? new Date(capo.aggiornato).getTime() : 0;
+  const fuori: Array<{ url: string; nome: string }> = [];
+
+  for (let i = 0; i < quanti; i++) {
+    const id = i === 0 ? `${paese}|${insegna}` : `${paese}|${insegna}#${i + 1}`;
+    const base = `${sulDisco(paese, insegna)}${i === 0 ? "" : "-" + (i + 1)}`;
+
+    let dati: Buffer | null = null;
+    try {
+      if (existsSync(base + ".gz") && Number(readFileSync(base + ".quando", "utf8")) === quando) {
+        dati = readFileSync(base + ".gz");
       }
-      da = fine + 1;
+    } catch {
+      /* Cache illeggibile: si riscarica, che e' il ripiego giusto. */
     }
-    return fuori;
-  } catch {
-    return [];
+
+    if (!dati) {
+      const doc = (await col.findOne({ _id: id })) as { dati?: { buffer: Buffer } } | null;
+      if (!doc?.dati) continue;
+      dati = Buffer.from(doc.dati.buffer);
+      try {
+        mkdirSync(CACHE, { recursive: true });
+        writeFileSync(base + ".gz", dati);
+        writeFileSync(base + ".quando", String(quando));
+      } catch {
+        /* Senza disco si va avanti lo stesso: piu' lenti, non rotti. */
+      }
+    }
+
+    try {
+      const testo = (await decomprimi(dati)).toString("utf8");
+      /* Si scorre il testo a mano invece di split: quello costruisce un array
+         di duecentomila stringhe che esiste solo per essere buttato riga dopo
+         riga, e per un attimo la sua memoria si somma a quella del testo E a
+         quella degli oggetti. */
+      let da = 0;
+      while (da < testo.length) {
+        let capolinea = testo.indexOf(String.fromCharCode(10), da);
+        if (capolinea === -1) capolinea = testo.length;
+        const t = testo.indexOf(String.fromCharCode(9), da);
+        if (t > da && t < capolinea) {
+          fuori.push({ url: testo.slice(da, t), nome: testo.slice(t + 1, capolinea) });
+        }
+        da = capolinea + 1;
+      }
+    } catch {
+      /* Un pezzo rovinato non deve far perdere gli altri. */
+    }
   }
+
+  return fuori;
 }
 
 export interface EsitoGiro {
@@ -252,6 +373,11 @@ export async function giroContinuo(
   const scadenza = Date.now() + minuti * 60_000;
   const inizio = Date.now();
   let ultimoRinnovo = Date.now();
+  /* Le schede senza prezzo di questo giro, per insegna. Si salvano alla fine
+     e non una per una: l'elenco si riscrive intero ogni volta, e farlo a ogni
+     pagina vorrebbe dire riscrivere due megabyte per ogni scheda vuota. */
+  const senzaPrezzo = new Map<string, string[]>();
+  const paeseDi = new Map<string, string>();
   let aperte = 0;
   let conPrezzo = 0;
   let saltate = 0;
@@ -326,25 +452,107 @@ export async function giroContinuo(
     const tutti = await indirizziDi(f.paese, f.insegna);
     if (tutti.length === 0) continue;
 
+    /* DUE ELENCHI, NON UNO, E LA DIFFERENZA E' QUELLA FRA CRESCERE E GIRARE
+       A VUOTO.
+
+         FRESCHE  lette da meno di settantadue ore: si saltano, il prezzo ce
+                  l'abbiamo ed e' buono.
+         VISTE    lette una volta qualsiasi, anche mesi fa.
+
+       Chi e' visto ma non fresco ha un prezzo scaduto: riaprirlo lo rinfresca,
+       e serve — ma non aggiunge un prodotto, perche' la riga c'e' gia'. Chi non
+       e' mai stato visto invece e' un prodotto in piu'.
+
+       Trattarli allo stesso modo si e' visto nei numeri: tre lettori al cento
+       per cento di resa, duecentomila pagine aperte, e il conto dei prodotti
+       fermo allo stesso numero per due ore. Stavano rinfrescando, non
+       scoprendo.
+
+       Quindi prima le mai viste, poi le scadute. Il rinfresco non si perde: si
+       fa dopo, quando non c'e' piu' niente di nuovo da prendere. */
     let sue = gia.get(f.insegna);
-    if (!sue) {
+    let viste = maiViste.get(f.insegna);
+    if (!sue || !viste) {
       const soglia = new Date(Date.now() - FRESCHEZZA_MS);
-      sue = new Set(
-        (
-          await (await collezionePrezzi())
-            .find({ c: numeroInsegna(f.insegna), t: { $gte: soglia } }, { projection: { _id: 1 } })
-            .toArray()
-        ).map((r) => r._id),
-      );
+      const numero = numeroInsegna(f.insegna);
+
+      /* PRIMA SI CHIEDE QUANTE SONO, CHE COSTA NIENTE.
+         Per mettere le pagine mai viste in testa alla coda servono gli
+         identificativi di quelle gia' lette. Chiederli tutti e' un
+         trasferimento vero: su Atlas gratuito la banda e' cento kilobyte al
+         secondo, e un'insegna con sessantamila righe sono venti secondi.
+
+         Ma un'insegna appena aggiunta di righe non ne ha NESSUNA — e sono
+         proprio quelle con i cataloghi piu' grossi, Argentina, Colombia,
+         Ucraina. Per loro l'elenco che torna e' vuoto, e lo si e' aspettato
+         per niente. Un conteggio costa una domanda e non trasferisce dati:
+         se e' zero, si sa gia' che nessuna scheda e' stata vista. */
+      const quante = await (await collezionePrezzi()).countDocuments({ c: numero } as never);
+      const righe =
+        quante === 0
+          ? []
+          : ((await (await collezionePrezzi())
+              .find({ c: numero }, { projection: { _id: 1, t: 1 } })
+              .toArray()) as Array<{ _id: string; t?: Date }>);
+      sue = new Set(righe.filter((r) => r.t && new Date(r.t) >= soglia).map((r) => r._id));
+      viste = new Set(righe.map((r) => r._id));
       gia.set(f.insegna, sue);
+      maiViste.set(f.insegna, viste);
     }
 
-    const daFare = tutti.filter((x) => !sue.has(improntaUrl(x.url)));
+    /* SI SALTANO ANCHE LE SCHEDE CHE IL PREZZO NON CE L'HANNO.
+       Il magazzino ricorda solo i successi: una scheda aperta che non espone
+       il prezzo non lascia nessuna riga, quindi non risulta mai fresca e
+       viene riaperta a ogni giro, per sempre. Misurato su una giornata: dieci
+       milioni e mezzo di pagine aperte, quattro e otto con un prezzo — cinque
+       milioni e mezzo di aperture a vuoto, ripetute all'infinito.
+
+       Gli scarti scadono dopo trenta giorni, quindi un negozio che cambia
+       sito viene comunque riprovato. Vedi `scarti.ts`. */
+    const scartate = await scartiDi(f.insegna, f.paese);
+    const candidate = tutti.filter(
+      (x) => !sue.has(improntaUrl(x.url)) && !scartate.has(improntaUrl(x.url)),
+    );
+    /* Le mai viste davanti: sono l'unica parte della coda che fa crescere il
+       numero dei prodotti. */
+    const daFare = [
+      ...candidate.filter((x) => !viste.has(improntaUrl(x.url))),
+      ...candidate.filter((x) => viste.has(improntaUrl(x.url))),
+    ];
     saltate += tutti.length - daFare.length;
     if (daFare.length === 0) continue;
     /* Solo la sua quota: senza questo tetto la coda terrebbe in memoria un
        milione e ottocentomila voci. Il resto alla prossima passata — quel che
        manca si ritrova, perche' il confronto e' sempre col magazzino. */
+    /* UN BATTITO ANCHE MENTRE SI MONTA LA CODA.
+       Chiedere al magazzino quali schede sono gia' fresche costa una domanda
+       per insegna, e su un paese grosso sono ventiquattro domande che tornano
+       centomila identificativi: minuti, non secondi. In quei minuti non si
+       apre nessuna pagina, quindi con il battito legato alle pagine il lettore
+       spariva dai vivi e diventava ambra — «zitto da 48s» — proprio mentre
+       stava lavorando. Chi guardava il pannello lo dava per morto e lo
+       riavviava, buttando via il lavoro fatto.
+
+       `segna` scrive al massimo ogni cinque secondi, quindi chiamarla a ogni
+       insegna non costa niente. I numeri restano a zero, ed e' giusto: zero
+       pagine aperte e' la verita'. La riga pero' resta verde. */
+    giro.segna(aperte, conPrezzo, saltate);
+    /* E SI RINNOVA ANCHE IL BIGLIETTO, PER LO STESSO MOTIVO.
+       L'affitto dura tre minuti e si rinnova lavorando; ma montare la coda di
+       un paese grosso ne dura di piu', e in quei minuti non si apre nessuna
+       pagina — quindi il rinnovo non arrivava mai. Il biglietto scadeva, il
+       paese tornava libero, e un'altra macchina poteva prenderselo mentre
+       questa ci stava gia' lavorando: il doppio lavoro che i biglietti
+       esistono per evitare, causato dal meccanismo stesso.
+
+       Visto sul lettore dedicato all'Italia: sparito dai vivi dopo due
+       minuti, Italia di nuovo fra i paesi liberi, e il processo che
+       continuava a montare la sua coda. */
+    if (Date.now() - ultimoRinnovo > 60_000) {
+      ultimoRinnovo = Date.now();
+      void rinnovaTurni(paesi, VALIDITA_MIN);
+    }
+    paeseDi.set(f.insegna, f.paese);
     mazzi.push(
       daFare.slice(0, MAX_PER_INSEGNA_A_GIRO).map((x) => ({ ...x, insegna: f.insegna })),
     );
@@ -371,21 +579,89 @@ export async function giroContinuo(
     if (giro.devoFermarmi) break;
 
     let prossima = 0;
+
+    /* QUANDO UN NEGOZIO CI DICE DI NO, SI SMETTE DI CHIEDERE.
+       Misurato stanotte: Naturitas ha risposto 403 a CINQUANTATREMILA
+       richieste di fila e ne abbiamo ricavato zero prezzi. Alcampo, che la
+       mattina dava cinque prezzi su sei, dopo settantaseimila pagine rendeva
+       l'uno per cento — non era cambiato il loro sito, l'avevamo rate-limitato
+       noi col nostro stesso volume.
+
+       Non e' solo lavoro buttato. E' insistere con qualcuno che ha gia' detto
+       di no, decine di migliaia di volte, e l'API la rivende un cliente: la
+       lamentela arriva a lui. Un blocco isolato puo' essere un caso; venti di
+       fila sulla stessa insegna sono una risposta, e la risposta e' no.
+
+       Ci si ferma per questo giro, non per sempre: al prossimo si riprova, e
+       se nel frattempo si sono calmati si riparte. */
+    const BASTA_COSI = 20;
+    const bloccatiDiFila = new Map<string, number>();
+
     const lavoratore = async () => {
       while (prossima < coda.length && Date.now() < scadenza && !giro.devoFermarmi) {
         const c = coda[prossima++];
+        if ((ritirateFinoA.get(c.insegna) ?? 0) > Date.now()) continue;
+
         const v = await verifyProductPage(c.url);
         aperte++;
-        raccolte.push({
-          url: c.url,
-          prezzo: v.page?.current ?? null,
-          valuta: v.page?.currency ?? "",
-          nome: c.nome.charAt(0).toUpperCase() + c.nome.slice(1),
-          insegna: c.insegna,
-          verifica: v.status,
-          visto: new Date(),
-        });
+
+        if (v.status === "bloccato") {
+          const quanti = (bloccatiDiFila.get(c.insegna) ?? 0) + 1;
+          bloccatiDiFila.set(c.insegna, quanti);
+          if (quanti >= BASTA_COSI) {
+            ritirateFinoA.set(c.insegna, Date.now() + RITIRO_MS);
+            console.info(
+              `
+[giro] ${c.insegna}: ${quanti} rifiuti di fila, la lascio in pace due ore`,
+            );
+          }
+        } else if (bloccatiDiFila.get(c.insegna)) {
+          /* Una pagina che si apre azzera il conto: erano singhiozzi, non un no. */
+          bloccatiDiFila.set(c.insegna, 0);
+        }
+
+        /* LA SCHEDA SENZA PREZZO NON SI SCRIVE PIU' IN `prezzi`.
+           La stessa informazione finiva in due posti: una riga intera qui
+           (centottantatre byte fra dati e indici) e un'impronta negli scarti
+           (pochi byte, compressa). E' l'impronta a impedire di riaprirla; la
+           riga pesava e basta. Erano 355.208 righe, sessantacinque megabyte.
+
+           Conta adesso perche' due milioni di prodotti sono trecentosessanta
+           megabyte su cinquecentododici del piano: con le righe vuote dentro
+           non ci si arriva, ci si ferma a meta' col database pieno — che non
+           e' un errore da leggere in un file, e' l'app che smette di
+           rispondere. */
+        if (v.page?.current != null) {
+          raccolte.push({
+            url: c.url,
+            prezzo: v.page.current,
+            valuta: v.page?.currency ?? "",
+            nome: c.nome.charAt(0).toUpperCase() + c.nome.slice(1),
+            insegna: c.insegna,
+            verifica: v.status,
+            visto: new Date(),
+          });
+        }
         if (v.page?.current != null) conPrezzo++;
+        /* NIENTE PREZZO E' UNA RISPOSTA; UN RIFIUTO NON LO E'.
+           Si annota fra gli scarti solo quando la pagina si e' APERTA e il
+           prezzo non c'era: quello e' un fatto sul negozio, vale trenta giorni
+           e risparmia milioni di aperture inutili.
+
+           Un 403 o un 202 invece non dicono niente sul prezzo, dicono che in
+           quel momento non ci hanno voluti. Trattarli allo stesso modo ha
+           congelato il danno peggiore di questa raccolta: martellate le
+           insegne spagnole, i loro rifiuti sono finiti fra gli scarti, e
+           centosettantamila pagine di Naturitas, Alcampo e Bonpreu sono
+           diventate irraggiungibili per un mese - dopo che il prezzo che
+           avevano ce l'eravamo gia' fatto scrivere sopra.
+
+           Un rifiuto si riprova al giro dopo, magari piu' piano. */
+        else if (v.status === "verificato" || v.status === "pagina-ok") {
+          const per = senzaPrezzo.get(c.insegna) ?? [];
+          per.push(improntaUrl(c.url));
+          senzaPrezzo.set(c.insegna, per);
+        }
         if (raccolte.length >= BLOCCO) await salvaPrezzi(raccolte.splice(0, raccolte.length));
         if (aperte % 50 === 0) {
           onAvanzamento?.(aperte, conPrezzo);
@@ -402,11 +678,40 @@ export async function giroContinuo(
       }
     };
 
-    await Promise.all(Array.from({ length: Math.min(INSIEME, coda.length) }, lavoratore));
+    /* QUANTI LAVORATORI: NON PIU' DI QUATTRO PER NEGOZIO.
+       `INSIEME` e' il tetto della macchina — quanto puo' reggere lei. Ma la
+       cortesia non si misura in pagine al secondo: si misura in richieste al
+       minuto AL SINGOLO NEGOZIO, ed e' quella che fa scattare i blocchi.
+
+       Finche' la coda alternava dodici paesi il conto tornava da solo:
+       quaranta richieste sparse su sessanta catene fanno meno di una a testa.
+       Ma con due soli paesi in coda le catene sono cinque o sei, e le stesse
+       quaranta richieste diventano sette per negozio — lo stesso lavoro,
+       otto volte piu' pesante per chi lo subisce.
+
+       Quattro per catena e' il numero che regge: abbastanza da non aspettare
+       un negozio lento, poco abbastanza da restare un visitatore e non un
+       assedio. */
+    const catene = new Set(coda.map((c) => c.insegna)).size;
+    const quanti = Math.max(1, Math.min(INSIEME, catene * PER_CATENA, coda.length));
+    if (quanti < INSIEME) {
+      console.info(`[giro] ${catene} catene in coda: ${quanti} pagine insieme invece di ${INSIEME}`);
+    }
+    await Promise.all(Array.from({ length: quanti }, lavoratore));
     if (raccolte.length > 0) await salvaPrezzi(raccolte.splice(0, raccolte.length));
   }
 
   if (raccolte.length > 0) await salvaPrezzi(raccolte);
+
+  /* Gli scarti si salvano prima di chiudere: se il giro e' stato interrotto,
+     quel che si e' imparato resta comunque. */
+  for (const [insegna, impronte] of senzaPrezzo) {
+    await segnaScarti(insegna, paeseDi.get(insegna) ?? "", impronte);
+  }
+  if (senzaPrezzo.size > 0) {
+    const quante = [...senzaPrezzo.values()].reduce((t, x) => t + x.length, 0);
+    console.info(`[giro] segnate ${quante} schede senza prezzo: non si riaprono per 30 giorni`);
+  }
 
   await giro.chiudi(giro.devoFermarmi ? "interrotto" : finito ? "catalogo finito" : "tempo scaduto");
   /* Si rendono i biglietti appena finito, senza aspettare la scadenza: il

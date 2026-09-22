@@ -45,7 +45,7 @@
 
 import { gunzipSync, gzipSync } from "node:zlib";
 import { Binary } from "mongodb";
-import { cataloghi as collezioneCataloghi, isDbConfigured } from "../base/db.js";
+import { cataloghi as collezioneCataloghi, fonti, isDbConfigured } from "../base/db.js";
 import { conInterruttore, statoInterruttore } from "../base/interruttore.js";
 
 /** Una voce come sta nel pacchetto: indirizzo e nome, niente altro. */
@@ -68,7 +68,40 @@ export interface VoceSalvata {
 const VALIDITA_MS = 30 * 3_600_000;
 
 /** Una lettura non deve tenere in ostaggio una richiesta. */
-const ATTESA_MS = 8_000;
+/**
+ * Quanto si aspetta per LEGGERE un catalogo.
+ *
+ * Erano otto secondi, tarati su un catalogo da poche migliaia di voci. Ma
+ * Carrefour Emirati sono ottocentomila indirizzi in venti megabyte, e su
+ * Atlas gratuito - cento kilobyte al secondo - scaricarli richiede piu' di
+ * tre minuti: la lettura scadeva sempre e quel catalogo risultava vuoto.
+ *
+ * Novanta secondi. Chi chiede un paese non resta appeso a questo: il
+ * caricamento gira in sottofondo e la richiesta ha la sua attesa, piu' corta.
+ * Questo e' il tetto oltre il quale si smette di provare, non il tempo che
+ * qualcuno passa a guardare una schermata.
+ */
+const ATTESA_MS = 90_000;
+
+/**
+ * Quanto si aspetta per SCRIVERE un catalogo.
+ *
+ * Otto secondi bastano a una lettura, che sta fra un utente e la sua risposta.
+ * Una scrittura no: il catalogo di Carrefour Emirati sono venti megabyte, e su
+ * Atlas gratuito - cento kilobyte al secondo - sono piu' di tre minuti.
+ * Scadendo a otto secondi il salvataggio falliva ogni volta, in silenzio,
+ * e l'interruttore poi saltava anche i successivi: ottocentomila indirizzi
+ * dichiarati salvati e mai scritti, due volte di fila.
+ *
+ * Qui non c'e' nessuno che aspetta. Dieci minuti sono generosi per un
+ * catalogo grosso e restano un tetto: se il database e' davvero morto, si
+ * smette comunque.
+ */
+const ATTESA_SCRITTURA_MS = 10 * 60_000;
+
+function nonOltreScrivendo<T>(lavoro: () => Promise<T>, ripiego: T): Promise<T> {
+  return conInterruttore("magazzino-catalogo-scrittura", ATTESA_SCRITTURA_MS, lavoro, ripiego);
+}
 
 /** Come sopra: vedi `interruttore.ts` per il perche' non basta un timeout. */
 function nonOltre<T>(lavoro: () => Promise<T>, ripiego: T): Promise<T> {
@@ -109,17 +142,27 @@ export async function catalogoSalvato(
 
   return nonOltre(
     async () => {
-      const doc = await (await collezioneCataloghi()).findOne({
-        _id: `${paese}|${insegna}`,
-      });
-      if (!doc) return null;
-      if (Date.now() - doc.aggiornato.getTime() > VALIDITA_MS) return null;
-      try {
-        return scompatta(Buffer.from(doc.dati.buffer));
-      } catch {
-        // Pacchetto rovinato: meglio riscaricare che servire spazzatura.
-        return null;
+      const col = await collezioneCataloghi();
+      const capo = await col.findOne({ _id: `${paese}|${insegna}` });
+      if (!capo) return null;
+      if (Date.now() - capo.aggiornato.getTime() > VALIDITA_MS) return null;
+
+      /* I cataloghi troppo grossi per un documento stanno in piu' pezzi: il
+         primo dice quanti sono, gli altri si chiamano `#2`, `#3`... Quelli
+         vecchi non hanno il campo e valgono per uno. */
+      const quanti = Math.max(1, Number((capo as { pezzi?: number }).pezzi) || 1);
+      const fuori: VoceSalvata[] = [];
+      for (let i = 0; i < quanti; i++) {
+        const doc =
+          i === 0 ? capo : await col.findOne({ _id: `${paese}|${insegna}#${i + 1}` });
+        if (!doc?.dati) continue;
+        try {
+          fuori.push(...scompatta(Buffer.from(doc.dati.buffer)));
+        } catch {
+          // Pacchetto rovinato: gli altri pezzi si tengono lo stesso.
+        }
       }
+      return fuori.length > 0 ? fuori : null;
     },
     null,
   );
@@ -133,62 +176,199 @@ export async function salvaCatalogo(
 ): Promise<void> {
   if (!isDbConfigured() || voci.length === 0) return;
 
-  await nonOltre(
+  const dati = impacchetta(voci);
+
+  /* TROPPO GRANDE SI DICE, NON SI TACE — E SI DICE FUORI DALL'INTERRUTTORE.
+     Mongo ammette sedici megabyte per documento. Prima, superata la soglia, si
+     tornava `undefined` esattamente come nel caso riuscito: chi chiamava
+     stampava «800.000 indirizzi salvati» su un nulla, e il catalogo di
+     Carrefour Emirati non e' mai esistito pur comparendo nei totali per un
+     giorno intero.
+
+     Il controllo sta PRIMA di `nonOltre` perche' quello e' un interruttore di
+     protezione: prende qualunque eccezione e restituisce il ripiego, che e'
+     giusto per un database che non risponde e sbagliato per un pacchetto
+     troppo grosso — quello non e' un guasto passeggero, e' un no definitivo
+     che chi chiama deve sentire. Un fallimento travestito da successo e'
+     peggio di un errore: nessuno lo va a cercare. */
+  /* SE NON CI STA IN UN DOCUMENTO, SI SPEZZA IN PIU' PEZZI.
+     Mongo ammette sedici megabyte per documento, e Carrefour Emirati ne
+     occupa di piu': ottocentomila indirizzi che per un giorno sono rimasti
+     sul disco perche' non c'era dove metterli. All'ottantacinque per cento di
+     resa sono seicentottantamila prodotti — piu' di quanti ne manchino al
+     traguardo.
+
+     Un catalogo grosso diventa `PAESE|Insegna` piu' `PAESE|Insegna#2`, `#3`…
+     Il primo pezzo tiene il nome di sempre, cosi' tutto quel che cerca un
+     catalogo per nome continua a trovarlo, e porta il conto totale; chi legge
+     segue i pezzi successivi finche' ci sono. I vecchi cataloghi, che pezzi
+     non ne hanno, funzionano esattamente come prima.
+
+     Si spezza a DIECI megabyte e non a quindici: il margine serve perche' il
+     documento porta anche il nome, il paese e le date, e perche' un pacchetto
+     che cresce fra una raccolta e l'altra non deve far fallire tutto per
+     cinquantamila byte. */
+  const PEZZO = 10_000_000;
+
+  await nonOltreScrivendo(
     async () => {
-      const dati = impacchetta(voci);
-      // Sedici megabyte e' il tetto di Mongo per documento: se un'insegna lo
-      // sfonda si lascia stare invece di far fallire tutto il salvataggio.
-      if (dati.length > 15_000_000) {
-        console.warn(
-          `[catalogo] ${paese} ${insegna}: pacchetto da ${(dati.length / 1048576).toFixed(1)} MB, ` +
-            `troppo per un documento: non lo salvo`,
-        );
-        return undefined;
-      }
-      await (await collezioneCataloghi()).updateOne(
-        { _id: `${paese}|${insegna}` },
-        {
-          $set: {
-            paese,
-            insegna,
-            prodotti: voci.length,
-            // Il driver vuole un Binary, non un Buffer nudo.
-            dati: new Binary(dati),
-            aggiornato: new Date(),
+      const col = await collezioneCataloghi();
+
+      /* Quanti pezzi servono: si divide l'elenco in parti che, compresse,
+         stiano sotto il tetto. Si conta sulle VOCI e non sui byte perche' e'
+         quello che si puo' tagliare — la compressione poi fa quel che fa, e il
+         rapporto e' abbastanza stabile da starci dentro con questo margine. */
+      const quanti = Math.max(1, Math.ceil(dati.length / PEZZO));
+      const perPezzo = Math.ceil(voci.length / quanti);
+
+      for (let i = 0; i < quanti; i++) {
+        const fetta = voci.slice(i * perPezzo, (i + 1) * perPezzo);
+        if (fetta.length === 0) continue;
+        await col.updateOne(
+          { _id: i === 0 ? `${paese}|${insegna}` : `${paese}|${insegna}#${i + 1}` },
+          {
+            $set: {
+              paese,
+              insegna,
+              /* Il conto sta tutto sul primo pezzo: e' quello che i totali
+                 sommano, e sommarlo anche dagli altri lo conterebbe due volte. */
+              prodotti: i === 0 ? voci.length : 0,
+              pezzi: i === 0 ? quanti : undefined,
+              // Il driver vuole un Binary, non un Buffer nudo.
+              dati: new Binary(impacchetta(fetta)),
+              aggiornato: new Date(),
+            },
           },
-        },
-        { upsert: true },
-      );
+          { upsert: true },
+        );
+      }
+
+      /* I pezzi di una raccolta precedente piu' lunga: se oggi il catalogo si
+         e' accorciato, quelli restano li' a raccontare prodotti che non ci
+         sono piu'. */
+      for (let i = quanti; i < quanti + 8; i++) {
+        await col.deleteOne({ _id: `${paese}|${insegna}#${i + 1}` } as never);
+      }
+
+      /* SI CONTROLLA DI AVER SCRITTO, INVECE DI FIDARSI.
+         Due volte di fila questo salvataggio ha detto «fatto» senza scrivere
+         niente: la prima perche' il pacchetto era troppo grosso, la seconda
+         perche' scadeva il tempo. Una rilettura costa una domanda e chiude la
+         questione — se il documento non c'e', chi ha chiesto deve saperlo e
+         mettere il catalogo sul disco. */
+      const scritto = await col.findOne({ _id: `${paese}|${insegna}` }, { projection: { _id: 1 } });
+      if (!scritto) throw new Error("scritto senza errori ma il documento non c'e'");
       return undefined;
     },
     undefined,
   );
 }
 
-/** Cosa c'e' in magazzino, per paese: serve allo stato e alle prove. */
+/**
+ * Cosa c'e' in magazzino: serve allo stato, al pannello e alle prove.
+ *
+ * TRE MUCCHI, NON UNO.
+ * Il conto era uno solo — tutti i cataloghi sommati — e diceva due milioni di
+ * link. Ma dentro c'erano tre cose che non si possono sommare senza mentire:
+ *
+ *   LEGGIBILI  insegne vive. Questo e' il lavoro che si puo' fare.
+ *   ESCLUSI    insegne che ci hanno detto di no — il robots.txt di Tigros,
+ *              l'accesso obbligatorio di CoopShop. Non sono «da fare piu'
+ *              tardi»: sono da non fare mai, e tenerli nel totale fa sembrare
+ *              in arretrato una raccolta che e' invece quasi finita.
+ *   ORFANI     cataloghi di insegne che nelle fonti non esistono piu'. Il
+ *              lettore cerca il catalogo col nome della fonte, quindi a questi
+ *              non ci arriva nessuno.
+ *
+ * Il danno di sommarli non era il numero grosso in se': era che la copertura
+ * non poteva salire. L'Italia risultava al 40% mentre il 96% delle schede
+ * leggibili era gia' stato letto. Un denominatore sbagliato e' peggio di
+ * nessun conto, perche' sembra una misura.
+ */
 export async function statoCataloghi(): Promise<{
   /** `aperto` = il database non risponde e abbiamo smesso di chiederglielo. */
   interruttore: "chiuso" | "aperto";
   attivo: boolean;
+  /** Insegne VIVE con un catalogo. Non i cataloghi in archivio. */
   insegne: number;
+  /** Link delle sole insegne vive: quelli su cui la copertura si misura. */
   prodotti: number;
   paesi: string[];
+  /** Quel che resta fuori, detto invece che nascosto nel totale. */
+  esclusi: { insegne: number; prodotti: number };
+  orfani: { insegne: number; prodotti: number };
 }> {
-  if (!isDbConfigured()) return { interruttore: "chiuso" as const, attivo: false, insegne: 0, prodotti: 0, paesi: [] };
+  const vuoto = {
+    interruttore: "chiuso" as const,
+    attivo: false,
+    insegne: 0,
+    prodotti: 0,
+    paesi: [],
+    esclusi: { insegne: 0, prodotti: 0 },
+    orfani: { insegne: 0, prodotti: 0 },
+  };
+  if (!isDbConfigured()) return vuoto;
 
   return nonOltre(
     async () => {
+      const elenco = (await (await fonti())
+        .find({})
+        .project({ insegna: 1, esclusa: 1 })
+        .toArray()) as Array<{ insegna?: string; esclusa?: string }>;
+      const vive = new Set<string>();
+      const escluse = new Set<string>();
+      for (const f of elenco) {
+        const nome = String(f.insegna ?? "");
+        if (f.esclusa) escluse.add(nome);
+        else vive.add(nome);
+      }
+
       const righe = await (await collezioneCataloghi())
-        .find({}, { projection: { paese: 1, prodotti: 1 } })
+        .find({}, { projection: { paese: 1, insegna: 1, prodotti: 1 } })
         .toArray();
+
+      let insegne = 0;
+      let prodotti = 0;
+      const esclusi = { insegne: 0, prodotti: 0 };
+      const orfani = { insegne: 0, prodotti: 0 };
+      const paesi = new Set<string>();
+
+      for (const r of righe) {
+        const nome = String((r as { insegna?: string }).insegna ?? "");
+        const quanti = Number((r as { prodotti?: number }).prodotti ?? 0);
+        if (vive.has(nome)) {
+          insegne++;
+          prodotti += quanti;
+          /* I paesi si contano sulle sole insegne vive: un paese presente solo
+             con una catena esclusa non e' un paese che copriamo. */
+          if (r.paese) paesi.add(String(r.paese));
+        } else if (escluse.has(nome)) {
+          esclusi.insegne++;
+          esclusi.prodotti += quanti;
+        } else {
+          orfani.insegne++;
+          orfani.prodotti += quanti;
+        }
+      }
+
       return {
         interruttore: statoInterruttore("magazzino-catalogo"),
         attivo: true,
-        insegne: righe.length,
-        prodotti: righe.reduce((n, r) => n + (r.prodotti ?? 0), 0),
-        paesi: [...new Set(righe.map((r) => r.paese))].sort(),
+        insegne,
+        prodotti,
+        paesi: [...paesi].sort(),
+        esclusi,
+        orfani,
       };
     },
-    { interruttore: "aperto" as const, attivo: true, insegne: -1, prodotti: -1, paesi: [] },
+    {
+      interruttore: "aperto" as const,
+      attivo: true,
+      insegne: -1,
+      prodotti: -1,
+      paesi: [],
+      esclusi: { insegne: 0, prodotti: 0 },
+      orfani: { insegne: 0, prodotti: 0 },
+    },
   );
 }

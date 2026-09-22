@@ -1,0 +1,25 @@
+# I ritorni a capo, decisi qui invece che dalla macchina di chi scrive.
+#
+# PERCHE' SERVE
+# Git su Windows converte i file a CRLF quando li tira fuori. Per un .cmd va
+# benissimo. Per uno script di shell no: bash legge il ritorno a capo di
+# Windows come parte del comando, e si ferma con un errore che non nomina mai
+# la vera causa —
+#
+#     installa-servizi.sh: line 2: $'\r': command not found
+#
+# Uno script che parte sul PC e muore sul server, con un messaggio che non
+# dice perche': e' il genere di guasto su cui si perde un pomeriggio.
+
+# Gli script che girano su Linux tengono i ritorni a capo di Linux, ovunque
+# vengano scritti.
+*.sh text eol=lf
+
+# I comandi di Windows tengono i suoi: un .cmd con ritorni a capo di Linux
+# puo' saltare l'ultima riga, e l'ultima riga di solito e' `pause`.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# I file di systemd si leggono solo su Linux.
+*.service text eol=lf
+*.timer text eol=lf

@@ -48,6 +48,7 @@ import {
 } from "../src/api/catalogo-fonti.js";
 import { giroContinuo } from "../src/api/prezzi-continuo.js";
 import { chiTieneIPaesi } from "../src/api/turni.js";
+import { contiPesanti } from "../src/api/statistiche.js";
 import { battitoDiAttesa, chiStaLavorando } from "../src/api/giri.js";
 import { statoMagazzino } from "../src/api/prezzi-magazzino.js";
 
@@ -56,7 +57,51 @@ const arg = (nome: string) =>
   process.argv.includes(nome) ? process.argv[process.argv.indexOf(nome) + 1] : undefined;
 
 const MINUTI = Number(arg("--minuti") ?? process.env.LETTORE_MINUTI ?? 30);
-const QUANTI_PAESI = Number(arg("--paesi") ?? process.env.LETTORE_PAESI ?? 6);
+
+/**
+ * `--finoAFine`: esci quando non c'e' piu' niente da aprire, invece di restare
+ * acceso in attesa che le schede scadano.
+ *
+ * SERVE A INCATENARE I PAESI, E SENZA NON SI POTEVA.
+ * Il lettore normale non finisce mai, ed e' giusto cosi': un magazzino va
+ * tenuto fresco, non riempito una volta. Ma per chiudere una lista di paesi
+ * uno dopo l'altro serve sapere quando il primo e' a posto, e aspettare
+ * l'uscita di un processo che non esce vuol dire restare sulla Spagna per
+ * sempre mentre la Lituania aspetta il suo turno.
+ *
+ * IL SEGNALE NON PUO' ESSERE «non resta niente da fare».
+ * `restaDaFare` conta gli indirizzi meno i prezzi, e in ogni paese ci sono
+ * insegne che il prezzo non lo pubblicano: la Spagna ha 6.449 indirizzi che
+ * non diventeranno mai una cifra, quindi quel conto non scende sotto 6.449
+ * nemmeno a lavoro finito. Aspettare lo zero vorrebbe dire aspettare per
+ * sempre.
+ *
+ * Il segnale vero e' un giro che non ha aperto NIENTE: ogni scheda del paese
+ * o e' fresca, o e' gia' stata provata e messa fra gli scarti. Quello e'
+ * «finito» detto dai fatti.
+ */
+const FINO_A_FINE = process.argv.includes("--finoAFine");
+/**
+ * Quanti paesi per giro.
+ *
+ * DUE, E NON DODICI
+ * -----------------
+ * Con dodici paesi in mano un lettore ne sfiora tanti e non ne finisce
+ * nessuno: ogni giro prende le prime duemila schede di ogni insegna, e con
+ * sessanta insegne in coda il tempo finisce prima di aver fatto un passo vero
+ * da nessuna parte. Con due, la coda e' piccola, si svuota, e il giro dopo
+ * riparte da dove era arrivato: l'Italia la fa uno solo, tutta, e quando ha
+ * finito passa ad altro.
+ *
+ * E i paesi non restano scoperti: sono i biglietti a distribuirli, e chi
+ * finisce ne prende altri. Due per volta non vuol dire due in tutto.
+ *
+ * La concorrenza si adatta da sola: con poche insegne in coda `giroContinuo`
+ * abbassa le pagine in parallelo, perche' il tetto che conta e' quante
+ * richieste arrivano al SINGOLO negozio, non quante ne regge la nostra
+ * macchina.
+ */
+const QUANTI_PAESI = Number(arg("--paesi") ?? process.env.LETTORE_PAESI ?? 2);
 const SOLO = (arg("--solo") ?? "")
   .split(",")
   .map((p) => p.trim().toUpperCase())
@@ -80,6 +125,52 @@ function ora(): string {
  * sapendo gia' che non avrebbero dato niente, e ogni pagina buttata e'
  * comunque una richiesta fatta a un negozio vero.
  */
+/**
+ * Quanto resta da provare, paese per paese.
+ *
+ * PERCHE' NON BASTA LA RESA
+ * -------------------------
+ * `paesiCheRendono` mette in cima chi da' piu' prezzi per pagina aperta, ed e'
+ * il criterio giusto per decidere DOVE conviene lavorare. Non dice pero' se li'
+ * c'e' ancora qualcosa da fare: un paese con resa altissima e catalogo gia'
+ * tutto letto e' il posto peggiore dove andare, perche' si prende il biglietto,
+ * si monta la coda, e si scopre che non c'e' niente.
+ *
+ * Visto dal vero: «giro 1: chiedo SE AR — 0 aperte, 8.947 gia' fresche, 6s».
+ * Corretto, e completamente inutile: sei secondi di lavoro per non fare
+ * niente, mentre altrove restavano centinaia di migliaia di schede mai
+ * provate.
+ *
+ * I conti per paese ci sono gia' — il pannello li usa, e si rifanno una volta
+ * al minuto — quindi qui costano una lettura dalla memoria.
+ */
+async function restaDaFare(): Promise<Map<string, number>> {
+  /* I CONTI SI ASPETTANO, LA PRIMA VOLTA.
+     `contiPesanti` risponde con quel che ha in memoria e ricalcola in
+     sottofondo: giusto per una pagina web, che non deve mai aspettare. Ma un
+     processo appena avviato la memoria ce l'ha vuota, e senza aspettare
+     leggerebbe zero per ogni paese — cioe' «non c'e' niente da fare
+     dappertutto», che e' il contrario della verita' e manda il primo giro
+     nel posto sbagliato. Si e' visto subito: «chiedo IT (0 schede da
+     provare)» con centottantamila schede ancora da guardare.
+
+     Qualche secondo di attesa una volta sola, all'avvio, e poi il valore e'
+     in memoria per tutti i giri successivi. */
+  for (let tentativo = 0; tentativo < 12; tentativo++) {
+    const conti = contiPesanti();
+    if (conti.presiIl && conti.paesi.length > 0) {
+      const m = new Map<string, number>();
+      for (const r of conti.paesi) m.set(r.paese, Math.max(0, r.link - r.prezzi));
+      return m;
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  /* Se dopo ventiquattro secondi non sono pronti si va avanti lo stesso:
+     meglio leggere nell'ordine sbagliato che non leggere. */
+  console.log(`  [${ora()}] i conti per paese non sono ancora pronti: ordine non ottimale`);
+  return new Map();
+}
+
 function paesiCheRendono(): string[] {
   const punteggio = new Map<string, number>();
   for (const f of tutteLeFonti()) {
@@ -122,9 +213,8 @@ async function main() {
   console.log("  si ferma con Ctrl+C, o dal pulsante «ferma» del pannello.");
   console.log("");
 
-  /* Si riparte da dove si era arrivati: senza, i primi sei paesi verrebbero
-     letti per sempre e gli altri non li vedrebbe mai nessuno. */
-  let da = 0;
+  /* La rotazione non serve piu': l'ordine lo decide quanto resta da fare in
+     ogni paese, e un paese finito scende in fondo da solo. */
   let giro = 0;
   let apertesTotali = 0;
   let conPrezzoTotali = 0;
@@ -155,7 +245,16 @@ async function main() {
        arriva secondo si tiene il resto. */
     const tenuti = await chiTieneIPaesi();
     const liberi = disponibili.filter((p) => !tenuti.has(p));
-    const daCui = liberi.length > 0 ? liberi : disponibili;
+
+    /* FRA I LIBERI, PRIMA QUELLI CHE HANNO ANCORA SCHEDE DA PROVARE.
+       Chi non ne ha resta in fondo: non si esclude, perche' fra tre giorni le
+       sue schede scadranno e torneranno da rileggere, e un paese escluso per
+       sempre e' un pezzo di catalogo che muore in silenzio. */
+    const resta = await restaDaFare();
+    const conLavoro = liberi.filter((p) => (resta.get(p) ?? 0) > 0);
+    const daCui = (conLavoro.length > 0 ? conLavoro : liberi.length > 0 ? liberi : disponibili)
+      .slice()
+      .sort((a, b) => (resta.get(b) ?? 0) - (resta.get(a) ?? 0));
 
     /* QUANTI NE PUO' PRENDERE UNO SOLO.
        Senza un tetto, il primo lettore acceso si prende quattordici paesi e
@@ -174,10 +273,7 @@ async function main() {
     const quanti = Math.min(QUANTI_PAESI, quota, daCui.length);
 
     const scelti: string[] = [];
-    for (let i = 0; i < quanti; i++) {
-      scelti.push(daCui[(da + i) % daCui.length]);
-    }
-    da = (da + scelti.length) % Math.max(1, daCui.length);
+    for (let i = 0; i < quanti; i++) scelti.push(daCui[i]);
     giro++;
 
     if (liberi.length === 0) {
@@ -189,6 +285,13 @@ async function main() {
          invisibile. `giroContinuo` lo diceva gia' per il suo caso; questo e'
          un secondo punto d'attesa, aggiunto dopo, e si era portato dietro lo
          stesso difetto. */
+      if (FINO_A_FINE) {
+        /* Li sta gia' facendo un'altra macchina. Restare qui ad aspettare
+           bloccherebbe la catena dei paesi dietro a un lavoro che qualcuno sta
+           gia' facendo: si passa al prossimo, che e' il punto della catena. */
+        console.log(`  [${ora()}] li tiene un altro lettore: passo oltre`);
+        process.exit(0);
+      }
       await battitoDiAttesa("in attesa: tutti i paesi occupati");
       await new Promise((r) => setTimeout(r, PAUSA_MS));
       continue;
@@ -197,9 +300,15 @@ async function main() {
     /* «chiedo» e non l'elenco secco: i paesi si prenotano, e se un altro
        lettore ne ha gia' in mano qualcuno questo giro ne lavorera' meno di
        quelli scritti qui. Il giro stesso lo dice nella riga dopo. */
+    /* Se i conti non ci sono si tace il numero invece di scrivere zero: uno
+       zero inventato si legge come «non c'e' niente da fare», ed e' la cosa
+       che fa spegnere un lettore che invece stava per lavorare. */
+    const noti = scelti.filter((p) => resta.has(p));
+    const daFare = noti.reduce((t, p) => t + (resta.get(p) ?? 0), 0);
+    const quante = noti.length === scelti.length ? `${n(daFare)} schede da provare` : "conto in corso";
     console.log(
       `  [${ora()}] giro ${giro}: chiedo ${scelti.join(" ")}` +
-        ` (${quantiLettori} lettori, quota ${quota})`,
+        ` (${quante} · ${quantiLettori} lettori, quota ${quota})`,
     );
     try {
       const e = await giroContinuo(scelti, MINUTI, (fatte, con) => {
@@ -217,6 +326,14 @@ async function main() {
       console.log(
         `             da quando e' acceso: ${n(apertesTotali)} aperte, ${n(conPrezzoTotali)} con prezzo`,
       );
+
+      if (FINO_A_FINE && e.aperte === 0) {
+        console.log("");
+        console.log(`  [${ora()}] ${scelti.join(" ")}: niente da aprire, ho finito qui.`);
+        console.log(`             ${n(apertesTotali)} schede aperte, ${n(conPrezzoTotali)} con prezzo.`);
+        console.log("");
+        process.exit(0);
+      }
     } catch (err) {
       /* Un giro che esplode non deve spegnere il lettore: quasi sempre e' la
          rete che ha singhiozzato, e domattina il magazzino sarebbe fermo alla

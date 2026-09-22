@@ -51,7 +51,8 @@ import {
   impara,
   LINGUA_DEL_PAESE as LINGUA_VOCABOLARIO,
 } from "./vocabolario.js";
-import { prezziGiaVisti, salvaPrezzi, type PrezzoSalvato } from "./prezzi-magazzino.js";
+import { improntaUrl, prezziGiaVisti, salvaPrezzi, type PrezzoSalvato } from "./prezzi-magazzino.js";
+import { scartiDi, segnaScarti } from "./scarti.js";
 
 /** La stessa forma che producono le altre due strade. */
 export interface PrezzoGrezzo {
@@ -638,6 +639,22 @@ export async function generatePricesCatalogo(
      tutto come prima: piu' lento, non rotto. */
   const inMagazzino = await prezziGiaVisti(daAprire.map((c) => c.url));
   const daSalvare: PrezzoSalvato[] = [];
+  const daScartare: Array<{ insegna: string; impronta: string }> = [];
+
+  /* CHI ABBIAMO GIA' PROVATO SENZA TROVARE UN PREZZO.
+     Prima questo lo diceva una riga in `prezzi` col prezzo a niente: la si
+     trovava in magazzino e non si riapriva la pagina. Quelle righe adesso non
+     si scrivono piu' — erano sessantacinque megabyte per ripetere quel che gli
+     scarti dicono in pochi byte — quindi la stessa risposta va chiesta a loro.
+
+     Senza questo pezzo l'app tornerebbe ad aprire dal vivo, mentre l'utente
+     aspetta, le stesse pagine che sappiamo gia' essere mute: un risparmio di
+     spazio pagato in secondi di attesa, cioe' un pessimo affare. */
+  const insegneInGioco = [...new Set(daAprire.map((c) => c.insegna))];
+  const scartatePerInsegna = new Map<string, Set<string>>();
+  await Promise.all(
+    insegneInGioco.map(async (ins) => scartatePerInsegna.set(ins, await scartiDi(ins, paeseIso))),
+  );
 
   const letti = await aBrani(
     daAprire,
@@ -666,6 +683,23 @@ export async function generatePricesCatalogo(
           link: c.url,
           // La data del MAGAZZINO: e' quando quel prezzo e' stato letto.
           letto: salvato.visto?.toISOString(),
+          giaVerificato: true,
+        } satisfies PrezzoGrezzo,
+        posto: c.posto,
+      };
+    }
+
+    /* Provata e muta: si risponde come rispondeva il magazzino, senza
+       aprire niente. */
+    if (scartatePerInsegna.get(c.insegna)?.has(improntaUrl(c.url))) {
+      return {
+        riga: {
+          prodotto: c.voce,
+          nome: c.nome,
+          prezzo: null,
+          valuta,
+          negozio: c.insegna,
+          link: c.url,
           giaVerificato: true,
         } satisfies PrezzoGrezzo,
         posto: c.posto,
@@ -712,19 +746,26 @@ export async function generatePricesCatalogo(
     }
     const nome = meglio ? (nomePagina as string) : nomeCatalogo;
 
-    /* Si mette da parte anche quel che non si mostra.
-       Sapere che una pagina non si apre, o che si apre e il prezzo non lo
-       dichiara, vale quanto sapere il prezzo: evita di tornare a chiederlo
-       domani per riscoprire la stessa cosa. */
-    daSalvare.push({
-      url: c.url,
-      prezzo,
-      valuta: v.page?.currency ?? valuta,
-      nome,
-      insegna: c.insegna,
-      verifica: v.status,
-      visto: new Date(),
-    });
+    /* SI SALVA IL PREZZO; IL «NIENTE» VA NEGLI SCARTI.
+       Sapere che una pagina si apre e il prezzo non lo dichiara vale quanto
+       sapere il prezzo — evita di tornare a chiederlo domani. Ma per dirlo
+       bastano pochi byte di impronta, non una riga da centottantatre:
+       trecentocinquantamila righe cosi' erano sessantacinque megabyte, ed e'
+       lo spazio che serve ai prodotti veri. Il lettore ha gia' smesso; questo
+       era l'ultimo rubinetto aperto. */
+    if (prezzo !== null) {
+      daSalvare.push({
+        url: c.url,
+        prezzo,
+        valuta: v.page?.currency ?? valuta,
+        nome,
+        insegna: c.insegna,
+        verifica: v.status,
+        visto: new Date(),
+      });
+    } else if (v.status !== "non-raggiungibile") {
+      daScartare.push({ insegna: c.insegna, impronta: improntaUrl(c.url) });
+    }
 
     // Se la pagina non si apre proprio, quella si butta: un link rotto non
     // serve a nessuno.
@@ -760,6 +801,15 @@ export async function generatePricesCatalogo(
      che vedra' non deve stare sulla sua strada. Se fallisce, domani si
      rileggono le pagine — come si faceva prima, e nessuno se ne accorge. */
   void salvaPrezzi(daSalvare);
+
+  /* Le schede provate e mute, ricordate per insegna: l'elenco si salva per
+     insegna, quindi si raggruppano prima invece di scriverlo una volta per
+     riga. */
+  if (daScartare.length > 0) {
+    const per = new Map<string, string[]>();
+    for (const x of daScartare) per.set(x.insegna, [...(per.get(x.insegna) ?? []), x.impronta]);
+    for (const [ins, impronte] of per) void segnaScarti(ins, paeseIso, impronte);
+  }
   if (daSalvare.length < daAprire.length) {
     console.info(
       `[magazzino] ${daAprire.length - daSalvare.length}/${daAprire.length} schede ` +

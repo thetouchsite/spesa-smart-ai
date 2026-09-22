@@ -69,8 +69,31 @@ export default function PianiScreen() {
     async (silenzioso = false) => {
       if (!silenzioso) setStato("carico");
       try {
-        setPiani(await getPlanStore().list());
+        const elenco = await getPlanStore().list();
+        setPiani(elenco);
         setStato("pronto");
+
+        /* IL PIANO IN CORSO NON PUO' SOPRAVVIVERE AL SUO POSTO NELL'ARCHIVIO.
+           Il piano attivo vive nella sessione del telefono, l'archivio sul
+           server: sono due posti, e si scollano. Si cancellano tutti i piani
+           da un altro telefono, o si azzera l'account, e la home continua a
+           mostrare «il tuo piano» — un piano che non esiste piu' da nessuna
+           parte, con un tocco che porta a una schermata di numeri orfani.
+
+           La regola e' una sola, e va detta con precisione: il piano attivo si
+           azzera quando ERA nell'archivio e non c'e' piu'. Non «quando
+           l'archivio e' vuoto», che era la mia prima versione ed era
+           pericolosa: l'archiviazione puo' fallire — server irraggiungibile —
+           e allora l'elenco e' vuoto mentre il piano dell'utente e'
+           perfettamente buono. Cancellarglielo per una richiesta non riuscita
+           sarebbe il danno peggiore che questa schermata possa fare.
+
+           `pianoAttivoId` distingue i due casi: se c'e', quel piano era stato
+           archiviato davvero, e la sua assenza dall'elenco e' una
+           cancellazione, non un guasto. */
+        if (currentPlan && pianoAttivoId && !elenco.some((x) => x.id === pianoAttivoId)) {
+          setPlan(null, null);
+        }
       } catch (e) {
         /* Se il token non vale più si esce pulitamente invece di mostrare un
            errore incomprensibile: l'utente rivedrà i suoi piani locali. */
@@ -83,7 +106,7 @@ export default function PianiScreen() {
         setStato("errore");
       }
     },
-    [scaduta],
+    [scaduta, currentPlan, pianoAttivoId, setPlan],
   );
 
   /* `useFocusEffect` e non `useEffect`: tornando qui dopo aver generato un

@@ -110,6 +110,9 @@ const PADRONI = {
   /* Chi legge quale paese, quando i lettori sono piu' di uno. E' una regola
      del mestiere di raccogliere prezzi, non dell'app: sta di qua. */
   turni: "api",
+  /* Le schede che il prezzo non ce l'hanno. E' memoria del mestiere di
+     raccogliere prezzi: sta di qua, accanto al magazzino. */
+  scarti: "api",
 
   // ── app ────────────────────────────────────────────────────────────
   /* Il modello e la ricerca sul web stanno di qua per una ragione precisa:
@@ -145,6 +148,8 @@ const PADRONI = {
   db: "base",
   http: "base",
   diario: "base",
+  intestazione: "base",
+  robots: "base",
   quota: "base",
   interruttore: "base",
   schemas: "base",

@@ -215,6 +215,52 @@ const LETTORI: Lettore[] = [
       return null;
     },
   },
+  {
+    /* LASTMILE — 61.013 indirizzi in Lituania.
+       Non ha un'API: il prezzo sta nella pagina. Ma sta in un posto che le
+       espressioni generiche non possono leggere senza sbagliare, e il perche'
+       vale la pena scriverlo.
+
+       Le loro schede pesano tre megabyte e mezzo e portano dentro la cache di
+       PARECCHI prodotti, non solo quello mostrato. Una regola che cerca il
+       primo `"prc":{"p":…}` pesca il prezzo di un altro articolo: provato, e
+       quattro schede diverse davano tutte 19,90. E' lo stesso danno della
+       tariffa di consegna di Checkers, con la differenza che qui la trappola
+       era pronta e l'ho vista prima di scriverla.
+
+       LA SECONDA TRAPPOLA E' NELLO STESSO OGGETTO. Accanto a `prc` c'e'
+       `convertedPrice: 6.03` per una lattina da 330 ml: e' il prezzo al LITRO.
+       Chi legge quello dice a un utente che un'energetica costa sei euro.
+
+       Quindi: si prende il codice dalla fine dell'indirizzo, si cerca QUEL
+       prodotto, e da li' il suo `prc.p`. Un confronto esatto invece di una
+       somiglianza — la stessa regola che vale per Consum. */
+    insegna: "LastMile",
+    host: /(^|\.)lastmile\.lt$/i,
+    async leggi(url) {
+      const codice = /-(\d{4,})(?:\/)?$/.exec(new URL(url).pathname)?.[1];
+      if (!codice) return null;
+
+      const r = await fetch(url, {
+        headers: { ...INTESTAZIONE, Accept: "text/html,application/xhtml+xml" },
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!r.ok) return null;
+      const html = await r.text();
+
+      /* Il blocco del prodotto giusto comincia dal suo codice. Si guarda solo
+         da li' in avanti, per un tratto corto: il `prc` piu' vicino e' il suo. */
+      const da = html.indexOf(`"erpCode":"${codice}"`);
+      if (da < 0) return null;
+      const tratto = html.slice(da, da + 4000);
+
+      const v = sensato(/"prc"\s*:\s*\{\s*"p"\s*:\s*([\d.,]+)/i.exec(tratto)?.[1]);
+      if (v === null) return null;
+
+      const nome = /"name"\s*:\s*"([^"]{3,120})"/i.exec(tratto)?.[1] ?? "";
+      return { prezzo: v, valuta: "EUR", nome };
+    },
+  },
 ];
 
 /**
