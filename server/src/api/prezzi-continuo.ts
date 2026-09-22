@@ -52,6 +52,7 @@ import {
   improntaUrl,
   numeroInsegnaPubblico as numeroInsegna,
   salvaPrezzi,
+  salvataggiArrivano,
   type PrezzoSalvato,
 } from "./prezzi-magazzino.js";
 import { tutteLeFonti } from "./catalogo-fonti.js";
@@ -592,6 +593,8 @@ export async function giroContinuo(
      e' costato un riavvio a Render: la prima versione la costruiva tutta in
      anticipo per risparmiare quei secondi. */
   let finito = false;
+  /* Quanti salvataggi di fila non sono arrivati: vedi il controllo nel ciclo. */
+  let senzaSalvare = 0;
   let raccolte: PrezzoSalvato[] = [];
 
   while (Date.now() < scadenza && !finito) {
@@ -975,7 +978,35 @@ export async function giroContinuo(
       console.info(`[giro] ${catene} catene in coda: ${quanti} pagine insieme invece di ${INSIEME}`);
     }
     await Promise.all(Array.from({ length: quanti }, lavoratore));
-    if (raccolte.length > 0) await salvaPrezzi(raccolte.splice(0, raccolte.length));
+    if (raccolte.length > 0) {
+      await salvaPrezzi(raccolte.splice(0, raccolte.length));
+
+      /* SE I SALVATAGGI NON ARRIVANO, SI SMETTE. NON SI FINGE.
+         `salvaPrezzi` sta dentro l'interruttore e non esplode mai: quando il
+         database non risponde restituisce il ripiego e il lettore va avanti
+         convinto di lavorare. Il 22 settembre un intoppo del DNS ha rotto la
+         connessione e i lettori hanno continuato per un'ora — pagine aperte,
+         prezzi trovati, rese del 92%, e nemmeno una riga scritta. Dal pannello
+         sembravano sani.
+
+         Due tentativi a vuoto di fila bastano: un salvataggio che fallisce e
+         poi riesce e' un singhiozzo di rete, due sono un guasto. Si chiude il
+         giro dicendolo — il lettore esterno riparte da solo dopo trenta
+         secondi, e ripartire rifa' la risoluzione del nome, che e'
+         esattamente la cura. */
+      if (!salvataggiArrivano()) {
+        senzaSalvare++;
+        if (senzaSalvare >= 2) {
+          console.error(
+            `
+[giro] IL DATABASE NON PRENDE PIU' QUEL CHE LEGGO: ` +
+              `due salvataggi a vuoto di fila. Chiudo il giro invece di continuare a ` +
+              `leggere per niente — le pagine aperte da qui in poi sarebbero buttate.`,
+          );
+          break;
+        }
+      } else senzaSalvare = 0;
+    }
 
     /* Il salvataggio degli scarti non sta piu' qui: vedi `scaricaScarti`, che
        gira a tempo dentro il lavoratore. Una passata con ventimila schede per
