@@ -641,6 +641,10 @@ export async function giroContinuo(
   /* Si costruisce la coda: da ogni insegna la sua quota, poi si mescola
      alternando le insegne fra loro. */
   const mazzi: Array<Array<{ url: string; nome: string; insegna: string }>> = [];
+  /* Almeno un'insegna ha schede mai viste? Se si', i mazzi di solo rinfresco
+     si buttano: vedi il commento sulla composizione della coda. */
+  let conNuove = false;
+  const soloRinfresco: number[] = [];
   for (const f of insegne) {
     if (Date.now() >= scadenza) break;
     /* UN'INSEGNA IN PAUSA NON ENTRA NEMMENO IN CODA.
@@ -812,11 +816,30 @@ export async function giroContinuo(
        ordine costa di piu'. */
     const maiVistePronte = candidate.filter((x) => !viste.has(improntaUrl(x.url)));
     const giaVistePronte = candidate.filter((x) => viste.has(improntaUrl(x.url)));
-    const quotaNuove = Math.min(maiVistePronte.length, MAX_PER_INSEGNA_A_GIRO);
-    const daFare = [
-      ...sparse(maiVistePronte, quotaNuove),
-      ...sparse(giaVistePronte, Math.max(0, MAX_PER_INSEGNA_A_GIRO - quotaNuove)),
-    ];
+
+    /* PRIMA TUTTO IL NUOVO, IL RINFRESCO DOPO — E NON «UN PO' E UN PO'».
+       La coda prendeva da un'insegna le sue mai viste e, se non bastavano a
+       riempire la quota, la completava con le gia' viste da rinfrescare.
+       Sembra ragionevole e non lo e', perche' le due cose non valgono
+       uguale: una scheda mai vista e' un prodotto in piu', una gia' vista e'
+       lo stesso prodotto con la data aggiornata.
+
+       Con ventotto paesi quasi finiti in un lettore solo, quel riempitivo si
+       mangiava la coda. Misurato il 23 settembre: UNDICI pagine al secondo
+       aperte, rese fra il 76% e il 99% — e ZERO VIRGOLA OTTO righe nuove al
+       secondo. Il motore girava a pieno regime rinfrescando roba che aveva
+       gia', mentre Alcampo aspettava con 87.767 schede mai aperte e Disco con
+       170.518.
+
+       Adesso finche' esiste UNA sola insegna con schede mai viste, la coda e'
+       fatta solo di quelle. Il rinfresco non si perde: quando non c'e' piu'
+       niente di nuovo da prendere — ed e' il caso di parecchi paesi europei —
+       il giro seguente lo fa tutto. */
+    const daFare =
+      maiVistePronte.length > 0
+        ? sparse(maiVistePronte, MAX_PER_INSEGNA_A_GIRO)
+        : sparse(giaVistePronte, MAX_PER_INSEGNA_A_GIRO);
+    if (maiVistePronte.length > 0) conNuove = true;
     saltate += tutti.length - daFare.length;
     if (daFare.length === 0) continue;
     /* Solo la sua quota: senza questo tetto la coda terrebbe in memoria un
@@ -851,9 +874,17 @@ export async function giroContinuo(
       void rinnovaTurni(biglietti, VALIDITA_MIN);
     }
     paeseDi.set(f.insegna, f.paese);
+    if (maiVistePronte.length === 0) soloRinfresco.push(mazzi.length);
     mazzi.push(
       daFare.slice(0, MAX_PER_INSEGNA_A_GIRO).map((x) => ({ ...x, insegna: f.insegna })),
     );
+  }
+
+  /* Se qualcuno ha del nuovo, i mazzi di solo rinfresco escono dalla coda:
+     rinfrescare mentre c'e' da scoprire e' spendere la stessa richiesta per
+     un prodotto che abbiamo gia'. */
+  if (conNuove && soloRinfresco.length > 0) {
+    for (const i of soloRinfresco.sort((a, b) => b - a)) mazzi.splice(i, 1);
   }
 
   const coda: Array<{ url: string; nome: string; insegna: string }> = [];
