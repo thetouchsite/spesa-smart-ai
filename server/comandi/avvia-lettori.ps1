@@ -28,6 +28,12 @@
 # Per questo AE sta da solo e SA sta con ZA, che e' Shoprite — un'altra
 # piattaforma, quindi quando una riposa l'altra lavora.
 #
+# E Carrefour Emirati va aperto UNA PAGINA PER VOLTA. Con due insieme a un
+# secondo e mezzo si e' messo in pausa dopo venti rifiuti e ci e' rimasto;
+# aperto uno alla volta ogni due secondi e mezzo da' cinque prezzi su sei. E'
+# il pool piu' grande che abbiamo — 784.877 indirizzi — e lo si prende piano o
+# non lo si prende affatto.
+#
 # Le pause sono misurate, non scelte: vedi `comandi/1 - Lettore continuo.cmd`
 # per il ragionamento completo, e `scripts/chi-rende-davvero.ts` per rifare la
 # misura quando un'insegna comincia a dare zero.
@@ -41,7 +47,7 @@ $log  = $env:TEMP
 
 $lettori = @(
   # nome      insieme  perCatena  pausa  paesi                                      quanti  memoria  vociMax
-  @{ n = "R-AE";   ins = 2;  cat = 2; pausa = 1500; solo = "AE";                     paesi = 1;  mem = 2560; voci = 900000 },
+  @{ n = "R-AE";   ins = 1;  cat = 1; pausa = 2500; solo = "AE";                     paesi = 1;  mem = 2560; voci = 900000 },
   @{ n = "R-SAZA"; ins = 4;  cat = 1; pausa = 2000; solo = "SA,ZA";                  paesi = 2;  mem = 1280; voci = 250000 },
   @{ n = "R-ES";   ins = 2;  cat = 1; pausa = 3000; solo = "ES";                     paesi = 1;  mem = 1280; voci = 250000 },
   @{ n = "R-AR";   ins = 4;  cat = 1; pausa = 1600; solo = "AR";                     paesi = 1;  mem = 1536; voci = 300000 },
