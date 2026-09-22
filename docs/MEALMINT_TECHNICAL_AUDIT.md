@@ -1,5 +1,10 @@
 # MealMint — Technical Audit
 
+> **Frozen snapshot, 22 September 2026.** Kept for its evidence — the
+> twelve-retailer structured-data probe in §0.1 and the repository module map
+> in §1 — not as a living plan. `MEALMINT_MASTER_BRIEF_v1.1.md` is the source
+> of truth, and wins wherever the two disagree.
+
 Answer to `MEALMINT_PRODUCT_AUDIT_AND_ROADMAP.md`, written after inspecting the
 repository and measuring the live database.
 

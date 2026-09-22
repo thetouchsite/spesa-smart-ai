@@ -2957,3 +2957,45 @@ on a confirmed `DISALLOW`.
 
 The audit §80 requires after one full 72-hour cycle applies to each half
 separately.
+
+---
+
+# 82. WHAT PHASE 1 DELIBERATELY DOES NOT DO
+
+Absorbed from the Phase 1 delta, which is retired. These are decisions, not
+omissions: each one was considered and declined for a stated reason.
+
+| Not done | Why |
+|---|---|
+| **Per-field provenance map** | `schede.fo` records provenance for the field set, not per field. A per-field map roughly triples the document for information nothing consumes yet. Addable later without migration. |
+| **Brand dictionary, fuzzy matching, LLM fallback** | JSON-LD carries `brand` on 12 of 12 probed retailers. Ship the structured-data stage, measure the real miss rate, then decide. Writing the other four stages first is building for a problem that has not been measured. |
+| **Canonical category taxonomy** | Phase 1 stores the raw retailer breadcrumb only. Mapping across 49 countries and many languages is Phase 3 work and would block Phase 1 for weeks. |
+| **Secondary index on `schede`** | Roughly 40 MB for a query nobody makes. Searching by brand arrives with Phase 3. |
+| **Exposing the new fields in `/v1`** | The public contract changes once, in Phase 2, together with the English alias layer — not twice. |
+| **Touching `cataloghi`** | The gzipped-blob design is correct and orthogonal to everything in Phase 1. |
+| **Storing product descriptions** | A product name is functional; three paragraphs of marketing copy are written by someone. It is the part of the dataset that least resembles data and most resembles someone else's content. Cheap to leave out, and it removes a whole front. |
+
+## Rollback
+
+Phase 1 is additive. Nothing is migrated, nothing is rewritten, nothing is
+deleted.
+
+- Existing `prezzi` documents keep their exact bytes. The new fields are
+  optional; absent means not observed, never zero.
+- `schede` and `osservazioni` start empty and are filled by the normal
+  72-hour read cycle — no re-reads, no extra requests to retailers.
+- The one non-additive operation is the currency backfill over ~327,592 rows
+  missing `v`. It is deterministic (retailer → country → ISO 4217) and only
+  ever writes into an empty field.
+
+To undo Phase 1: drop the two new collections and ignore the optional fields.
+The previous state is restored exactly.
+
+## Document status after v1.1
+
+| Document | Status |
+|---|---|
+| `MEALMINT_MASTER_BRIEF_v1.1.md` | **Living.** Decisions, architecture, legal, pricing, phases. Updated when a decision changes. |
+| `MEALMINT_TECHNICAL_AUDIT.md` | **Frozen snapshot, 22 September 2026.** Kept for its evidence: the twelve-retailer structured-data probe and the repository module map. Where it conflicts with this brief, this brief wins. |
+| `MEALMINT_PHASE1_DELTA.md` | **Retired.** Approved, and absorbed into §73-§82. |
+| `MEALMINT_PRODUCT_AUDIT_AND_ROADMAP.md` | **Superseded and removed.** Its content became this brief. |
