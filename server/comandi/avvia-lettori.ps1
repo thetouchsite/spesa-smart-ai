@@ -56,7 +56,17 @@ $lettori = @(
   # nome      insieme  perCatena  pausa  paesi                                      quanti  memoria  vociMax
   @{ n = "R-AE";   ins = 1;  cat = 1; pausa = 2500; solo = "AE";                     paesi = 1;  mem = 2560; voci = 900000 },
   @{ n = "R-SAZA"; ins = 4;  cat = 1; pausa = 2000; solo = "SA,ZA";                  paesi = 2;  mem = 1280; voci = 250000 },
-  @{ n = "R-ES";   ins = 1;  cat = 1; pausa = 3000; solo = "ES";                     paesi = 1;  mem = 1280; voci = 250000 },
+  # R-ES E' SPENTO DI PROPOSITO, dal 23 settembre 2026.
+  # Alcampo risponde «bloccato» anche a UNA pagina ogni tre secondi: l'abbiamo
+  # letto troppo a lungo. Il lettore aveva aperto 1.222 pagine per 12 prezzi,
+  # cioe' stava insistendo con qualcuno che ha gia' detto di no — e l'API la
+  # rivende un cliente, quindi la lamentela arriva a lui.
+  #
+  # Sono 107.000 indirizzi che rendevano il 100%: vale la pena riaverli, non
+  # vale la pena forzarli. Prima di riaccenderlo:
+  #     npx tsx --env-file-if-exists=.env scripts/chi-rende-davvero.ts --paese ES
+  # e si riaccende solo se Alcampo torna a dare almeno 3 prezzi su 6.
+  # @{ n = "R-ES";   ins = 1;  cat = 1; pausa = 3000; solo = "ES";                     paesi = 1;  mem = 1280; voci = 250000 },
   @{ n = "R-AR";   ins = 4;  cat = 1; pausa = 1600; solo = "AR";                     paesi = 1;  mem = 1536; voci = 300000 },
   @{ n = "R-UA";   ins = 6;  cat = 1; pausa = 1200; solo = "UA";                     paesi = 1;  mem = 1280; voci = 250000 },
   @{ n = "R-LAT";  ins = 12; cat = 1; pausa = 1500; solo = "CO,MX,BR,CL,PE,EG";      paesi = 6;  mem = 1280; voci = 250000 },
