@@ -95,9 +95,24 @@ export interface Robots {
 
 const cache = new Map<string, Promise<Robots>>();
 
-export function robotsDi(origine: string): Promise<Robots> {
+/**
+ * Il `robots.txt` di un sito, letto una volta e ricordato.
+ *
+ * SUL RILEGGERE
+ * -------------
+ * Il ricordo non scade da solo, e va bene per uno script che parte, fa il suo
+ * lavoro e muore. Non va bene per il lettore continuo, che resta acceso per
+ * giorni: li' il ricordo del primo minuto varrebbe fino al riavvio, e un
+ * divieto aggiunto martedi' non lo vedremmo fino a quando a qualcuno non
+ * viene in mente di spegnere e riaccendere. Che e' precisamente il guaio che
+ * questo file esiste per evitare.
+ *
+ * Chi ha bisogno di sapere com'e' ADESSO passa `rileggi`. Vedi `permessi.ts`,
+ * che lo fa ogni dodici ore per insegna.
+ */
+export function robotsDi(origine: string, rileggi = false): Promise<Robots> {
   const c = cache.get(origine);
-  if (c) return c;
+  if (c && !rileggi) return c;
   const p = (async (): Promise<Robots> => {
     try {
       /* CI PRESENTIAMO COME UN BROWSER ANCHE QUI, E NON E' UN PARADOSSO.

@@ -114,6 +114,11 @@ const PADRONI = {
   /* Le schede che il prezzo non ce l'hanno. E' memoria del mestiere di
      raccogliere prezzi: sta di qua, accanto al magazzino. */
   scarti: "api",
+  /* Chi ci ha dato il permesso di leggerlo e chi ce l'ha tolto. E' una regola
+     del mestiere di raccogliere prezzi — e, se l'API si stacca domani, e' il
+     file che deve partire INSIEME a lei: e' quello che rende difendibile cio'
+     che vende. Sta di qua. */
+  permessi: "api",
 
   // ── app ────────────────────────────────────────────────────────────
   /* Il modello e la ricerca sul web stanno di qua per una ragione precisa:

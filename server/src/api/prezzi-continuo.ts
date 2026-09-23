@@ -47,6 +47,7 @@ import { scartiDi, segnaScarti } from "./scarti.js";
 import { prezzi as collezionePrezzi } from "../base/db.js";
 import { verifyProductPage } from "./price-page.js";
 import { GiroInCorso, battitoDiAttesa } from "./giri.js";
+import { permessoDiLeggere, riepilogoPermessi } from "./permessi.js";
 import {
   FRESCHEZZA_MS,
   improntaUrl,
@@ -662,6 +663,33 @@ export async function giroContinuo(
     if ((ritirateFinoA.get(f.insegna) ?? 0) > Date.now()) continue;
     const tutti = await indirizziDi(f.paese, f.insegna);
     if (tutti.length === 0) continue;
+
+    /* SI CHIEDE IL PERMESSO, E SI CHIEDE QUI.
+       Qui perche' e' l'unico punto in cui abbiamo in mano gli indirizzi VERI
+       che stiamo per aprire: un `Disallow: /prodotti/` non si vede chiedendo
+       il permesso per la home. E costa zero — gli indirizzi sono gia' in
+       memoria, il file si scarica una volta ogni dodici ore per insegna.
+
+       Prima di oggi questa domanda non la faceva nessuno: il permesso si
+       controllava quando l'insegna entrava in catalogo e poi si dava per
+       acquisito. Vedi `permessi.ts`.
+
+       Un IGNOTO — il file non risponde, la rete e' caduta — lascia lavorare.
+       Un silenzio non e' un divieto, e trattarlo come tale vorrebbe dire
+       spegnere mezzo catalogo alla prima ora di rete ballerina. */
+    const varco = await permessoDiLeggere(
+      f.paese,
+      f.insegna,
+      tutti.map((x) => x.url),
+    );
+    /* E SI BATTE SUBITO DOPO, perche' quella sopra e' una chiamata di rete
+       con quindici secondi di pazienza, e sta dentro il ciclo che monta la
+       coda. Il battito in fondo al ciclo c'e' gia' ed e' li' per questo
+       motivo; questo qui copre il pezzo che e' stato aggiunto dopo. `segna`
+       scrive al massimo ogni cinque secondi, quindi non costa niente. */
+    giro.segnaPermessi(riepilogoPermessi());
+    giro.segna(aperte, conPrezzo, saltate);
+    if (varco.esito === "DISALLOW") continue;
 
     /* DUE ELENCHI, NON UNO, E LA DIFFERENZA E' QUELLA FRA CRESCERE E GIRARE
        A VUOTO.

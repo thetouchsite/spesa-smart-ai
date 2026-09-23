@@ -159,6 +159,10 @@ export class GiroInCorso {
   private conPrezzo = 0;
   private saltate = 0;
   private readonly inizio = new Date();
+  /* L'esito dei permessi, per la riga del giro. E' una comodita' per chi
+     guarda il pannello: la prova che non scade sta in `permessi`. Vedi
+     `PermessoDoc` e il commento su `GiroDoc.robots`. */
+  private robots?: GiroDoc["robots"];
   /* Le scritture non si aspettano: se Mongo e' lento, il lettore non deve
      rallentare per raccontare che sta andando veloce. */
   private inVolo: Promise<unknown> = Promise.resolve();
@@ -184,6 +188,17 @@ export class GiroInCorso {
     this.ultimoInvio = ora;
     this.scrivi("battito");
     this.leggiOrdini();
+  }
+
+  /**
+   * Com'e' andato il controllo dei permessi finora.
+   *
+   * Si aggiorna quando cambia, e finisce sia sul battito sia sulla riga
+   * archiviata: sul battito perche' se stanotte un negozio ci dice di no si
+   * vuole vederlo subito, non domattina.
+   */
+  segnaPermessi(r: GiroDoc["robots"]): void {
+    this.robots = r;
   }
 
   /**
@@ -235,6 +250,7 @@ export class GiroInCorso {
         ...comeSta(),
         esito,
         ...(this.paesi ? { paesi: this.paesi } : {}),
+        ...(this.robots ? { robots: this.robots } : {}),
       };
       const { _id, ...corpo } = riga;
       await c.replaceOne({ _id }, corpo, { upsert: true });
@@ -265,6 +281,7 @@ export class GiroInCorso {
             saltate: this.saltate,
             ...comeSta(),
             ...(this.paesi ? { paesi: this.paesi } : {}),
+            ...(this.robots ? { robots: this.robots } : {}),
           },
           { upsert: true },
         );

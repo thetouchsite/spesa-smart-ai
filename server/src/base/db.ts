@@ -264,6 +264,59 @@ export interface OsservazioneDoc {
 }
 
 /**
+ * Cosa ci ha detto il `robots.txt` di un'insegna, e QUANDO ce l'ha detto.
+ *
+ * PERCHE' NON BASTA IL CAMPO SU `fonti`
+ * -------------------------------------
+ * `fonti.robots` dice com'e' la situazione ADESSO, e si sovrascrive a ogni
+ * controllo. Risponde alla domanda «la possiamo leggere?», che e' quella che
+ * serve stanotte.
+ *
+ * Non risponde all'altra, che e' quella che serve fra un anno: «il 14 marzo,
+ * quando l'avete letta, il permesso c'era?». Se a giugno il negozio aggiunge
+ * un divieto, il campo su `fonti` diventa DISALLOW e la risposta di marzo
+ * sparisce — sostituita da quella che ci fa torto.
+ *
+ * PERCHE' NON SULLA RIGA DEL GIRO
+ * -------------------------------
+ * Era il posto ovvio, ed e' sbagliato per un motivo preciso: `giri` ha un TTL
+ * di trenta giorni. Una prova che vive un mese non e' una prova — e sparirebbe
+ * da sola, in silenzio, esattamente come sarebbe sparita la storia dei prezzi
+ * se l'avessimo messa dentro `prezzi`. E' lo stesso errore, nello stesso
+ * progetto, a tre settimane di distanza.
+ *
+ * Sulla riga del giro l'esito ci va lo stesso, ma come comodita' per chi
+ * guarda il pannello domattina. La prova sta qui.
+ *
+ * SI SCRIVE SOLO QUANDO CAMBIA
+ * ----------------------------
+ * Come gli intervalli di prezzo, e per la stessa ragione: un controllo ogni
+ * dodici ore su cinquanta insegne sarebbero trentaseimila righe l'anno quasi
+ * tutte identiche. Con `t` (da quando dice questo) e `u` (ultima conferma),
+ * un anno di «sempre permesso» e' una riga sola con una durata. Cinquanta
+ * insegne, una manciata di righe ciascuna: qualche decina di kilobyte.
+ *
+ * NIENTE TTL SU QUESTA COLLEZIONE.
+ */
+export interface PermessoDoc {
+  _id: ObjectId;
+  /** L'insegna: `"PAESE|Insegna"`, come `fonti._id`. */
+  f: string;
+  /** Cosa dice il file. `IGNOTO` quando non risponde: vedi sotto. */
+  e: "ALLOW" | "DISALLOW" | "PARZIALE" | "IGNOTO";
+  /** La regola che ha vinto, testuale: `"Disallow: /prodotti/"`. */
+  r: string;
+  /** I percorsi provati, cosi' si puo' rifare il conto a mano. */
+  pr: string[];
+  /** Da quando dice questo. */
+  t: Date;
+  /** Ultima volta che l'ha confermato. */
+  u: Date;
+  /** Vero sull'ultima riga: l'esito in vigore. */
+  aperta?: true;
+}
+
+/**
  * Il catalogo di un'insegna, compresso in un documento solo.
  *
  * Tre milioni di prodotti come tre milioni di documenti sarebbero 867 MB con
@@ -450,6 +503,15 @@ export interface GiroDoc {
   /** Solo sulle righe finite: perche' ha smesso. */
   esito?: "tempo scaduto" | "catalogo finito" | "interrotto";
   paesi?: string[];
+  /**
+   * Com'e' andato il controllo dei permessi all'inizio del giro.
+   *
+   * E' una COMODITA', non la prova: questa riga scade dopo trenta giorni.
+   * Serve a chi apre il pannello domattina e vuole sapere in una riga se
+   * stanotte qualcuno ci ha detto di no. La prova, che non scade, sta in
+   * `permessi` — vedi `PermessoDoc`.
+   */
+  robots?: { permesse: number; vietate: number; ignote: number; sospese?: string[] };
   /* Lo stato della macchina che sta leggendo, preso al volo insieme al battito.
      Serve perche' quando il lettore rallenta la prima domanda e' sempre «e' la
      macchina che non ce la fa, o sono i negozi che non rispondono?» — e senza
@@ -530,6 +592,17 @@ export async function getDb(): Promise<Db> {
     db.collection<CatalogoDoc>("cataloghi").createIndex({ paese: 1, prodotti: 1 }),
     // Le fonti si chiedono sempre per paese, e quasi sempre ordinate per resa.
     db.collection<FonteDoc>("fonti").createIndex({ paese: 1, resa: -1 }),
+    /* IL REGISTRO DEI PERMESSI, CHE NON SCADE.
+       Un indice unico PARZIALE sulle righe aperte: e' il database a garantire
+       che un'insegna abbia un esito in vigore solo, non il codice. Se una
+       chiusura fallisce a meta', l'inserimento successivo sbatte contro
+       l'indice e fallisce rumorosamente, invece di lasciare due verita' in
+       giro senza che nessuno se ne accorga. */
+    db.collection<PermessoDoc>("permessi").createIndex(
+      { f: 1 },
+      { unique: true, partialFilterExpression: { aperta: true } },
+    ),
+    db.collection<PermessoDoc>("permessi").createIndex({ f: 1, t: -1 }),
     /* Il diario si legge sempre in ordine di tempo, e le righe dei giri finiti
        dopo un mese non servono piu' a nessuno: le butta Mongo da sola. */
     db.collection<GiroDoc>("giri").createIndex({ tocco: -1 }),
@@ -648,6 +721,11 @@ export async function schede(): Promise<Collection<SchedaDoc>> {
 
 export async function osservazioni(): Promise<Collection<OsservazioneDoc>> {
   return (await getDb()).collection<OsservazioneDoc>("osservazioni");
+}
+
+/** Chi ci ha detto di si' e chi di no, con le date. Vedi `PermessoDoc`. */
+export async function permessi(): Promise<Collection<PermessoDoc>> {
+  return (await getDb()).collection<PermessoDoc>("permessi");
 }
 
 export async function fonti(): Promise<Collection<FonteDoc>> {
