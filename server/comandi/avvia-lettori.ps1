@@ -65,10 +65,19 @@ $lettori = @(
   # Due ore di riposo e sono tornati: Bonpreu 6 prezzi su 6, Alcampo 5 su 6.
   # Riaccesa con UN lavoratore solo a tre secondi, che e' il passo misurato.
   #
-  # Se torna a dare quasi zero, si spegne di nuovo e si aspetta. La verifica:
-  #     npx tsx --env-file-if-exists=.env scripts/chi-rende-davvero.ts --paese ES
-  # e si riaccende quando Alcampo da' almeno 3 prezzi su 6.
-  @{ n = "R-ES";   ins = 1;  cat = 1; pausa = 3000; solo = "ES";                     paesi = 1;  mem = 1280; voci = 250000 },
+  # E POI HA RICHIUSO DOPO 140 PAGINE. La ripresa e' SUPERFICIALE: reggono una
+  # dozzina di richieste — abbastanza da far passare la verifica a sei schede —
+  # e poi tornano a rifiutare. Il lettore ha aperto 140 pagine per zero prezzi.
+  #
+  # Quindi la verifica a sei richieste, da sola, NON basta per questa
+  # piattaforma: dice che sono svegli, non che reggono un turno di lavoro. Il
+  # segnale vero e' il lettore stesso dopo qualche centinaio di pagine.
+  #
+  # Rispento il 23 settembre. Prima di riaccenderlo, aspettare ore e non
+  # minuti, e poi guardare la resa DOPO cinquecento pagine, non dopo sei.
+  # Sono 108.173 schede che rendevano quasi il cento per cento e valgono
+  # l'attesa; non valgono l'insistenza.
+  # @{ n = "R-ES";   ins = 1;  cat = 1; pausa = 3000; solo = "ES";                     paesi = 1;  mem = 1280; voci = 250000 },
   @{ n = "R-AR";   ins = 4;  cat = 1; pausa = 1600; solo = "AR";                     paesi = 1;  mem = 1536; voci = 300000 },
   @{ n = "R-UA";   ins = 6;  cat = 1; pausa = 1200; solo = "UA";                     paesi = 1;  mem = 1280; voci = 250000 },
   @{ n = "R-LAT";  ins = 12; cat = 1; pausa = 1500; solo = "CO,MX,BR,CL,PE,EG";      paesi = 6;  mem = 1280; voci = 250000 },
