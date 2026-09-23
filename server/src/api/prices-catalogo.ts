@@ -51,7 +51,13 @@ import {
   impara,
   LINGUA_DEL_PAESE as LINGUA_VOCABOLARIO,
 } from "./vocabolario.js";
-import { improntaUrl, prezziGiaVisti, salvaPrezzi, type PrezzoSalvato } from "./prezzi-magazzino.js";
+import {
+  improntaUrl,
+  prezziGiaVisti,
+  salvaPrezzi,
+  campiDallaPagina,
+  type PrezzoSalvato,
+} from "./prezzi-magazzino.js";
 import { scartiDi, segnaScarti } from "./scarti.js";
 
 /** La stessa forma che producono le altre due strade. */
@@ -666,7 +672,17 @@ export async function generatePricesCatalogo(
       return {
         riga: {
           prodotto: c.voce,
-          nome: salvato.nome,
+          /* IL NOME LO METTE CHI CHIAMA, E PRIMA NESSUNO LO FACEVA.
+             Nella forma stretta il magazzino non tiene piu' il nome — sono
+             quarantadue byte per riga scritti due volte, e chi legge ce l'ha
+             gia' dal catalogo. Giusto, ma la seconda meta' mancava: qui si
+             prendeva `salvato.nome`, che da allora e' sempre vuoto.
+
+             Misurato su una spesa inglese da sei voci: ventitre offerte su
+             ventotto senza nome. Nell'app diventa una riga con il prezzo e il
+             link e uno spazio bianco al posto del prodotto — e non da' nessun
+             errore, perche' una stringa vuota e' una stringa valida. */
+          nome: salvato.nome || c.nome,
           prezzo: salvato.prezzo,
           valuta: salvato.valuta || valuta,
           negozio: c.insegna,
@@ -752,6 +768,7 @@ export async function generatePricesCatalogo(
         insegna: c.insegna,
         verifica: v.status,
         visto: new Date(),
+        ...campiDallaPagina(v),
       });
     } else if (v.status !== "non-raggiungibile") {
       daScartare.push({ insegna: c.insegna, impronta: improntaUrl(c.url) });

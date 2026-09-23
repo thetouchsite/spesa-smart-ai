@@ -70,6 +70,23 @@ export interface PrezzoSalvato {
   verifica: VerifyStatus;
   /** Quando l'abbiamo letta. Chi mostra il prezzo puo' dirne l'eta'. */
   visto: Date;
+
+  /* ─── QUEL CHE LA PAGINA DICHIARAVA E CHE SI BUTTAVA ───
+     `price-page.ts` legge da sempre prezzo pieno, risparmio, percentuale di
+     sconto e scadenza dell'offerta: sono dentro `PagePrice` da prima di
+     questo lavoro. Solo che il magazzino non aveva dove metterli, e a ogni
+     lettura finivano nel niente — mezzo milione di volte al giorno.
+
+     Non e' un campo che mancava: e' un campo che raccoglievamo e gettavamo. */
+
+  /** Prezzo pieno, quando la pagina dichiara una promozione. */
+  listino?: number;
+  /** Percentuale di sconto, arrotondata. */
+  scontoPercento?: number;
+  /** Fino a quando l'offerta e' dichiarata valida. */
+  promoFino?: Date;
+  /** 0 ignota, 1 disponibile, 2 esaurita, 3 scorte limitate. */
+  disponibilita?: 0 | 1 | 2 | 3;
 }
 
 /**
@@ -280,6 +297,65 @@ export function salvataggiArrivano(): boolean {
   return ultimoSalvataggioRiuscito;
 }
 
+/**
+ * Dalla lettura della pagina ai campi da salvare.
+ *
+ * STA IN UN POSTO SOLO PERCHE' I POSTI CHE SALVANO SONO TRE.
+ * Il giro continuo, il giro notturno e la strada dei prezzi a richiesta
+ * costruiscono tutti e tre una riga da un `VerifiedPrice`. Scritta tre volte,
+ * questa conversione diverge: uno aggiunge un campo, gli altri due no, e
+ * l'insegna che passa da quella strada perde meta' della scheda senza che
+ * nessuno se ne accorga.
+ */
+export function campiDallaPagina(v: {
+  page?: { list?: number; discountPercent?: number; validUntil?: string };
+  scheda?: { disponibilita?: 0 | 1 | 2 | 3 };
+}): Pick<PrezzoSalvato, "listino" | "scontoPercento" | "promoFino" | "disponibilita"> {
+  const fuori: Pick<PrezzoSalvato, "listino" | "scontoPercento" | "promoFino" | "disponibilita"> = {};
+  if (typeof v.page?.list === "number") fuori.listino = v.page.list;
+  if (typeof v.page?.discountPercent === "number") fuori.scontoPercento = v.page.discountPercent;
+  if (v.page?.validUntil) {
+    /* La scadenza arriva come testo dai dati strutturati, e a volte e' un
+       giorno solo (`2026-09-30`) e a volte un istante intero. `Date` regge
+       tutte e due; quel che non regge lo scartiamo invece di salvare una data
+       inventata. */
+    const q = new Date(v.page.validUntil);
+    if (!Number.isNaN(q.getTime())) fuori.promoFino = q;
+  }
+  if (v.scheda?.disponibilita !== undefined) fuori.disponibilita = v.scheda.disponibilita;
+  return fuori;
+}
+
+/**
+ * I campi che cambiano a ogni lettura, quando la pagina li dichiara.
+ *
+ * SI SCRIVONO SOLO QUANDO CI SONO, E NON SI CANCELLANO MAI.
+ * Un `$set` con `undefined` scrive `null`, e `null` vorrebbe dire «letto, e
+ * non c'era»: e' un'affermazione diversa da «non osservato». Su una scheda
+ * che oggi dichiara la promozione e domani no, la differenza fra le due e'
+ * tutto quel che distingue «l'offerta e' finita» da «non l'abbiamo vista».
+ *
+ * Quindi il campo assente resta assente. Chi legge trova `undefined` e sa che
+ * non sa — che e' la risposta onesta.
+ *
+ * QUI NON C'E' L'IMPRONTA `sh`, E NON E' UNA DIMENTICANZA.
+ * L'impronta serve a capire se i campi descrittivi sono cambiati, per non
+ * riscrivere `schede` a ogni lettura. Ma scriverla ORA, con `schede` ancora
+ * spenta, sarebbe una trappola: il giorno che si accende, l'impronta
+ * combacerebbe gia' e il codice salterebbe la scrittura. `schede` resterebbe
+ * vuota per sempre, senza dare nessun errore.
+ *
+ * `sh` si accende insieme a `schede`, mai prima.
+ */
+function volatili(r: PrezzoSalvato): Record<string, unknown> {
+  const campi: Record<string, unknown> = {};
+  if (typeof r.listino === "number") campi.l = r.listino;
+  if (typeof r.scontoPercento === "number") campi.sc = r.scontoPercento;
+  if (r.promoFino instanceof Date && !Number.isNaN(r.promoFino.getTime())) campi.pf = r.promoFino;
+  if (r.disponibilita !== undefined) campi.av = r.disponibilita;
+  return campi;
+}
+
 export async function salvaPrezzi(righe: PrezzoSalvato[]): Promise<void> {
   if (!isDbConfigured() || righe.length === 0) return;
 
@@ -300,6 +376,7 @@ export async function salvaPrezzi(righe: PrezzoSalvato[]): Promise<void> {
                 s: STATO[r.verifica] ?? 1,
                 t: r.visto,
                 c: numeroInsegna(r.insegna),
+                ...volatili(r),
               },
             },
             upsert: true,

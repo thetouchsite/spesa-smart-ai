@@ -95,11 +95,22 @@ export interface VerifiedPrice {
    * aperta, prezzo servito da un'API, nome per esteso disponibile.
    */
   nome?: string;
+  /**
+   * Marca, codice del negozio, indirizzo dell'immagine, disponibilita',
+   * categoria grezza: quel che la pagina dichiara e che fino a ieri si
+   * buttava.
+   *
+   * Sta accanto a `page` e non dentro, per la stessa ragione del nome: questi
+   * campi esistono anche quando il prezzo non si e' potuto leggere, e quello
+   * e' il caso normale per quarantadue insegne del catalogo.
+   */
+  scheda?: SchedaPagina;
 }
 
 import { haLettoreApi, prezzoDaApi } from "./prezzi-api.js";
 import { INTESTAZIONE_BROWSER } from "../base/intestazione.js";
 import { quantitaDa } from "./quantita.js";
+import { schedaDallaPagina, type SchedaPagina } from "./scheda-pagina.js";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
@@ -673,7 +684,10 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
   }
 
   const page = readPrices(html);
-  if (page) return { status: "verificato", page };
+  /* La scheda si legge una volta sola e serve a tutti e tre i rami: la pagina
+     e' gia' aperta e la fetta e' gia' in memoria, quindi costa una scorsa. */
+  const scheda = schedaDallaPagina(html);
+  if (page) return { status: "verificato", page, scheda };
 
   /* LA PAGINA C'E' MA IL PREZZO NON E' SCRITTO DENTRO.
      Per quarantadue insegne del catalogo e' la norma, non l'eccezione: 1,28
@@ -688,6 +702,7 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
       return {
         status: "verificato",
         page: { current: daApi.prezzo, currency: daApi.valuta },
+        scheda,
       };
     }
   }
@@ -697,7 +712,7 @@ export async function verifyProductPage(url: string): Promise<VerifiedPrice> {
      perche' il prezzo lo servono da un'API. La riga il prezzo ce l'ha gia' —
      gliel'ha dato l'API — e quel che le manca e' il FORMATO, che sta nel nome
      per esteso. Leggerlo qui non costa niente: la pagina e' gia' aperta. */
-  return { status: "pagina-ok", nome: nomeDallaPagina(html) };
+  return { status: "pagina-ok", nome: nomeDallaPagina(html), scheda };
 }
 
 /** Una riga di prezzo dopo il controllo, pronta per il client. */
