@@ -23,6 +23,13 @@
 #   Alcampo e Bonpreu Esclat   stessa piattaforma. Insieme a 1,5 secondi
 #                              davano 13 prezzi su 4.250 pagine; separati e a
 #                              tre secondi, sei su sei.
+#
+#                              E non basta dare tre secondi a CIASCUNA: con due
+#                              lavoratori il backend ne riceve comunque una
+#                              ogni secondo e mezzo, e torna al 2%. La Spagna
+#                              ha percio' UN lavoratore solo per tutte le sue
+#                              insegne — `ins = 1`. La pausa conta per il
+#                              backend, non per l'insegna.
 #   Carrefour Emirati e Arabia stesso gruppo (MAF). Stessa storia.
 #
 # Per questo AE sta da solo e SA sta con ZA, che e' Shoprite — un'altra
@@ -49,7 +56,7 @@ $lettori = @(
   # nome      insieme  perCatena  pausa  paesi                                      quanti  memoria  vociMax
   @{ n = "R-AE";   ins = 1;  cat = 1; pausa = 2500; solo = "AE";                     paesi = 1;  mem = 2560; voci = 900000 },
   @{ n = "R-SAZA"; ins = 4;  cat = 1; pausa = 2000; solo = "SA,ZA";                  paesi = 2;  mem = 1280; voci = 250000 },
-  @{ n = "R-ES";   ins = 2;  cat = 1; pausa = 3000; solo = "ES";                     paesi = 1;  mem = 1280; voci = 250000 },
+  @{ n = "R-ES";   ins = 1;  cat = 1; pausa = 3000; solo = "ES";                     paesi = 1;  mem = 1280; voci = 250000 },
   @{ n = "R-AR";   ins = 4;  cat = 1; pausa = 1600; solo = "AR";                     paesi = 1;  mem = 1536; voci = 300000 },
   @{ n = "R-UA";   ins = 6;  cat = 1; pausa = 1200; solo = "UA";                     paesi = 1;  mem = 1280; voci = 250000 },
   @{ n = "R-LAT";  ins = 12; cat = 1; pausa = 1500; solo = "CO,MX,BR,CL,PE,EG";      paesi = 6;  mem = 1280; voci = 250000 },
