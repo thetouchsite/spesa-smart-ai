@@ -2999,3 +2999,280 @@ The previous state is restored exactly.
 | `MEALMINT_TECHNICAL_AUDIT.md` | **Frozen snapshot, 22 September 2026.** Kept for its evidence: the twelve-retailer structured-data probe and the repository module map. Where it conflicts with this brief, this brief wins. |
 | `MEALMINT_PHASE1_DELTA.md` | **Retired.** Approved, and absorbed into §73-§82. |
 | `MEALMINT_PRODUCT_AUDIT_AND_ROADMAP.md` | **Superseded and removed.** Its content became this brief. |
+
+---
+
+# 83. PHASE 1a — WHAT SHIPPED, AND WHAT IMPLEMENTATION CHANGED
+
+Updated 23 September 2026, after four of the seven Phase 1a items landed.
+This section amends §18, §76 and §79 where they disagree.
+
+## 83.1 Shipped
+
+| | Status | Where |
+|---|---|---|
+| Schema: volatile fields, `SchedaDoc`, `OsservazioneDoc`, compliance record | **done** | `src/base/db.ts` |
+| Structured-data extraction | **done** | `src/api/scheda-pagina.ts` (new) |
+| Volatile fields persisted | **done** | `src/api/prezzi-magazzino.ts` |
+| Currency backfill | **done, executed** | `scripts/valuta-mancante.ts` (new) |
+| robots.txt checked on every round, auto-suspend | **done** | `src/api/permessi.ts` (new) |
+| robots outcome recorded, without a TTL | **done** | `permessi` collection |
+| Field-coverage metrics | **done** | `scripts/copertura-campi.ts` (new) |
+
+**Phase 1a is complete.** §84 records what the last three items turned out to be.
+
+## 83.2 Measured extraction rates, on twelve real retailers
+
+The audit's table counted the *presence of markup*. These are the rates at
+which the extractor actually returns a usable value:
+
+| | audit (markup present) | measured (value extracted) |
+|---|---:|---:|
+| retailer SKU | 12/12 | **12/12** |
+| image URL | 12/12 | **12/12** |
+| brand | 12/12 | **11/12** |
+| availability | 11/12 | **11/12** |
+| raw category | 9/12 | **6/12** |
+
+**The category figure is the one that moved, and the audit was optimistic.**
+9/12 counted the string `BreadcrumbList` anywhere in the HTML; 6/12 is how
+often it can actually be parsed. The other three retailers write their
+breadcrumbs as microdata attributes, not as a JSON-LD block, and a JSON reader
+cannot reach those.
+
+A hypothesis was tested and rejected in the process: that the breadcrumb block
+was falling outside the slice `porzioneConPrezzi()` produces. Passing the whole
+page instead left the figure at 6/12 and cost milliseconds on every one of
+~500,000 daily reads. Reverted.
+
+## 83.3 A trap in the approved design, found while building it
+
+§76 specifies the `sh` fingerprint as a write-avoidance device for `schede`.
+Correct — but **it must not be written before `schede` is enabled.**
+
+With `schede` off and `sh` already stored, the day `schede` is switched on the
+fingerprint would already match, the write would be skipped, and **`schede`
+would stay empty forever without raising a single error.**
+
+`sh` ships with `schede`, in Phase 1b. Phase 1a writes four volatile fields
+(`l`, `sc`, `av`, `pf`) and not the fingerprint. Storage for Phase 1a is
+therefore ~35 MB rather than the ~50 MB estimated.
+
+## 83.4 Currency: deduced from the corpus, not from a table, and marked as deduced
+
+355,575 rows had a price and no currency — 20% of the warehouse, concentrated
+in whole retailers rather than scattered rows. **Now 96.**
+
+Not fixed with a hand-written country→currency table. One already exists in
+`app/amazon-search.ts`, covers twenty countries of forty-nine, and falls back
+to EUR when it does not know — which writes a false value for Romania with the
+appearance of a true one.
+
+The rule reads the corpus instead: among the rows that *do* declare a currency,
+first within the same retailer, then within its country, fill only when one
+currency covers **≥99%** with **≥10 witnesses**. Romania had 78,783 rows and
+every one of them RON.
+
+99% and not 100% because Italy carries 28 rows in USD and 2 in MAD against
+150,713 in EUR; demanding unanimity would have blocked 24,401 Italian rows over
+thirty pieces of noise.
+
+**Every filled row carries `vd: true`.** Without that marker, a currency read
+from the page and one written by us become indistinguishable the next day, and
+an operation over 355,000 rows becomes irreversible. Ten bytes on the rows
+touched, ~3 MB in total — and it is also honest toward whoever buys the data:
+*"deduced from the retailer's country"* is information; *"EUR"* alone is an
+assertion.
+
+96 rows are deliberately left empty: Bulk, a UK retailer in a country where
+eight currencies coexist.
+
+## 83.5 Storage now has a date, not just a threshold
+
+§18 recorded 410 MB of 512 MB. Measured over two days:
+
+```
+21 Sep   412 MB
+23 Sep   426 MB      →  ~11 MB/day,  86 MB left
+```
+
+**Roughly eight days** before the free tier is full, after which the reader
+starts failing writes. §79's infrastructure decision is no longer open-ended.
+
+## 83.6 Infrastructure recommendation, revised after looking at real offers
+
+§79 left the VPS direction open. Two offers were examined:
+
+| | verdict |
+|---|---|
+| OVH VPS-1 — 2 vCPU, 4 GB, 40 GB | **RAM too small.** MongoDB (~1 GB) + reader (~0.5 GB) + API (measured at 569 MB with three countries loaded, and the point is to raise that) + OS does not fit in 4 GB. Fine for database and reader only, with the API left on Render. |
+| Contabo Cloud VPS 6 — 6 vCPU, 12 GB, 200 GB | **Size is right.** The known risk is Contabo's variable disk I/O, which MongoDB is sensitive to. |
+
+**Two conditions on the Contabo option.** Take it *monthly*, never the
+24-month term: that turns the disk question from a two-year bet into a
+first-week measurement. And watch three things during that week — the reader's
+pages/second in the panel, whether `salvaPrezzi` drifts from milliseconds to
+seconds in waves, and whether an API request from the warehouse stays under a
+second.
+
+Contabo's 2 snapshots are **not** a backup: they live on the same
+infrastructure. §79's off-host backup requirement stands unchanged.
+
+One correction to an earlier assessment recorded here so it is not repeated:
+the 300 Mbit/s port was briefly called the number to watch. It is not. At the
+measured page sizes it caps the reader around 50–80 pages/second, which sits
+above two of the three current readers — and the reader is limited by its
+courtesy pause and by retailer response times long before either the port or
+the CPU.
+
+## 83.7 Deployment note for every machine
+
+A `git pull` updates files; it does not update a process that is already
+running. The reader loads its code into memory at startup and never re-reads
+the source.
+
+Measured consequence: 177,000 reads in 24 hours produced 165 rows carrying the
+new fields — all of them from short test runs, none from the long-lived
+readers.
+
+**After any pull that touches `server/`, close and reopen the reader window.**
+No rebuild is needed (the reader runs through `tsx`, which reads the `.ts`
+sources), and nothing is lost: the warehouse holds what was read, country
+tickets expire on their own, and `lettore.cmd` already loops. Render redeploys
+itself on push.
+
+---
+
+# 84. PERMISSION, MEASURED — AND WHAT PHASE 1a ACTUALLY FOUND
+
+Updated 23 September 2026, on completion of Phase 1a.
+
+## 84.1 The gap was not the one on the roadmap
+
+The roadmap item read "schedule the robots.txt check". The code said something
+worse: **the reader had never checked robots.txt at all.**
+
+`base/robots.ts` has parsed those files correctly since the beginning, but the
+only caller was `caccia-insegne` — the moment a *new* retailer is evaluated.
+After that the permission was treated as permanently granted. The process that
+opens ~500,000 pages a day, every day, never asked.
+
+A retailer adding a `Disallow` in March would have been read until someone
+thought to run a script by hand.
+
+The check now runs inside the round, per retailer, every 12 hours, **against
+the addresses the round is about to open** — a `Disallow: /prodotti/` is
+invisible to a request for `/`. It costs one request per retailer per 12 hours
+against 500,000 page reads.
+
+## 84.2 The second TTL trap, three weeks after the first
+
+The plan said to log the robots outcome on the round row. `giri` carries a
+**30-day TTL**.
+
+Evidence that lives one month is not evidence. It would have expired silently —
+exactly as price history would have expired had it been stored in `prezzi`. Same
+mistake, same project, three weeks apart. The lesson generalises: **before
+writing anything meant to be kept, check the collection's TTL.**
+
+Three destinations, three different questions:
+
+| | question it answers | expires |
+|---|---|---|
+| `fonti.robots` | may we read it *now*? | overwritten each check |
+| `permessi` (new) | were we allowed *on 14 March*? | **never** |
+| the round row | what happened last night? | 30 days, and that is fine |
+
+`permessi` appends only on change — `t` from when, `u` last confirmed — the same
+shape as price intervals, for the same reason. 235 retailers, a handful of rows
+each: tens of kilobytes. A partial unique index on `{ f: 1 }` over open rows
+makes it impossible for a retailer to have two verdicts in force.
+
+## 84.3 Silence is not refusal
+
+A `robots.txt` answers three ways — yes, no, depends on the path — and there is
+a fourth case: no answer at all (absent file, timeout, 5xx, dead network). That
+fourth case is `IGNOTO`, and **it suspends nothing.**
+
+The opposite fails in the worst possible way: one hour of flaky network would
+suspend half the catalogue, and recovery would need somebody to notice. It would
+be a malfunction wearing the costume of a scruple — and nobody audits scruples.
+Suspension requires a `Disallow` that was *read*, in a file that *answered*,
+matching the path.
+
+Three sample paths per retailer, spread across the catalogue, distinguish "this
+retailer refuses" from "this section refuses". A mixed result is `PARZIALE` and
+suspends nothing: it flags that we are reading pages the retailer divides into
+two groups, and a human should look at which group.
+
+Re-enabling is equally narrow. `esclusa` is the master switch and humans write
+into it for reasons a permissive robots.txt does not resolve — *"they sent us a
+cease and desist"* does not expire because a file changed. Only exclusions
+carrying our own `robots.txt:` prefix are ever reversed automatically.
+
+The manual command is **dry-run unless `--scrivi`**, matching
+`valuta-mancante.ts`. A check that suspends real retailers must not be able to
+fire by accident.
+
+## 84.4 Measured, on a live reader
+
+Italy, 23 September, first round with the new code:
+
+```
+aperte=567  conPrezzo=157  righe=157  av=156        →  99% carry availability
+robots: 23 allowed · 0 forbidden · 1 no answer
+```
+
+`l`, `sc` and `pf` stayed at zero in that sample, as expected: they exist only
+where a page declares a promotion. Availability is the field that proves the
+chain end to end — page read, structured data extracted, row written.
+
+## 84.5 Coverage is measured against recent rows, not the whole warehouse
+
+`scripts/copertura-campi.ts` prints two columns. The left one — coverage over all
+1.8M rows — will read near zero for weeks even if everything works perfectly,
+because old rows refresh at the pace of the 72-hour cycle. That is arithmetic,
+not diagnosis.
+
+The column that means something is coverage over rows read **since the new code
+started running**.
+
+The first version of that script warned only at exactly zero. With the reader on
+stale code and a handful of manual tests having written 165 rows, the figure was
+0.1% — not zero — and the warning stayed silent in precisely the case it existed
+to catch. The threshold is now 5%.
+
+## 84.6 Two defects found while watching, one still open
+
+**Fixed.** The heartbeat is written once per retailer at the end of the
+queue-mounting loop. The permission check is a network call with a 15-second
+budget and sits inside that loop, so a beat now follows it too.
+
+**Still open — the panel's `-1`.** When the warehouse counts exceed their
+4-second budget the fallback returns `-1`, which the panel renders raw. It means
+"I could not finish counting"; it reads as "the data is gone" — and it was read
+that way by the person who wrote the code. Measured on 23 September:
+
+```
+righe (countDocuments)     573 ms        righe (estimated)       33 ms
+fresche  t>=72h            425 ms
+conPrezzo  p!=null       1.016 ms
+freschi con prezzo       2.772 ms        budget: 4.000 ms, all four together
+```
+
+2.772 of 4.000 from a local machine. From Render, with network latency on top
+and a reader competing for the same free-tier cluster, it exceeds the budget —
+and it degrades further as the warehouse grows, because those are linear scans.
+
+The fix is cheap and has three parts: count the complement (rows *without* a
+price are 12.388 of 1.796.396, and a partial index over just those is a few tens
+of kilobytes); use `estimatedDocumentCount()` for the total (33 ms against 573,
+identical answer); and display the last good value with its timestamp instead of
+`-1`. Not done: it was found mid-test and the panel is served by Render, so it
+changes nothing until a deploy.
+
+## 84.7 A note on the toolchain
+
+`npx tsc --noEmit` covers `src/**/*.ts` only — `tsconfig.json` does not include
+`scripts/`. A script can be committed with a broken import and nothing will say
+so until it is run. Scripts need their own explicit check.
