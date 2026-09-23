@@ -112,6 +112,21 @@ export interface PrezzoDoc {
   p: number | null;
   /** La valuta. */
   v: string;
+  /**
+   * La valuta non l'ha detta la pagina: l'abbiamo dedotta noi.
+   *
+   * PERCHE' UN CAMPO E NON UN SILENZIO
+   * Una riga su cinque arrivava senza moneta, e riempirle guardando cosa
+   * dichiarano le altre righe della stessa insegna e' una deduzione solida —
+   * ma resta una deduzione. Senza questo segno, il giorno dopo non si
+   * distingue piu' una valuta LETTA dalla pagina da una MESSA da noi, e
+   * l'operazione su trecentocinquantacinquemila righe diventa irreversibile.
+   *
+   * Costa dieci byte sulle righe dedotte e niente su tutte le altre. Vale
+   * anche verso chi comprera' i dati: «dedotta dal paese dell'insegna» e'
+   * un'informazione, «EUR» e basta e' un'affermazione.
+   */
+  vd?: true;
   /** Com'e' andata la lettura, in un numero: vedi `STATO` in prezzi-magazzino. */
   s: number;
   /** Quando l'abbiamo letta. Fa da freschezza E da scadenza: il TTL e' su questa. */
