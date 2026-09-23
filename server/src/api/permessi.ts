@@ -188,11 +188,26 @@ async function segnaSullaFonte(chiave: string, v: Verdetto): Promise<void> {
   const col = await fonti();
   const ora = new Date();
 
-  /* IGNOTO non tocca niente oltre alla data: non sappiamo, e scrivere «non
-     sappiamo» sopra un «ci hanno detto di si'» letto ieri peggiora la scheda
-     invece di aggiornarla. */
+  /* IGNOTO NON SOVRASCRIVE UN VERDETTO, MA NON DEVE NEMMENO SPARIRE.
+     La prima versione scriveva solo la data: «non sappiamo» sopra un «ci hanno
+     detto di si'» letto ieri peggiora la scheda invece di aggiornarla, e
+     quello resta vero.
+
+     Ma il pannello, la sera stessa, ha mostrato Conad fra le «mai
+     controllate» — e non e' vero: l'abbiamo interrogata, non ha risposto.
+     «Non abbiamo chiesto» e «non siamo riusciti a chiedere» finivano nella
+     stessa casella, che e' proprio la distinzione per cui quella tabella
+     esiste.
+
+     Quindi si scrive IGNOTO solo dove non c'era ancora niente. Un verdetto
+     gia' noto resta; un'insegna che non ha mai risposto smette di sembrare
+     una a cui nessuno ha chiesto. */
   if (v.esito === "IGNOTO") {
     await col.updateOne({ _id: chiave }, { $set: { controllatoIl: ora } });
+    await col.updateOne(
+      { _id: chiave, robots: { $exists: false } },
+      { $set: { robots: "IGNOTO" } },
+    );
     return;
   }
 
@@ -272,4 +287,106 @@ export function riepilogoPermessi(): {
     else permesse++;
   }
   return { permesse, vietate, ignote, ...(sospese.length ? { sospese } : {}) };
+}
+
+/**
+ * I permessi raccolti, paese per paese.
+ *
+ * PERCHE' IL NUMERO DI INSEGNE STA ACCANTO AGLI ALTRI
+ * ---------------------------------------------------
+ * «Due vietate» non vuol dire niente da solo: su due insegne e' il paese
+ * chiuso, su quaranta e' un dettaglio. Il denominatore non e' un di piu',
+ * e' la meta' dell'informazione — e senza, chi guarda il pannello se lo va
+ * a cercare altrove o, peggio, se lo immagina.
+ *
+ * E «senza risposta» sta in una colonna sua, lontano da «permesse». Sono due
+ * cose che si somigliano e non sono la stessa: una vuol dire «abbiamo chiesto
+ * e ci hanno detto di si'», l'altra vuol dire «non siamo riusciti a chiedere».
+ * Metterle insieme racconterebbe una situazione piu' tranquilla del vero, ed
+ * e' esattamente il tipo di arrotondamento che in una due diligence si paga.
+ */
+export interface PermessiPaese {
+  paese: string;
+  insegne: number;
+  si: number;
+  no: number;
+  meta: number;
+  ignote: number;
+  /** Quelle a cui non ha ancora chiesto nessuno. */
+  mai: number;
+  /** L'ultimo controllo fatto in questo paese, quale che sia l'insegna. */
+  ultimo?: string;
+  /**
+   * Le insegne che NON sono un semplice «si'», con nome e motivo.
+   *
+   * Un conteggio dice che c'e' qualcosa da guardare; non dice cosa. «DE: 1
+   * vietata» manda comunque qualcuno ad aprire un terminale — ed e' il viaggio
+   * che questo pannello esiste per risparmiare. Le permesse non si elencano:
+   * sono duecentoventisei e non le legge nessuno.
+   */
+  daGuardare: Array<{ insegna: string; stato: Esito; regola?: string }>;
+}
+
+export async function permessiPerPaese(): Promise<PermessiPaese[]> {
+  const col = await fonti();
+  const righe = (await col
+    .find({}, { projection: { paese: 1, insegna: 1, robots: 1, controllatoIl: 1, esclusa: 1 } })
+    .toArray()) as unknown as Array<{
+    paese?: string;
+    insegna?: string;
+    robots?: Esito;
+    controllatoIl?: Date;
+    esclusa?: string;
+  }>;
+
+  /* La regola che ha deciso sta nel registro, non sulla fonte: si prende da li'
+     per poterla mostrare accanto al nome. Sono poche righe — una per insegna
+     che ha un esito in vigore — e si leggono in una volta sola. */
+  const regole = new Map<string, string>();
+  try {
+    for (const r of await (await permessi()).find({ aperta: true }).project({ f: 1, r: 1 }).toArray()) {
+      const x = r as unknown as { f: string; r: string };
+      regole.set(x.f, x.r);
+    }
+  } catch {
+    /* Senza le regole la tabella si vede lo stesso, con i soli conteggi. */
+  }
+
+  const per = new Map<string, PermessiPaese>();
+  for (const r of righe) {
+    const paese = r.paese ?? "??";
+    let x = per.get(paese);
+    if (!x) {
+      x = { paese, insegne: 0, si: 0, no: 0, meta: 0, ignote: 0, mai: 0, daGuardare: [] };
+      per.set(paese, x);
+    }
+    x.insegne++;
+    /* «Mai» si misura sulla DATA, non sul verdetto: un'insegna interrogata che
+       non ha risposto ha una data e nessuna risposta, ed e' un terzo stato. */
+    if (r.robots === "ALLOW") x.si++;
+    else if (r.robots === "DISALLOW") x.no++;
+    else if (r.robots === "PARZIALE") x.meta++;
+    else if (r.robots === "IGNOTO" || r.controllatoIl) x.ignote++;
+    else x.mai++;
+
+    if (r.robots && r.robots !== "ALLOW") {
+      x.daGuardare.push({
+        insegna: r.insegna ?? "?",
+        stato: r.robots,
+        regola: regole.get(`${paese}|${r.insegna}`),
+      });
+    }
+    if (r.controllatoIl) {
+      const q = new Date(r.controllatoIl).toISOString();
+      if (!x.ultimo || q > x.ultimo) x.ultimo = q;
+    }
+  }
+
+  /* Prima i paesi che hanno qualcosa da guardare: un divieto, una regola di
+     sezione, un silenzio. Poi i mai controllati. In fondo quelli a posto —
+     che sono la maggioranza, e che nessuno apre il pannello per vedere. */
+  return [...per.values()].sort((a, b) => {
+    const peso = (x: PermessiPaese) => x.no * 1000 + x.meta * 100 + x.ignote * 10 + (x.mai ? 1 : 0);
+    return peso(b) - peso(a) || b.insegne - a.insegne || a.paese.localeCompare(b.paese);
+  });
 }

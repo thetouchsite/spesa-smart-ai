@@ -423,6 +423,8 @@ export async function statoMagazzino(): Promise<{
   conPrezzo: number;
   /** Quelle che un prezzo ce l'hanno E sono ancora valide: il numero vendibile. */
   freschiConPrezzo: number;
+  /** C'e' solo quando i numeri sono vecchi: quando sono stati veri. */
+  quando?: string;
 }> {
   const vuoto = {
     interruttore: "chiuso" as const,
@@ -434,34 +436,131 @@ export async function statoMagazzino(): Promise<{
   };
   if (!isDbConfigured()) return vuoto;
 
-  return nonOltre(
+  const fresco = await nonOltre(
     async () => {
       const c = await collezionePrezzi();
       const soglia = new Date(Date.now() - FRESCHEZZA_MS);
-      const [righe, fresche, conPrezzo, freschiConPrezzo] = await Promise.all([
-        c.countDocuments(),
+
+      /* SI CONTA IL CONTRARIO, ED E' QUATTRO VOLTE PIU' VELOCE.
+         `{ p: { $ne: null } }` non puo' usare nessun indice: Mongo deve
+         guardare tutte e 1,8 milioni di righe per scoprire che 1.784.008
+         hanno una cifra. Misurato il 23 settembre: 1.016 ms per `conPrezzo`
+         e 2.772 ms per `freschiConPrezzo`, su quattro secondi in tutto.
+
+         Le righe SENZA prezzo pero' sono 12.388 — lo 0,7%. Contare quelle e
+         sottrarle da' lo stesso identico numero leggendone centocinquanta
+         volte di meno, e c'e' un indice parziale apposta (vedi `db.ts`) che
+         indicizza solo loro: qualche decina di kilobyte.
+
+         E per il totale c'e' `estimatedDocumentCount`, che legge i metadati
+         della collezione invece di contare: 33 ms contro 573, stessa
+         risposta. Si chiama «stimato» perche' dopo un arresto brusco puo'
+         sbagliare di qualche riga — su un numero che sta in un riquadro a
+         fianco di «1,8 milioni», non e' una differenza che qualcuno vede. */
+      const [righe, fresche, senzaPrezzo, frescheSenzaPrezzo] = await Promise.all([
+        c.estimatedDocumentCount(),
         // `t`, non `visto`: nella forma stretta il campo ha un nome di una lettera.
         c.countDocuments({ t: { $gte: soglia } } as never),
         // `p` a null vuol dire «aperta, nessun prezzo in pagina».
-        c.countDocuments({ p: { $ne: null } } as never),
-        c.countDocuments({ p: { $ne: null }, t: { $gte: soglia } } as never),
+        c.countDocuments({ p: null } as never),
+        c.countDocuments({ p: null, t: { $gte: soglia } } as never),
       ]);
       return {
         interruttore: statoInterruttore("magazzino-prezzi"),
         attivo: true,
         righe,
         fresche,
-        conPrezzo,
-        freschiConPrezzo,
+        conPrezzo: righe - senzaPrezzo,
+        freschiConPrezzo: fresche - frescheSenzaPrezzo,
       };
     },
-    {
-      interruttore: "aperto" as const,
-      attivo: true,
-      righe: -1,
-      fresche: -1,
-      conPrezzo: -1,
-      freschiConPrezzo: -1,
+    null,
+  );
+
+  if (fresco) {
+    ultimoBuono = { ...fresco, quando: new Date().toISOString() };
+    return fresco;
+  }
+
+  /* IL RIPIEGO NON E' PIU' `-1`.
+     Lo era, e il pannello lo mostrava tal quale: «prodotti con prezzo -1», in
+     rosso. Vuol dire «non ho fatto in tempo a contare» e si legge «i dati sono
+     spariti» — l'ha letto cosi' chi il pannello l'ha scritto, alle undici di
+     mattina del 23 settembre, con 1.796.553 righe tranquillamente al loro
+     posto.
+
+     Un numero inventato sarebbe peggio del silenzio. Un numero VERO DI CINQUE
+     MINUTI FA, con scritto di quando e', e' meglio di tutti e due: si legge, si
+     sa quanto fidarsi, e nessuno va a cercare un guasto che non c'e'. */
+  if (ultimoBuono) return { ...ultimoBuono, interruttore: "aperto" as const };
+
+  return { ...vuoto, attivo: true, interruttore: "aperto" as const };
+}
+
+/** L'ultima lettura riuscita, per quando la prossima non fa in tempo. */
+let ultimoBuono: {
+  interruttore: "chiuso" | "aperto";
+  attivo: boolean;
+  righe: number;
+  fresche: number;
+  conPrezzo: number;
+  freschiConPrezzo: number;
+  quando: string;
+} | null = null;
+
+/**
+ * Quanti dei campi nuovi stanno arrivando davvero.
+ *
+ * PERCHE' SI GUARDANO LE RIGHE RECENTI E NON TUTTE
+ * ------------------------------------------------
+ * Il magazzino ha 1,8 milioni di righe scritte da un codice che quei campi non
+ * li conosceva. La copertura sul totale restera' vicina a zero per settimane
+ * anche se tutto funziona alla perfezione: e' aritmetica, non diagnosi — le
+ * righe vecchie si rinnovano al ritmo del ciclo di freschezza.
+ *
+ * Il numero che dice qualcosa e' la copertura sulle righe lette DA POCO. Se
+ * quella e' zero mentre i lettori girano, i lettori hanno il codice vecchio in
+ * memoria: un `git pull` non aggiorna un processo gia' acceso, e questa e'
+ * l'unica spia che lo dice senza che nessuno debba sospettarlo.
+ *
+ * COSTA POCO PERCHE' GUARDA POCO
+ * ------------------------------
+ * Tutte le domande sono limitate alle ultime ore e passano dall'indice su `t`.
+ * Non c'e' nessuna scansione dell'intero magazzino — quella e' l'errore che ha
+ * reso `-1` il pannello per mezza mattinata.
+ */
+export async function coperturaCampi(ore = 24): Promise<{
+  ore: number;
+  righe: number;
+  campi: Array<{ campo: string; nome: string; quante: number }>;
+} | null> {
+  if (!isDbConfigured()) return null;
+  return nonOltre(
+    async () => {
+      const c = await collezionePrezzi();
+      const da = new Date(Date.now() - ore * 3_600_000);
+      const quanti = (campo: string) =>
+        c.countDocuments({ t: { $gte: da }, [campo]: { $exists: true } } as never);
+      const [righe, av, l, sc, pf, vd] = await Promise.all([
+        c.countDocuments({ t: { $gte: da } } as never),
+        quanti("av"),
+        quanti("l"),
+        quanti("sc"),
+        quanti("pf"),
+        quanti("vd"),
+      ]);
+      return {
+        ore,
+        righe,
+        campi: [
+          { campo: "av", nome: "disponibilita'", quante: av },
+          { campo: "l", nome: "prezzo pieno", quante: l },
+          { campo: "sc", nome: "sconto", quante: sc },
+          { campo: "pf", nome: "scadenza promo", quante: pf },
+          { campo: "vd", nome: "valuta dedotta", quante: vd },
+        ],
+      };
     },
+    null,
   );
 }

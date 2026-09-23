@@ -36,19 +36,24 @@ import { giroContinuo } from "./prezzi-continuo.js";
 import { chiTieneIPaesi, turniInCorso } from "./turni.js";
 import { assicuraFonti, tutteLeFonti } from "./catalogo-fonti.js";
 import { contiPesanti } from "./statistiche.js";
-import { statoMagazzino } from "./prezzi-magazzino.js";
+import { statoMagazzino, coperturaCampi } from "./prezzi-magazzino.js";
+import { permessiPerPaese } from "./permessi.js";
 import { statoCataloghi } from "./catalogo-magazzino.js";
 import { statoCatalogo } from "./catalogo.js";
 import { statoFonti, paesiConCatalogo } from "./catalogo-fonti.js";
 
 export async function datiPannello() {
-  const [vivi, passati, perGiorno, prezzi, cataloghi, turni] = await Promise.all([
+  const [vivi, passati, perGiorno, prezzi, cataloghi, turni, permessi, campi] = await Promise.all([
     chiStaLavorando(),
     giriPassati(10),
     lavoroPerGiorno(14),
     statoMagazzino(),
     statoCataloghi(),
     turniInCorso(),
+    /* I permessi non devono poter far fallire il pannello: se il database non
+       risponde su questa domanda, il resto della pagina si vede lo stesso. */
+    permessiPerPaese().catch(() => []),
+    coperturaCampi(24).catch(() => null),
   ]);
   return {
     adesso: new Date().toISOString(),
@@ -65,6 +70,8 @@ export async function datiPannello() {
        bisognava aprire un terminale e interrogare il database, e l'ho fatto
        tre volte in una notte. Adesso e' una riga qui. */
     turni: turni.map((t) => ({ paese: t.paese, macchina: t.macchina })),
+    permessi,
+    campi,
     paesiTotali: paesiConCatalogo(),
     fonti: statoFonti(),
     /* `quantiPaesi` e non `paesi`: i conti pesanti portano gia' un `paesi` che
@@ -509,6 +516,55 @@ export function paginaPannello(): string {
   .paesi{background:var(--piano);border:1px solid var(--filo);border-radius:9px;overflow:hidden}
   .pr{display:grid;grid-template-columns:26px minmax(132px,1.1fr) 2fr 92px 84px 58px;gap:12px;
     align-items:center;padding:7px 16px;border-bottom:1px solid var(--filo)}
+
+  /* I PERMESSI: SEI COLONNE, E «SENZA RISPOSTA» NON STA ACCANTO A «SI'».
+     Sono due stati che si somigliano e non sono la stessa cosa — «ci hanno
+     detto di si'» e «non siamo riusciti a chiedere» — e affiancarli
+     racconterebbe una situazione piu' tranquilla del vero. Fra i due ci
+     passano le colonne dei divieti, che e' anche l'ordine in cui si leggono:
+     dal permesso al silenzio, passando per i no. */
+  .pm{display:grid;grid-template-columns:26px minmax(120px,1fr) 58px 58px 58px 58px 58px 104px;
+    gap:10px;align-items:center;padding:7px 16px;border-bottom:1px solid var(--filo)}
+  .pm:last-child{border-bottom:0}
+  .pm.cap{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--lieve);
+    font-weight:600;border-bottom:1px solid var(--filo)}
+  .pm .nome{display:flex;align-items:baseline;gap:7px;min-width:0}
+  .pm .nome b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pm .nome i{font-family:var(--mono);font-size:10.5px;color:var(--lieve);font-style:normal}
+  .pm .c{font-family:var(--mono);font-size:12.5px;text-align:right;font-variant-numeric:tabular-nums}
+  .pm .c.zero{color:var(--lieve)}
+  .pm .c.si{color:var(--verde)}
+  .pm .c.no{color:var(--rosso);font-weight:600}
+  .pm .c.meta{color:var(--ambra);font-weight:600}
+  .pm .c.boh{color:var(--ambra)}
+  .pm .c.mai{color:var(--lieve)}
+  .pm .visto{font-family:var(--mono);font-size:10.5px;color:var(--lieve);text-align:right}
+  /* LE INSEGNE DA GUARDARE, sotto la riga del loro paese.
+     Non una tabella a parte: cosi' il nome sta accanto al numero che lo ha
+     fatto comparire, e non serve incrociare due elenchi. */
+  .pm-det{grid-column:2/-1;display:flex;flex-wrap:wrap;gap:5px 10px;padding:0 0 3px;margin-top:-3px}
+  .pm-det span{font-size:11.5px;color:var(--tenue)}
+  .pm-det b{font-weight:600}
+  .pm-det code{font-family:var(--mono);font-size:10.5px;color:var(--lieve)}
+  .pm-det .no b{color:var(--rosso)}
+  .pm-det .meta b{color:var(--ambra)}
+  .pm-det .boh b{color:var(--ambra)}
+
+  /* I CAMPI: quanti ne porta la roba letta di recente. Non una tabella —
+     sono cinque numeri e vanno letti in un colpo. */
+  .campi{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:1px;
+    background:var(--filo);border:1px solid var(--filo);border-radius:9px;overflow:hidden}
+  .campi div{background:var(--piano);padding:11px 13px}
+  .campi b{display:block;font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+  .campi span{display:block;font-size:10px;font-weight:600;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--lieve);margin-top:3px}
+  .campi i{font-family:var(--mono);font-size:10.5px;color:var(--lieve);font-style:normal}
+  .campi .v b{color:var(--verde)} .campi .z b{color:var(--lieve)}
+  @media(max-width:760px){
+    .pm{grid-template-columns:22px 1fr repeat(5,40px);gap:6px;padding:7px 12px}
+    .pm .visto{display:none}
+    .pm .c{font-size:11.5px}
+  }
   /* LA BANDIERA E' UN'IMMAGINE, E NON PER SCELTA.
      Prima era il carattere emoji, ricavato dal codice: elegante, zero file,
      zero elenchi da aggiornare. Solo che Windows le bandiere non le disegna —
@@ -587,6 +643,14 @@ export function paginaPannello(): string {
   </section>
 
   <section data-vista="raccolta" hidden>
+    <h2>I campi che arrivano</h2>
+    <p class="intro" id="campiIntro"></p>
+    <div class="campi" id="campi"></div>
+
+    <h2>Permessi</h2>
+    <p class="intro" id="permessiIntro"></p>
+    <div class="paesi" id="permessi"></div>
+
     <div class="titolo-riga">
       <h2>Copertura</h2>
       <div class="scelta-vista" id="scelta-copertura">
@@ -624,6 +688,19 @@ const nomePaese = (c) => {
 };
 const n = (x) => (x ?? 0).toLocaleString("it-IT");
 const ora = (s) => new Date(s).toLocaleTimeString("it-IT");
+/* QUANTO E' VECCHIO, non QUANDO e' successo.
+   «23/09 13:04» obbliga chi legge a fare la sottrazione a mente; «2 ore fa»
+   e' gia' la risposta alla domanda che si sta facendo, che e' sempre «e'
+   fresco?». Oltre la settimana si torna alla data, perche' «22 giorni fa»
+   smette di dire qualcosa e la data ricomincia. */
+const giorno = (s) => {
+  const m = Math.round((Date.now() - new Date(s).getTime()) / 60000);
+  if (m < 1) return "adesso";
+  if (m < 60) return m + " min fa";
+  if (m < 48 * 60) return Math.round(m / 60) + " ore fa";
+  if (m < 8 * 24 * 60) return Math.round(m / 1440) + " giorni fa";
+  return new Date(s).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
+};
 
 function durata(ms) {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -693,6 +770,59 @@ function schedaPassata(g) {
 /* L&rsquo;ultima risposta, tenuta da parte: il selettore della copertura deve
    poter ridisegnare senza rifare la richiesta. */
 let datiUltimi = {};
+
+/* LA SCELTA STA FUORI DALLA FUNZIONE DI RINFRESCO, E QUESTO ERA IL BUG.
+   La variabile della scelta era dichiarata DENTRO la funzione che gira ogni
+   cinque secondi: si premeva «per insegna», la tabella cambiava, e al
+   rinfresco successivo la variabile rinasceva a «paese». Il bottone pero'
+   restava acceso, perche' quella classe la mette il click e nessuno la
+   toglie — quindi si vedeva «per insegna» selezionato sopra una tabella di
+   paesi. Da fuori sembrava casuale; era puntuale, ogni cinque secondi.
+
+   E i bottoni si collegavano li' dentro, quindi ogni rinfresco aggiungeva un
+   ascoltatore in piu' agli stessi due bottoni: dopo un'ora erano
+   settecentoventi, e un click faceva settecentoventi ridisegni. */
+let perCosa = "paese";
+
+function disegnaCopertura() {
+    const righe = perCosa === "paese" ? (datiUltimi.paesi || []) : (datiUltimi.insegne || []);
+    const dove = document.getElementById("perpaese");
+    if (!righe.length) {
+      dove.innerHTML = '<div class="pr"><span></span><span class="nome"><b>&mdash;</b></span>' +
+        '<span>i conti si rifanno una volta al minuto: il primo arriva a momenti</span>' +
+        '<span></span><span></span><span></span></div>';
+      return;
+    }
+    const capo = perCosa === "paese" ? "paese" : "insegna";
+    dove.innerHTML =
+      '<div class="pr cap"><span></span><span>' + capo + '</span><span>copertura</span>' +
+      '<span>indirizzi</span><span>con prezzo</span><span>quota</span></div>' +
+      righe.slice(0, 60).map((r) => {
+        const q = Math.round(r.copertura * 100);
+        const classe = q === 0 ? "zero" : q < 25 ? "bassa" : "";
+        const iso = (r.paese || "").toLowerCase();
+        const titolo = perCosa === "paese" ? nomePaese(r.paese) : r.insegna;
+        const sotto = perCosa === "paese" ? r.paese : r.paese;
+        return '<div class="pr">' +
+          '<img class="bnd" alt="" loading="lazy" src="https://flagcdn.com/20x15/' + iso + '.png">' +
+          '<span class="nome"><b>' + titolo + '</b><i>' + sotto + '</i></span>' +
+          '<span class="barra"><i style="width:' + q + '%"></i></span>' +
+          '<span class="num">' + n(r.link) + '</span>' +
+          '<span class="num">' + n(r.prezzi) + '</span>' +
+          '<span class="qta ' + classe + '">' + q + '%</span>' +
+        '</div>';
+      }).join("");
+  }
+
+for (const b of document.querySelectorAll("#scelta-copertura button")) {
+  b.addEventListener("click", () => {
+    perCosa = b.dataset.per;
+    for (const x of document.querySelectorAll("#scelta-copertura button")) {
+      x.classList.toggle("acceso", x === b);
+    }
+    disegnaCopertura();
+  });
+}
 
 async function aggiorna() {
   let d;
@@ -816,46 +946,97 @@ async function aggiorna() {
 
      Le barre sono la copertura, non i link: due colonne di numeri raccontano
      quanto, la barra racconta quanto MANCA, che &egrave; la domanda vera. */
-  let perCosa = "paese";
 
-  function disegnaCopertura() {
-    const righe = perCosa === "paese" ? (datiUltimi.paesi || []) : (datiUltimi.insegne || []);
-    const dove = document.getElementById("perpaese");
-    if (!righe.length) {
-      dove.innerHTML = '<div class="pr"><span></span><span class="nome"><b>&mdash;</b></span>' +
-        '<span>i conti si rifanno una volta al minuto: il primo arriva a momenti</span>' +
-        '<span></span><span></span><span></span></div>';
-      return;
-    }
-    const capo = perCosa === "paese" ? "paese" : "insegna";
-    dove.innerHTML =
-      '<div class="pr cap"><span></span><span>' + capo + '</span><span>copertura</span>' +
-      '<span>indirizzi</span><span>con prezzo</span><span>quota</span></div>' +
-      righe.slice(0, 60).map((r) => {
-        const q = Math.round(r.copertura * 100);
-        const classe = q === 0 ? "zero" : q < 25 ? "bassa" : "";
-        const iso = (r.paese || "").toLowerCase();
-        const titolo = perCosa === "paese" ? nomePaese(r.paese) : r.insegna;
-        const sotto = perCosa === "paese" ? r.paese : r.paese;
-        return '<div class="pr">' +
-          '<img class="bnd" alt="" loading="lazy" src="https://flagcdn.com/20x15/' + iso + '.png">' +
-          '<span class="nome"><b>' + titolo + '</b><i>' + sotto + '</i></span>' +
-          '<span class="barra"><i style="width:' + q + '%"></i></span>' +
-          '<span class="num">' + n(r.link) + '</span>' +
-          '<span class="num">' + n(r.prezzi) + '</span>' +
-          '<span class="qta ' + classe + '">' + q + '%</span>' +
-        '</div>';
+
+  /* I CAMPI CHE ARRIVANO.
+     La spia che dice se l'arricchimento funziona DAVVERO, e l'unica che
+     accorge di un lettore col codice vecchio in memoria senza che nessuno lo
+     sospetti. Percentuale sulle righe lette di recente, non sul magazzino:
+     quella resterebbe vicina a zero per settimane ed e' aritmetica, non
+     diagnosi. */
+  {
+    const k = d.campi;
+    const intro = document.getElementById("campiIntro");
+    const dove = document.getElementById("campi");
+    if (!k) {
+      intro.textContent = "Non misurabile adesso.";
+      dove.innerHTML = "";
+    } else if (!k.righe) {
+      intro.textContent = "Nessuna pagina letta nelle ultime " + k.ore +
+        " ore: non c'è niente da misurare. Controlla che un lettore sia acceso.";
+      dove.innerHTML = "";
+    } else {
+      const grosso = k.campi.find((x) => x.campo === "av");
+      const quota = grosso ? grosso.quante / k.righe : 0;
+      intro.textContent = n(k.righe) + " righe lette nelle ultime " + k.ore + " ore." +
+        (quota < 0.05
+          ? " Quasi nessuna porta i campi nuovi: un lettore gira col codice vecchio in memoria, e un git pull non aggiorna un processo già acceso."
+          : quota < 0.7
+            ? " Qualche lettore ha il codice nuovo e qualcun altro no."
+            : " Prezzo pieno, sconto e scadenza compaiono solo dove la pagina dichiara una promozione: pochi sono normali.");
+      dove.innerHTML = k.campi.map((x) => {
+        const q = Math.round((x.quante / k.righe) * 100);
+        return '<div class="' + (q >= 50 ? "v" : q === 0 ? "z" : "") + '"><b>' + q + "%</b>" +
+          "<span>" + x.nome + "</span><i>" + n(x.quante) + "</i></div>";
       }).join("");
+    }
   }
 
-  for (const b of document.querySelectorAll("#scelta-copertura button")) {
-    b.addEventListener("click", () => {
-      perCosa = b.dataset.per;
-      for (const x of document.querySelectorAll("#scelta-copertura button")) {
-        x.classList.toggle("acceso", x === b);
-      }
-      disegnaCopertura();
-    });
+  /* I PERMESSI, PAESE PER PAESE.
+     La domanda che risponde non e' «quanto abbiamo raccolto» ma «lo potevamo
+     raccogliere», ed e' per questo che sta sopra la copertura: viene prima
+     anche nell'ordine delle cose. */
+  {
+    const righe = d.permessi || [];
+    const somma = righe.reduce((t, r) => ({
+      insegne: t.insegne + r.insegne, si: t.si + r.si, no: t.no + r.no,
+      meta: t.meta + r.meta, ignote: t.ignote + r.ignote, mai: t.mai + r.mai,
+    }), { insegne: 0, si: 0, no: 0, meta: 0, ignote: 0, mai: 0 });
+
+    const intro = document.getElementById("permessiIntro");
+    if (!righe.length) {
+      intro.textContent = "Nessun controllo ancora registrato.";
+      document.getElementById("permessi").innerHTML = "";
+    } else {
+      /* SI DICE IL NUMERO DELLE NON CONTROLLATE PER PRIMO, quando ce ne sono.
+         «226 permesse» da solo suona come una risposta completa; se accanto ce
+         ne sono nove a cui non ha mai chiesto nessuno, la risposta completa e'
+         un'altra. */
+      const parti = [somma.si + " permesse su " + somma.insegne + " insegne"];
+      if (somma.no) parti.push(somma.no + " vietate");
+      if (somma.meta) parti.push(somma.meta + " con una sezione vietata");
+      if (somma.ignote) parti.push(somma.ignote + " che non rispondono");
+      if (somma.mai) parti.push(somma.mai + " mai controllate");
+      intro.textContent = parti.join(" · ") +
+        ". Un robots.txt che non risponde non e' un divieto: quelle si leggono lo stesso.";
+
+      document.getElementById("permessi").innerHTML =
+        '<div class="pm cap"><span></span><span>paese</span><span>insegne</span>' +
+        '<span>si&rsquo;</span><span>no</span><span>meta&rsquo;</span><span>muti</span>' +
+        '<span>ultimo</span></div>' +
+        righe.map((r) => {
+          const iso = (r.paese || "").toLowerCase();
+          const cella = (v, classe) =>
+            '<span class="c ' + (v ? classe : "zero") + '">' + (v || "·") + "</span>";
+          return '<div class="pm">' +
+            '<img class="bnd" alt="" loading="lazy" src="https://flagcdn.com/20x15/' + iso + '.png">' +
+            '<span class="nome"><b>' + nomePaese(r.paese) + '</b><i>' + r.paese + '</i></span>' +
+            '<span class="c">' + r.insegne + '</span>' +
+            cella(r.si, "si") + cella(r.no, "no") + cella(r.meta, "meta") +
+            cella(r.ignote + r.mai, r.ignote ? "boh" : "mai") +
+            '<span class="visto">' + (r.ultimo ? giorno(r.ultimo) : "mai") + "</span>" +
+            ((r.daGuardare || []).length
+              ? '<div class="pm-det">' + r.daGuardare.map((g) => {
+                  const cl = g.stato === "DISALLOW" ? "no" : g.stato === "PARZIALE" ? "meta" : "boh";
+                  const che = g.stato === "DISALLOW" ? "vieta" : g.stato === "PARZIALE" ? "in parte" : "muta";
+                  return '<span class="' + cl + '"><b>' + g.insegna + "</b> " + che +
+                    (g.regola ? ' <code>' + g.regola + "</code>" : "") + "</span>";
+                }).join("")
+              + "</div>"
+              : "") +
+          "</div>";
+        }).join("");
+    }
   }
 
   disegnaCopertura();

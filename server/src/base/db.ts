@@ -592,6 +592,21 @@ export async function getDb(): Promise<Db> {
     db.collection<CatalogoDoc>("cataloghi").createIndex({ paese: 1, prodotti: 1 }),
     // Le fonti si chiedono sempre per paese, e quasi sempre ordinate per resa.
     db.collection<FonteDoc>("fonti").createIndex({ paese: 1, resa: -1 }),
+    /* LE RIGHE SENZA PREZZO, CHE SONO POCHISSIME E SI CHIEDONO SEMPRE.
+       Il pannello vuole sapere quante schede hanno davvero una cifra. Chiederlo
+       come `{ p: { $ne: null } }` non puo' usare nessun indice e costa una
+       scansione di 1,8 milioni di righe — 2.772 ms sui 4.000 che il pannello
+       ha in tutto, misurati il 23 settembre.
+
+       Le righe SENZA prezzo sono 12.388, lo 0,7%. Questo indice contiene solo
+       quelle: qualche decina di kilobyte, contro i ~30 MB che costerebbe
+       indicizzare `p` per intero su un database che ne ha 86 liberi. La data
+       sta dentro l'indice perche' la stessa domanda si fa anche limitata alle
+       ultime 72 ore. Vedi `statoMagazzino`. */
+    db.collection<PrezzoDoc>("prezzi").createIndex(
+      { t: 1 },
+      { name: "senza_prezzo", partialFilterExpression: { p: null } },
+    ),
     /* IL REGISTRO DEI PERMESSI, CHE NON SCADE.
        Un indice unico PARZIALE sulle righe aperte: e' il database a garantire
        che un'insegna abbia un esito in vigore solo, non il codice. Se una
